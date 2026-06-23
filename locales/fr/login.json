@@ -1,0 +1,18 @@
+{
+  "username": "Nom d'utilisateur",
+  "password": "Mot de passe",
+  "username_placeholder": "Votre nom d'utilisateur",
+  "password_placeholder": "Votre mot de passe",
+  "show_password": "Afficher le mot de passe",
+  "hide_password": "Masquer le mot de passe",
+  "sign_in": "Se connecter",
+  "signing_in": "Connexion…",
+  "portal_prompt": "Patient ?",
+  "portal_link": "Connexion portail",
+  "authorized_only": "Accès autorisé uniquement · l'activité est enregistrée",
+  "visiting_doctor_link": "Connexion médecin visiteur (VD1–VD20)",
+  "default_subtitle": "Un HMS intégré",
+  "copyright_line": "© {{year}} Un HMS intégré",
+  "invalid_credentials": "Nom d'utilisateur ou mot de passe incorrect.",
+  "server_error": "Erreur serveur. Veuillez réessayer."
+}

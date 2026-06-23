@@ -1,0 +1,78 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'staff', showHrLeaveAdmin: true }) %>
+<% if (locals.flash) { %>
+<div class="hms-flash hms-flash--success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+<% } %>
+<% if (locals.error) { %>
+<div class="hms-flash hms-flash--error border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+<% } %>
+
+<div class="row align-items-center mb-4">
+  <div class="col-sm-8">
+    <h4 class="page-title font-weight-bold text-dark"><%= _t('nav.staff', { ns: 'payroll', defaultValue: 'Staff directory' }) %></h4>
+    <p class="text-muted small mb-0"><%= _t('staff.subtitle', { ns: 'payroll', defaultValue: 'Active hospital staff linked to payroll (read-only directory).' }) %></p>
+  </div>
+  <div class="col-sm-4 text-right">
+    <a href="/payroll/profiles" class="btn btn-outline-primary btn-sm"><i class="fa fa-id-card-o mr-1"></i> <%= _t('dashboard.pay_profiles', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></a>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-5">
+    <div class="input-group">
+      <div class="input-group-prepend"><span class="input-group-text bg-white border-right-0"><i class="fa fa-search text-muted"></i></span></div>
+      <input type="text" id="staffSearch" class="hms-input w-full border-left-0" placeholder="<%= _t('staff.filter_ph', { ns: 'payroll', defaultValue: 'Filter by name, department, role…' }) %>" autocomplete="off">
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0" id="staffTable">
+      <thead class="thead-light">
+        <tr>
+          <th>#</th>
+          <th><%= _t('staff.col_name', { ns: 'payroll', defaultValue: 'Name' }) %></th>
+          <th><%= _t('staff.col_role', { ns: 'payroll', defaultValue: 'Role' }) %></th>
+          <th><%= _t('staff.col_department', { ns: 'payroll', defaultValue: 'Department' }) %></th>
+          <th><%= _t('staff.col_position', { ns: 'payroll', defaultValue: 'Position' }) %></th>
+          <th><%= _t('staff.col_status', { ns: 'payroll', defaultValue: 'Status' }) %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% (staff || []).forEach(function(row) { %>
+        <tr data-search="<%= [row.first_name, row.last_name, row.username, row.roleLabel, row.primary_department, row.job_title].filter(Boolean).join(' ').toLowerCase() %>">
+          <td class="text-muted"><%= row.id %></td>
+          <td class="font-weight-bold"><%= row.first_name %> <%= row.last_name %><% if (row.username) { %><br><small class="text-muted">@<%= row.username %></small><% } %></td>
+          <td><%= row.roleLabel || row.role || '—' %></td>
+          <td><%= row.primary_department || '—' %></td>
+          <td><%= row.job_title || '—' %></td>
+          <td>
+            <% if (String(row.status) === '1') { %>
+            <span class="badge badge-success"><%= _t('staff.status_active', { ns: 'payroll', defaultValue: 'Active' }) %></span>
+            <% } else { %>
+            <span class="badge badge-secondary"><%= _t('staff.status_inactive', { ns: 'payroll', defaultValue: 'Inactive' }) %></span>
+            <% } %>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  var input = document.getElementById('staffSearch');
+  var rows = document.querySelectorAll('#staffTable tbody tr');
+  if (!input || !rows.length) return;
+  input.addEventListener('input', function () {
+    var q = (input.value || '').trim().toLowerCase();
+    rows.forEach(function (tr) {
+      var hay = tr.getAttribute('data-search') || '';
+      tr.style.display = !q || hay.indexOf(q) !== -1 ? '' : 'none';
+    });
+  });
+})();
+</script>
+
+<%- include('partials/payroll-layout-end') %>

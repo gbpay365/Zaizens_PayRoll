@@ -1,0 +1,119 @@
+/**
+ * Accounting · Payroll · HR — Odoo 17 module shell (full-width, no HMS sidebar)
+ */
+body.hms-body--module-odoo #hms-sidebar,
+body.hms-body--module-odoo .hms-topbar {
+  display: none !important;
+}
+
+body.hms-body--module-odoo .main-wrapper {
+  margin-left: 0 !important;
+  min-height: 100vh;
+  background: #f0eeee;
+  display: flex;
+  flex-direction: column;
+}
+
+body.hms-body--module-odoo .page-wrapper,
+body.hms-body--module-odoo .page-wrapper > .content {
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: none !important;
+}
+
+.hms-module-odoo-app {
+  --o-brand: #10b981;
+  --o-brand-hover: #5c3d54;
+  --o-border: #dee2e6;
+  --o-text: #212529;
+  --o-muted: #6c757d;
+  --o-surface: #ffffff;
+  --o-bg: #f8f9fa;
+  font-family: 'Roboto', 'Inter', 'Segoe UI', sans-serif;
+  color: var(--o-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+body.hms-body--odoo-accounting .hms-module-odoo-app {
+  --o-brand: #1e3a5f;
+  --o-brand-hover: #152a45;
+}
+
+body.hms-body--odoo-payroll .hms-module-odoo-app {
+  --o-brand: #5b21b6;
+  --o-brand-hover: #4c1d95;
+}
+
+body.hms-body--odoo-hr .hms-module-odoo-app {
+  --o-brand: #0d9488;
+  --o-brand-hover: #0f766e;
+}
+
+.hms-module-odoo-app .o_action_manager {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  background: var(--o-bg);
+}
+
+.hms-module-odoo-app .o_module_content {
+  flex: 1;
+  min-height: 0;
+}
+
+.fin-module--odoo .fin-layout,
+.pay-module--odoo .pay-layout {
+  display: block;
+  min-height: 0;
+}
+
+.fin-module--odoo .fin-main--odoo,
+.pay-module--odoo .pay-main--odoo {
+  max-width: none;
+  margin: 0;
+  padding: 16px 24px 28px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.fin-module--odoo .fin-main--odoo .hms-react-page,
+.fin-module--odoo .fin-main--odoo .hms-react-page .hms-surface-module {
+  width: 100%;
+  max-width: none;
+}
+
+.fin-module--odoo .fin-hero,
+.pay-module--odoo .pay-hero {
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.fin-module--odoo .fin-kpi-row,
+.pay-module--odoo .pay-kpi-row {
+  margin-bottom: 16px;
+}
+
+.fin-module--odoo .fin-panel,
+.pay-module--odoo .pay-panel {
+  border-radius: 6px;
+  border: 1px solid var(--o-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+/* Accounting dashboard: full-width stack, not global Odoo tile grid */
+.hms-module-odoo-app .o_dashboard {
+  display: block;
+  padding: 0;
+}
+
+@media (max-width: 768px) {
+  .fin-module--odoo .fin-main--odoo,
+  .pay-module--odoo .pay-main--odoo {
+    padding: 12px 12px 24px;
+  }
+}

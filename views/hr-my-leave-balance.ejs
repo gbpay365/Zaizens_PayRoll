@@ -1,0 +1,40 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leavebal', paySelfServiceOnly: 'leave' }) %>
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+ <div>
+ <h4 class="page-title font-weight-bold text-dark mb-1"><%= _t('hr_my_leave_balance.title', { ns: 'legacy', defaultValue: 'My leave balance' }) %></h4>
+ <p class="text-muted small mb-0"><%= _t('hr_my_leave_balance.subtitle', { ns: 'legacy', defaultValue: 'Balances configured by HR for the selected year.' }) %></p>
+ </div>
+ <div class="d-flex flex-wrap gap-2 align-items-center">
+ <form method="GET" action="/hr/my-leave-balance" class="form-inline">
+ <label class="small font-weight-bold mr-2 mb-0"><%= _t('hr_my_leave_balance.year', { ns: 'legacy', defaultValue: 'Year' }) %></label>
+ <select name="year" class="hms-input w-full text-sm" onchange="this.form.submit()">
+ <% var cy = new Date().getFullYear(); for(var y = cy - 2; y <= cy + 2; y++){ %>
+ <option value="<%= y %>" <%= (Number(year)===y)?'selected':'' %>><%= y %></option>
+ <% } %>
+ </select>
+ </form>
+ <a href="/payroll" class="hms-btn hms-btn-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _t('hr_my_leave_balance.hr_hub', { ns: 'legacy', defaultValue: 'HR hub' }) %></a>
+ </div>
+ </div>
+
+ <div class="card border-0 shadow-sm" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= year %></div>
+ <div class="card-body p-0 table-responsive">
+ <table class="table table-sm table-striped mb-0">
+ <thead><tr><th><%= _t('hr_my_leave_balance.col_leave_type', { ns: 'legacy', defaultValue: 'Leave type' }) %></th><th class="text-right"><%= _t('hr_my_leave_balance.col_days', { ns: 'legacy', defaultValue: 'Days' }) %></th></tr></thead>
+ <tbody>
+ <% if(!rows || !rows.length){ %>
+ <tr><td colspan="2" class="text-center text-muted py-4"><%= _t('hr_my_leave_balance.none', { ns: 'legacy', defaultValue: 'No balance rows for this year.' }) %></td></tr>
+ <% } %>
+ <% (rows||[]).forEach(function(r){ %>
+ <tr>
+ <td><%= r.leave_type %></td>
+ <td class="text-right font-weight-bold"><%= Number(r.balance||0).toLocaleString('fr-FR',{maximumFractionDigits:1}) %></td>
+ </tr>
+ <% }); %>
+ </tbody>
+ </table>
+ </div>
+ </div>
+
+<%- include('partials/payroll-layout-end') %>

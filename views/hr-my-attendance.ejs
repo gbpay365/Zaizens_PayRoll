@@ -1,0 +1,34 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'attendance', paySelfServiceOnly: 'payslips' }) %>
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+ <div>
+ <h4 class="page-title font-weight-bold text-dark mb-1"><%= _t('hr_my_attendance.title', { ns: 'legacy', defaultValue: 'My attendance' }) %></h4>
+ <p class="text-muted small mb-0"><%= _t('hr_my_attendance.subtitle', { ns: 'legacy', defaultValue: 'Recorded check-in rows for your employee profile.' }) %></p>
+ </div>
+ <a href="/payroll" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _t('hr_my_attendance.hr_hub', { ns: 'legacy', defaultValue: 'HR hub' }) %></a>
+ </div>
+
+ <div class="card border-0 shadow-sm" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= _t('hr_my_attendance.history', { ns: 'legacy', defaultValue: 'History' }) %></div>
+ <div class="card-body p-0 table-responsive">
+ <table class="table table-sm table-striped mb-0" data-hms-table-paginate="10">
+ <thead><tr><th><%= _t('hr_my_attendance.col_date', { ns: 'legacy', defaultValue: 'Date' }) %></th><th><%= _t('hr_my_attendance.col_check_in', { ns: 'legacy', defaultValue: 'Check-in' }) %></th><th><%= _t('hr_my_attendance.col_check_out', { ns: 'legacy', defaultValue: 'Check-out' }) %></th><th><%= _t('hr_my_attendance.col_status', { ns: 'legacy', defaultValue: 'Status' }) %></th></tr></thead>
+ <tbody>
+ <% if(!rows || !rows.length){ %>
+ <tr><td colspan="4" class="text-center text-muted py-4"><%= _t('hr_my_attendance.none', { ns: 'legacy', defaultValue: 'No attendance rows yet.' }) %></td></tr>
+ <% } %>
+ <% (rows||[]).forEach(function(r){ %>
+ <tr>
+ <td><%= r.att_date %></td>
+ <td><%= r.check_in_time || '—' %></td>
+ <td><%= r.check_out_time || '—' %></td>
+ <td><%= r.status || '—' %></td>
+ </tr>
+ <% }); %>
+ </tbody>
+ </table>
+ </div>
+ </div>
+ </div>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

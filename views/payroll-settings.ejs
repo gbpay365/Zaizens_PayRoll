@@ -1,0 +1,284 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'settings', canPayrollSettings: true }) %>
+<%
+var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+var cur = current || {};
+var br = Array.isArray(brackets) ? brackets : [];
+var brRate = function (i, fallback) {
+  var row = br[i];
+  return row && row.rate != null ? row.rate : fallback;
+};
+var _canEdit = !!canEdit;
+var _activeSector = locals.activeSector || 'medical';
+var _facilitySector = locals.facilitySector || 'medical';
+var _allSectors = locals.allSectors || {};
+var _allowRows = locals.allowanceSettings || [];
+var _initialTab = (typeof query !== 'undefined' && query && query.tab) ? String(query.tab) : 'employer';
+var _calcLabels = {
+  seniority_scale: _t('settings.calc_seniority', { ns: 'payroll', defaultValue: 'Seniority scale (auto)' }),
+  pct_basic: _t('settings.calc_pct_basic', { ns: 'payroll', defaultValue: '% of Basic' }),
+  fixed: _t('settings.calc_fixed', { ns: 'payroll', defaultValue: 'Fixed amount (XAF)' }),
+  per_shift: _t('settings.calc_per_shift', { ns: 'payroll', defaultValue: 'Per shift (XAF × shifts)' }),
+  none: _t('settings.calc_disabled', { ns: 'payroll', defaultValue: 'Disabled' })
+};
+%>
+
+<div class="pay-hero">
+  <h1><%= _t('settings.title', { ns: 'payroll', defaultValue: 'Payroll tax settings' }) %></h1>
+  <div class="pay-hero-actions no-print">
+    <a href="/payroll/monthly" class="btn btn-outline-light btn-sm font-weight-bold"><i class="fa fa-money mr-1"></i> <%= _t('monthly.title', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></a>
+  </div>
+</div>
+
+<div class="pay-panel">
+  <div class="pay-panel-head flex-wrap">
+    <nav id="paySettingsTabs" class="pay-settings-tabs no-print" data-initial-tab="<%= _initialTab %>" role="tablist" aria-label="<%= _t('settings.title', { ns: 'payroll', defaultValue: 'Payroll tax settings' }) %>">
+      <a href="#" class="pay-settings-tab" data-pay-settings-tab="employer" role="tab"><%= _t('settings.tab_employer', { ns: 'payroll', defaultValue: 'Employer' }) %></a>
+      <a href="#" class="pay-settings-tab" data-pay-settings-tab="deductions" role="tab"><%= _t('settings.tab_deductions', { ns: 'payroll', defaultValue: 'Deductions (%)' }) %></a>
+      <a href="#" class="pay-settings-tab" data-pay-settings-tab="irpp" role="tab"><%= _t('settings.tab_irpp', { ns: 'payroll', defaultValue: 'IRPP brackets' }) %></a>
+      <a href="#" class="pay-settings-tab" data-pay-settings-tab="allowances" role="tab"><%= _t('settings.tab_allowances', { ns: 'payroll', defaultValue: 'Allowances & Bonuses' }) %></a>
+    </nav>
+  </div>
+
+  <form method="POST" action="/payroll/settings/save" id="paySettingsMainForm">
+    <div class="pay-settings-pane p-3 p-md-4" data-pay-settings-pane="employer" <%= _initialTab !== 'employer' && _initialTab !== 'deductions' && _initialTab !== 'irpp' ? 'hidden' : '' %>>
+      <div class="pay-settings-section" data-pay-settings-section="employer">
+      <h2 class="h6 font-weight-bold mb-3"><%= _t('settings.tab_employer', { ns: 'payroll', defaultValue: 'Employer' }) %></h2>
+      <div class="row">
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.tax_year', { ns: 'payroll', defaultValue: 'Tax year (settings row key)' }) %></label>
+          <input type="number" name="tax_year" class="form-control" value="<%= cur.tax_year || new Date().getFullYear() %>" min="2000" max="2100" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.cnps_employer_number', { ns: 'payroll', defaultValue: 'CNPS employer number' }) %></label>
+          <input type="text" name="employer_cnps_number" class="form-control" value="<%= cur.employer_cnps_number || '' %>" maxlength="32" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.niu', { ns: 'payroll', defaultValue: 'NIU (fiscal ID)' }) %></label>
+          <input type="text" name="employer_niu" class="form-control" value="<%= cur.employer_niu || '' %>" maxlength="32" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.cnps_regime', { ns: 'payroll', defaultValue: 'CNPS regime' }) %></label>
+          <select name="cnps_regime" class="form-control" <%= _canEdit ? '' : 'disabled' %>>
+            <option value="1" <%= String(cur.cnps_regime || 1) === '1' ? 'selected' : '' %>><%= _t('settings.regime_general', { ns: 'payroll', defaultValue: 'General' }) %></option>
+            <option value="2" <%= String(cur.cnps_regime) === '2' ? 'selected' : '' %>><%= _t('settings.regime_agriculture', { ns: 'payroll', defaultValue: 'Agriculture' }) %></option>
+            <option value="3" <%= String(cur.cnps_regime) === '3' ? 'selected' : '' %>><%= _t('settings.regime_public', { ns: 'payroll', defaultValue: 'Public' }) %></option>
+          </select>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.activity_sector', { ns: 'payroll', defaultValue: 'Activity Sector' }) %></label>
+          <select name="default_sector" class="form-control" <%= _canEdit ? '' : 'disabled' %>>
+            <% Object.keys(_allSectors).forEach(function(secKey) { %>
+            <option value="<%= secKey %>" <%= String(cur.default_sector || _facilitySector) === secKey ? 'selected' : '' %>><%= _allSectors[secKey] %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="col-md-12 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.address', { ns: 'payroll', defaultValue: 'Address' }) %></label>
+          <textarea name="employer_address" class="form-control" rows="2" maxlength="500" <%= _canEdit ? '' : 'readonly' %>><%= cur.employer_address || '' %></textarea>
+        </div>
+        <div class="col-md-6 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.phone', { ns: 'payroll', defaultValue: 'Phone' }) %></label>
+          <input type="text" name="employer_phone" class="form-control" value="<%= cur.employer_phone || '' %>" maxlength="64" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-6 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.email', { ns: 'payroll', defaultValue: 'Email' }) %></label>
+          <input type="email" name="employer_email" class="form-control" value="<%= cur.employer_email || '' %>" maxlength="128" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+      </div>
+      </div>
+
+      <div class="pay-settings-section" data-pay-settings-section="deductions" hidden>
+      <hr class="my-4">
+      <h2 class="h6 font-weight-bold mb-3"><%= _t('settings.tab_deductions', { ns: 'payroll', defaultValue: 'Deductions (%)' }) %></h2>
+      <div class="row">
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.cnps_employee', { ns: 'payroll', defaultValue: 'CNPS employee — Vieillesse (%)' }) %></label>
+          <input type="number" step="0.01" name="cnps_employee_rate" class="form-control" value="<%= cur.cnps_employee_rate != null ? cur.cnps_employee_rate : 4.2 %>" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.cfc_employee', { ns: 'payroll', defaultValue: 'CFC — Crédit Foncier employee (%)' }) %></label>
+          <input type="number" step="0.01" name="cimr_employee_rate" class="form-control" value="<%= cur.cimr_employee_rate != null ? cur.cimr_employee_rate : 1.0 %>" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.fne', { ns: 'payroll', defaultValue: "FNE — Fonds National de l'Emploi (%)" }) %></label>
+          <input type="number" step="0.01" name="development_tax_rate" class="form-control" value="<%= cur.development_tax_rate != null ? cur.development_tax_rate : 1.0 %>" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.crtv_royalty', { ns: 'payroll', defaultValue: 'CRTV / RAV royalty' }) %></label>
+          <input type="text" class="form-control" value="<%= _t('settings.fixed_scale', { ns: 'payroll', defaultValue: 'Fixed scale' }) %>" readonly>
+          <input type="hidden" name="crtv_rate" value="<%= cur.crtv_rate != null ? cur.crtv_rate : 0 %>">
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.council_tax', { ns: 'payroll', defaultValue: 'Council Tax (Taxe Communale)' }) %></label>
+          <input type="text" class="form-control" value="<%= _t('settings.fixed_scale', { ns: 'payroll', defaultValue: 'Fixed scale' }) %>" readonly>
+          <input type="hidden" name="council_tax_rate" value="<%= cur.council_tax_rate != null ? cur.council_tax_rate : 0 %>">
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.cac', { ns: 'payroll', defaultValue: 'CAC — Centimes Additionnels Communaux' }) %></label>
+          <input type="text" class="form-control" value="<%= _t('settings.cac_irpp_note', { ns: 'payroll', defaultValue: '10% of IRPP' }) %>" readonly>
+          <input type="hidden" name="cnhc_rate" value="<%= cur.cnhc_rate != null ? cur.cnhc_rate : 0 %>">
+        </div>
+      </div>
+      </div>
+
+      <div class="pay-settings-section" data-pay-settings-section="irpp" hidden>
+      <hr class="my-4">
+      <h2 class="h6 font-weight-bold mb-3"><%= _t('settings.tab_irpp', { ns: 'payroll', defaultValue: 'IRPP brackets' }) %></h2>
+      <div class="row">
+        <% var _brLabels = [
+          _t('settings.bracket_1', { ns: 'payroll', defaultValue: '0 – 166,666 XAF/month (0 – 2,000,000/year)' }),
+          _t('settings.bracket_2', { ns: 'payroll', defaultValue: '166,667 – 250,000' }),
+          _t('settings.bracket_3', { ns: 'payroll', defaultValue: '250,001 – 416,666' }),
+          _t('settings.bracket_4', { ns: 'payroll', defaultValue: '416,667 – 833,333' }),
+          _t('settings.bracket_5', { ns: 'payroll', defaultValue: 'Above 833,334' })
+        ];
+        var _brDefaults = [10, 15, 25, 35, 35];
+        for (var bi = 0; bi < 5; bi++) { %>
+        <div class="col-md-6 col-lg-4 form-group">
+          <label class="small font-weight-bold text-muted"><%= _brLabels[bi] %></label>
+          <div class="input-group">
+            <input type="number" step="0.01" name="tax_rate_<%= bi + 1 %>" class="form-control" value="<%= brRate(bi, _brDefaults[bi]) %>" <%= _canEdit ? '' : 'readonly' %>>
+            <div class="input-group-append"><span class="input-group-text">%</span></div>
+          </div>
+        </div>
+        <% } %>
+      </div>
+      </div>
+
+      <% if (_canEdit) { %>
+      <div class="text-right mt-3 pay-settings-pane" data-pay-settings-pane="employer" <%= _initialTab !== 'employer' && _initialTab !== 'deductions' && _initialTab !== 'irpp' ? 'hidden' : '' %>>
+        <button type="submit" class="btn hms-btn-primary font-weight-bold"><i class="fa fa-save mr-1"></i><%= _t('settings.save_settings', { ns: 'payroll', defaultValue: 'Save settings' }) %></button>
+      </div>
+      <% } %>
+    </div>
+  </form>
+
+  <form method="POST" action="/payroll/settings/allowances/save" class="pay-settings-pane" data-pay-settings-pane="allowances" <%= _initialTab === 'allowances' ? '' : 'hidden' %>>
+    <input type="hidden" name="sector" value="<%= _activeSector %>">
+    <div class="p-3 p-md-4">
+      <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+        <div>
+          <h2 class="h6 font-weight-bold mb-1"><%= _t('settings.tab_allowances', { ns: 'payroll', defaultValue: 'Allowances & Bonuses' }) %></h2>
+          <div class="small text-muted"><%= _t('settings.sector_label', { ns: 'payroll', defaultValue: 'Sector:' }) %>
+            <% Object.keys(_allSectors).forEach(function(secKey) {
+              var isActive = secKey === _activeSector;
+            %>
+            <a href="/payroll/settings?sector=<%= secKey %>&tab=allowances" class="badge ml-1 <%= isActive ? 'badge-success' : 'badge-light border' %>"><%= _allSectors[secKey] %></a>
+            <% }); %>
+          </div>
+        </div>
+        <% if (_canEdit && _activeSector === 'medical') { %>
+        <a href="/payroll/settings/allowances/repair?sector=<%= _activeSector %>" class="btn btn-sm hms-btn-secondary"
+           data-pay-confirm="<%= _t('settings.restore_confirm', { ns: 'payroll', defaultValue: 'Restore medical allowance rates and legal references to Cameroon defaults?' }) %>"
+           onclick="return window.HmsPayroll && window.HmsPayroll.confirmPayAction(this.getAttribute('data-pay-confirm'));">
+          <i class="fa fa-undo mr-1"></i><%= _t('settings.restore_medical', { ns: 'payroll', defaultValue: 'Restore medical defaults' }) %>
+        </a>
+        <% } %>
+      </div>
+
+      <div class="pay-table-wrap">
+        <table class="pay-table">
+          <thead>
+            <tr>
+              <th><%= _t('settings.col_on', { ns: 'payroll', defaultValue: 'On' }) %></th>
+              <th><%= _t('settings.col_label', { ns: 'payroll', defaultValue: 'Label (EN / FR)' }) %></th>
+              <th><%= _t('settings.col_formula', { ns: 'payroll', defaultValue: 'Formula type' }) %></th>
+              <th><%= _t('settings.col_rate', { ns: 'payroll', defaultValue: 'Rate / Amt' }) %></th>
+              <th><%= _t('settings.col_cap', { ns: 'payroll', defaultValue: 'Cap %' }) %></th>
+              <th><%= _t('settings.col_legal', { ns: 'payroll', defaultValue: 'Legal basis' }) %></th>
+            </tr>
+          </thead>
+          <tbody>
+          <% _allowRows.forEach(function(row, idx) {
+            var code = String(row.code || '');
+            var calcType = String(row.calc_type || 'none');
+            var enabled = row.enabled === 1 || row.enabled === '1' || row.enabled === true;
+          %>
+            <tr>
+              <td>
+                <input type="hidden" name="allowance_code[]" value="<%= code %>">
+                <input type="hidden" name="allowance_label[]" value="<%= row.label || '' %>">
+                <input type="hidden" name="allowance_label_fr[]" value="<%= row.label_fr || '' %>">
+                <input type="hidden" name="allowance_sort_order[]" value="<%= row.sort_order != null ? row.sort_order : (idx + 1) %>">
+                <input type="hidden" name="allowance_applies_roles[]" value="<%= row.applies_to_roles || '' %>">
+                <input type="hidden" name="allowance_description[]" value="<%= row.description || '' %>">
+                <% if (_canEdit) { %>
+                <input type="checkbox" name="allowance_enabled[]" value="<%= code %>" <%= enabled ? 'checked' : '' %> title="<%= _t('settings.enable_allowance', { ns: 'payroll', defaultValue: 'Enable this allowance' }) %>">
+                <% } else { %>
+                <input type="checkbox" disabled <%= enabled ? 'checked' : '' %>>
+                <% } %>
+              </td>
+              <td>
+                <strong><%= row.label || code %></strong>
+                <% if (row.label_fr && row.label_fr !== row.label) { %><br><small class="text-muted"><%= row.label_fr %></small><% } %>
+              </td>
+              <td>
+                <% if (_canEdit) { %>
+                <select name="allowance_calc_type[]" class="form-control form-control-sm">
+                  <% ['seniority_scale','pct_basic','fixed','per_shift','none'].forEach(function(ct) { %>
+                  <option value="<%= ct %>" <%= calcType === ct ? 'selected' : '' %>><%= _calcLabels[ct] || ct %></option>
+                  <% }); %>
+                </select>
+                <% } else { %>
+                <%= _calcLabels[calcType] || calcType %>
+                <input type="hidden" name="allowance_calc_type[]" value="<%= calcType %>">
+                <% } %>
+              </td>
+              <td>
+                <% if (_canEdit) { %>
+                <input type="number" step="0.01" name="allowance_pct_value[]" class="form-control form-control-sm mb-1" value="<%= row.pct_value != null && row.pct_value !== '' ? row.pct_value : '' %>" placeholder="%" title="% of basic">
+                <input type="number" step="1" name="allowance_fixed_amount[]" class="form-control form-control-sm mb-1" value="<%= row.fixed_amount != null && row.fixed_amount !== '' ? row.fixed_amount : '' %>" placeholder="XAF fixed">
+                <input type="number" step="1" name="allowance_per_unit_amount[]" class="form-control form-control-sm" value="<%= row.per_unit_amount != null && row.per_unit_amount !== '' ? row.per_unit_amount : '' %>" placeholder="XAF / shift">
+                <% if (calcType === 'seniority_scale') { %><small class="text-muted"><%= _t('settings.rate_auto_hire', { ns: 'payroll', defaultValue: '(auto — hire date)' }) %></small><% } %>
+                <% } else { %>
+                <% if (row.pct_value != null && row.pct_value !== '') { %><%= row.pct_value %>%<% } %>
+                <% if (row.fixed_amount != null && row.fixed_amount !== '') { %><%= row.fixed_amount %> XAF<% } %>
+                <% if (row.per_unit_amount != null && row.per_unit_amount !== '') { %><%= row.per_unit_amount %> / shift<% } %>
+                <input type="hidden" name="allowance_pct_value[]" value="<%= row.pct_value != null ? row.pct_value : '' %>">
+                <input type="hidden" name="allowance_fixed_amount[]" value="<%= row.fixed_amount != null ? row.fixed_amount : '' %>">
+                <input type="hidden" name="allowance_per_unit_amount[]" value="<%= row.per_unit_amount != null ? row.per_unit_amount : '' %>">
+                <% if (!enabled && _canEdit === false) { %><input type="hidden" name="allowance_enabled[]" value="<%= code %>"><% } %>
+                <% } %>
+              </td>
+              <td>
+                <% if (_canEdit) { %>
+                <input type="number" step="0.01" name="allowance_cap_pct[]" class="form-control form-control-sm" value="<%= row.cap_pct != null && row.cap_pct !== '' ? row.cap_pct : '' %>" placeholder="<%= _t('settings.no_cap', { ns: 'payroll', defaultValue: 'No cap on this allowance type' }) %>">
+                <% } else { %>
+                <%= row.cap_pct != null && row.cap_pct !== '' ? row.cap_pct + '%' : '—' %>
+                <input type="hidden" name="allowance_cap_pct[]" value="<%= row.cap_pct != null ? row.cap_pct : '' %>">
+                <% } %>
+              </td>
+              <td class="small">
+                <% if (_canEdit) { %>
+                <input type="text" name="allowance_legal_basis[]" class="form-control form-control-sm" value="<%= row.legal_basis || '' %>">
+                <% } else { %>
+                <%= row.legal_basis || '—' %>
+                <input type="hidden" name="allowance_legal_basis[]" value="<%= row.legal_basis || '' %>">
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+          </tbody>
+        </table>
+      </div>
+
+      <% if (_canEdit) { %>
+      <div class="text-right mt-3">
+        <button type="submit" class="btn hms-btn-primary font-weight-bold"><i class="fa fa-save mr-1"></i><%= _t('settings.save_allowances', { ns: 'payroll', defaultValue: 'Save allowance settings' }) %></button>
+      </div>
+      <% } %>
+    </div>
+  </form>
+</div>
+
+<style>
+  .pay-settings-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pay-settings-tab {
+    display: inline-flex; align-items: center; padding: 8px 14px; border-radius: 999px;
+    background: #f1f5f9; color: #334155; font-size: 0.82rem; font-weight: 700; text-decoration: none !important;
+  }
+  .pay-settings-tab:hover { background: #e2e8f0; color: #1e293b; }
+  .pay-settings-tab.active { background: #059669; color: #fff; }
+</style>
+
+<%- include('partials/payroll-layout-end') %>

@@ -1,0 +1,72 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'tax', canTaxHub: true }) %>
+<% if(locals.flash){ %>
+ <div class="alert alert-success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+ <% } %>
+ <% if(locals.error){ %>
+ <div class="alert alert-danger border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+ <% } %>
+
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+ <div>
+ <h4 class="page-title font-weight-bold text-dark mb-1"><%= _tl('tax_cnps.title', 'CNPS / DIPE') %></h4>
+ <p class="text-muted small mb-0"><%= _tl('tax_cnps.subtitle', 'Builds lines from tbl_hms_payroll_record and employer settings. Confirm layout with CNPS before filing.') %></p>
+ </div>
+ <a href="/tax" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _tl('tax_cnps.tax_hub', 'Tax hub') %></a>
+ </div>
+
+ <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= _tl('tax_cnps.generate_file', 'Generate file') %></div>
+ <div class="card-body">
+ <form method="POST" action="/tax/cnps/generate" class="form-row align-items-end">
+ <div class="form-group col-md-3">
+ <label class="small font-weight-bold"><%= _tl('tax_hub_page.month', 'Month') %></label>
+ <select name="month" class="form-control">
+ <% for(var n=1;n<=12;n++){ %>
+ <option value="<%=n%>" <%= n===cm ? 'selected' : '' %>><%= months[n] %></option>
+ <% } %>
+ </select>
+ </div>
+ <div class="form-group col-md-3">
+ <label class="small font-weight-bold"><%= _tl('tax_hub_page.year', 'Year') %></label>
+ <select name="year" class="form-control">
+ <% for(var y = cy - 1; y <= cy + 1; y++){ %>
+ <option value="<%=y%>" <%= y===cy ? 'selected' : '' %>><%=y%></option>
+ <% } %>
+ </select>
+ </div>
+ <div class="form-group col-md-6">
+ <button type="submit" class="btn btn-primary font-weight-bold"><%= _tl('tax_cnps.generate_save', 'Generate & save') %></button>
+ <p class="small text-muted mb-0 mt-2"><%= _tl('tax_cnps.generate_hint', 'Requires at least one employee with gross > 0 for the period.') %></p>
+ </div>
+ </form>
+ </div>
+ </div>
+
+ <div class="card border-0 shadow-sm" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= _tl('tax_cnps.recent_exports', 'Recent exports') %></div>
+ <div class="card-body p-0 table-responsive">
+ <table class="table table-sm table-striped mb-0" data-hms-table-paginate="8">
+ <thead><tr><th><%= _tl('tax_cnps.col_created', 'Created') %></th><th><%= _tl('tax_cnps.col_period', 'Period') %></th><th><%= _tl('tax_cnps.col_file', 'File') %></th><th class="text-right"><%= _tl('tax_cnps.col_download', 'Download') %></th></tr></thead>
+ <tbody>
+ <% if(!history || !history.length){ %>
+ <tr><td colspan="4" class="text-center text-muted py-4"><%= _tl('tax_cnps.no_exports', 'No exports yet.') %></td></tr>
+ <% } %>
+ <% (history||[]).forEach(function(h){
+ var hid = parseInt(h.id,10)||0;
+ %>
+ <tr>
+ <td class="text-nowrap small"><%= h.created_at %></td>
+ <td><%= months[h.month] %> <%= h.year %></td>
+ <td><code class="small"><%= h.filename %></code></td>
+ <td class="text-right">
+ <% if(hid > 0){ %>
+ <a class="btn btn-sm btn-outline-primary" href="/tax/dipe/<%= hid %>/download"><%= _tl('tax_cnps.download', 'Download') %></a>
+ <% } %>
+ </td>
+ </tr>
+ <% }); %>
+ </tbody>
+ </table>
+ </div>
+
+<%- include('partials/payroll-layout-end') %>

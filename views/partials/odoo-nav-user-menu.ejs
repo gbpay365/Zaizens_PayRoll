@@ -1,0 +1,8 @@
+<%
+var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+var _odooUser = (locals.user && locals.user.name) || (locals.user && locals.user.username) || 'User';
+%>
+<div class="o_nav_right">
+  <span class="o_nav_user text-white small mr-2"><%= _odooUser %></span>
+  <a href="/logout" class="o_nav_right_link o_nav_logout" title="Log out" aria-label="Log out"><i class="fa fa-sign-out"></i></a>
+</div>

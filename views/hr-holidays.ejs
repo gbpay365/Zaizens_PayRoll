@@ -1,0 +1,77 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
+ <div class="content">
+ <% if(locals.flash){ %>
+ <div class="hms-flash hms-flash--success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+ <% } %>
+ <% if(locals.error){ %>
+ <div class="hms-flash hms-flash--error border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+ <% } %>
+
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+ <div>
+ <h4 class="page-title font-weight-bold text-dark mb-1"><%= _t('hr_holidays.title', { ns: 'legacy', defaultValue: 'Public holidays' }) %></h4>
+ <p class="text-muted small mb-0"><%= _t('hr_holidays.subtitle', { ns: 'legacy', defaultValue: 'Facility calendar holidays (reference for leave and attendance).' }) %></p>
+ </div>
+ <a href="/payroll" class="hms-btn hms-btn-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _t('hr_holidays.hr_hub', { ns: 'legacy', defaultValue: 'HR hub' }) %></a>
+ </div>
+
+ <div class="row">
+ <div class="col-lg-5 mb-4">
+ <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= _t('hr_holidays.add_holiday', { ns: 'legacy', defaultValue: 'Add holiday' }) %></div>
+ <div class="card-body">
+ <form method="POST" action="/hr/holidays/add">
+ <div class="form-group">
+ <label class="small font-weight-bold"><%= _t('hr_holidays.name', { ns: 'legacy', defaultValue: 'Name' }) %></label>
+ <input type="text" name="holiday_name" class="hms-input w-full" required maxlength="120" placeholder="<%= _t('hr_holidays.name_ph', { ns: 'legacy', defaultValue: 'e.g. Labour Day' }) %>">
+ </div>
+ <div class="form-group">
+ <label class="small font-weight-bold"><%= _t('hr_holidays.date', { ns: 'legacy', defaultValue: 'Date' }) %></label>
+ <input type="date" name="holiday_date" class="hms-input w-full" required>
+ </div>
+ <div class="form-group form-check">
+ <input type="checkbox" class="form-check-input" name="is_recurring" value="1" id="rec" checked>
+ <label class="form-check-label small" for="rec"><%= _t('hr_holidays.recurring_yearly', { ns: 'legacy', defaultValue: 'Recurring yearly' }) %></label>
+ </div>
+ <button type="submit" class="hms-btn hms-btn-primary font-weight-bold"><%= _t('hr_holidays.add', { ns: 'legacy', defaultValue: 'Add' }) %></button>
+ </form>
+ </div>
+ </div>
+ </div>
+ <div class="col-lg-7 mb-4">
+ <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= _t('hr_holidays.registered', { ns: 'legacy', defaultValue: 'Registered' }) %></div>
+ <div class="card-body p-0 table-responsive">
+ <table class="table table-sm table-striped mb-0" data-hms-table-paginate="8">
+ <thead><tr><th><%= _t('hr_holidays.date', { ns: 'legacy', defaultValue: 'Date' }) %></th><th><%= _t('hr_holidays.name', { ns: 'legacy', defaultValue: 'Name' }) %></th><th><%= _t('hr_holidays.col_recurring', { ns: 'legacy', defaultValue: 'Recurring' }) %></th><th class="text-right"><%= _t('hr_holidays.col_remove', { ns: 'legacy', defaultValue: 'Remove' }) %></th></tr></thead>
+ <tbody>
+ <% if(!rows || !rows.length){ %>
+ <tr><td colspan="4" class="text-center text-muted py-4"><%= _t('hr_holidays.no_holidays', { ns: 'legacy', defaultValue: 'No holidays yet.' }) %></td></tr>
+ <% } %>
+ <% (rows||[]).forEach(function(h){
+ var hid = parseInt(h.id,10)||0;
+ %>
+ <tr>
+ <td><%= h.holiday_date %></td>
+ <td><%= h.holiday_name %></td>
+ <td><%= h.is_recurring ? _t('hr_holidays.yes', { ns: 'legacy', defaultValue: 'Yes' }) : _t('hr_holidays.no', { ns: 'legacy', defaultValue: 'No' }) %></td>
+ <td class="text-right">
+ <% if(hid > 0){ %>
+ <form method="POST" action="/hr/holidays/delete" class="d-inline" onsubmit="return confirm('<%= _t('hr_holidays.confirm_remove', { ns: 'legacy', defaultValue: 'Remove this holiday?' }).replace(/'/g, "\\'") %>');">
+ <input type="hidden" name="id" value="<%= hid %>">
+ <button type="submit" class="btn btn-sm btn-outline-danger"><%= _t('hr_holidays.delete', { ns: 'legacy', defaultValue: 'Delete' }) %></button>
+ </form>
+ <% } %>
+ </td>
+ </tr>
+ <% }); %>
+ </tbody>
+ </table>
+ </div>
+ </div>
+ </div>
+ </div>
+ </div>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

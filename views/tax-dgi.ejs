@@ -1,0 +1,72 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'tax', canTaxHub: true }) %>
+ <% if(locals.flash){ %>
+ <div class="alert alert-success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+ <% } %>
+ <% if(locals.error){ %>
+ <div class="alert alert-danger border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+ <% } %>
+
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+ <div>
+ <h4 class="page-title font-weight-bold text-dark mb-1"><%= _tl('tax_dgi.title', 'DGI payroll exports') %></h4>
+ <p class="text-muted small mb-0"><%= _tl('tax_dgi.subtitle', 'Semicolon-separated CSV (UTF-8 BOM), aligned with the legacy PHP HmsDgiGenerator layout. Validate with your accountant or DGI before filing.') %></p>
+ </div>
+ <a href="/tax" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _tl('tax_dgi.tax_hub', 'Tax hub') %></a>
+ </div>
+
+ <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= _tl('tax_dgi.monthly_declaration', 'Monthly declaration') %></div>
+ <div class="card-body">
+ <p class="small text-muted mb-3"><%= _tl('tax_dgi.monthly_desc', 'Summary row plus per-employee gross, IRPP, and net.') %></p>
+ <form method="GET" action="/tax/dgi/declaration.csv" class="form-row align-items-end">
+ <div class="form-group col-md-3">
+ <label class="small font-weight-bold"><%= _tl('tax_hub_page.month', 'Month') %></label>
+ <select name="month" class="form-control">
+ <% for(var n=1;n<=12;n++){ %>
+ <option value="<%=n%>" <%= n===cm ? 'selected' : '' %>><%= months[n] %></option>
+ <% } %>
+ </select>
+ </div>
+ <div class="form-group col-md-3">
+ <label class="small font-weight-bold"><%= _tl('tax_hub_page.year', 'Year') %></label>
+ <select name="year" class="form-control">
+ <% for(var y = cy - 1; y <= cy + 1; y++){ %>
+ <option value="<%=y%>" <%= y===cy ? 'selected' : '' %>><%=y%></option>
+ <% } %>
+ </select>
+ </div>
+ <div class="form-group col-md-6">
+ <button type="submit" class="btn btn-primary font-weight-bold"><%= _tl('tax_dgi.download_declaration', 'Download declaration CSV') %></button>
+ </div>
+ </form>
+ </div>
+ </div>
+
+ <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= _tl('tax_dgi.annual_summary', 'Annual summary') %></div>
+ <div class="card-body">
+ <p class="small text-muted mb-3"><%= _tl('tax_dgi.annual_desc', 'Totals grouped by employee for the calendar year (includes employee NIU when the column exists).') %></p>
+ <form method="GET" action="/tax/dgi/annual.csv" class="form-row align-items-end">
+ <div class="form-group col-md-3">
+ <label class="small font-weight-bold"><%= _tl('tax_hub_page.year', 'Year') %></label>
+ <select name="year" class="form-control">
+ <% for(var y = cy - 2; y <= cy + 1; y++){ %>
+ <option value="<%=y%>" <%= y===cy ? 'selected' : '' %>><%=y%></option>
+ <% } %>
+ </select>
+ </div>
+ <div class="form-group col-md-6">
+ <button type="submit" class="btn btn-outline-primary font-weight-bold"><%= _tl('tax_dgi.download_annual', 'Download annual CSV') %></button>
+ </div>
+ </form>
+ </div>
+ </div>
+
+ <div class="alert alert-light border small mb-0" style="border-radius:12px;">
+ <i class="fa fa-info-circle mr-1 text-muted"></i>
+ <%= _tl('tax_dgi.alt_hint_prefix', 'For a simple comma-separated extract (different columns), use') %> <strong><%= _tl('tax_dgi.tax_hub_label', 'Tax hub') %></strong> <%= _tl('tax_dgi.alt_hint_suffix', '→ quick CSV, or') %> <a href="/tax/dgi-export">/tax/dgi-export</a>.
+ </div>
+ </div>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

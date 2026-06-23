@@ -1,0 +1,28 @@
+<%
+if (typeof _t !== 'function') {
+  var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+}
+var _thr = function (key, fallback) {
+  return _t(key, { ns: 'payroll', defaultValue: fallback });
+};
+var _hrMode = String(locals.paySelfServiceOnly || '').toLowerCase();
+var _path = locals.hmsPath || '';
+function _hrActive(prefix) {
+  if (_hrMode === 'payslips' && prefix === '/hr/my-payslips') return ' active';
+  if (_hrMode === 'leave' && (prefix === '/hr/request-leave' || prefix === '/hr/my-leave-balance')) return ' active';
+  if (!_hrMode && _path === prefix) return ' active';
+  if (!_hrMode && prefix !== '/' && _path.indexOf(prefix) === 0) return ' active';
+  return '';
+}
+%>
+<header class="o_web_navbar">
+  <button type="button" class="o_nav_home" id="hmsOdooAppsBtn" title="<%= _thr('nav.all_apps', 'All applications') %>" aria-label="<%= _thr('nav.apps', 'Applications') %>"><i class="fa fa-th"></i></button>
+  <a href="/payroll" class="o_nav_module"><%= _thr('nav.hr_module', 'HR') %></a>
+  <nav class="o_nav_menu" aria-label="<%= _thr('nav.hr_aria_label', 'HR self-service') %>">
+    <a href="/hr/my-payslips" class="o_nav_link<%= _hrActive('/hr/my-payslips') %>"><%= _thr('nav.my_payslips', 'My payslips') %></a>
+    <a href="/hr/request-leave" class="o_nav_link<%= _hrActive('/hr/request-leave') %>"><%= _thr('nav.request_leave', 'Request leave') %></a>
+    <a href="/hr/my-leave-balance" class="o_nav_link<%= _hrActive('/hr/my-leave-balance') %>"><%= _thr('nav.my_leave_balance', 'My leave balance') %></a>
+    <a href="/hr/my-attendance" class="o_nav_link<%= _hrActive('/hr/my-attendance') %>"><%= _thr('nav.my_attendance', 'My attendance') %></a>
+  </nav>
+  <%- include('odoo-nav-user-menu') %>
+</header>

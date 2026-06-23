@@ -1,0 +1,30 @@
+{
+  "name": "zaizens-payroll",
+  "version": "1.0.0",
+  "description": "Standalone Cameroon payroll & HR — Zaizens",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node --watch app.js",
+    "db:create": "node scripts/create-database.js",
+    "db:seed": "node scripts/seed-admin.js",
+    "sync:core": "node scripts/resync-payroll-to-core.js",
+    "sync:core:all": "node scripts/resync-payroll-to-core.js --all",
+    "clear:core": "node scripts/clear-core-payroll-month.js",
+    "migrate:from-hms": "node scripts/migrate-from-hms.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.3.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "express-session": "^1.17.3",
+    "i18next": "^26.3.0",
+    "i18next-fs-backend": "^2.6.6",
+    "mysql2": "^3.6.1"
+  }
+}

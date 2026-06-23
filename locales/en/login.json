@@ -1,0 +1,18 @@
+{
+  "username": "Username",
+  "password": "Password",
+  "username_placeholder": "Your username",
+  "password_placeholder": "Your password",
+  "show_password": "Show password",
+  "hide_password": "Hide password",
+  "sign_in": "Sign in",
+  "signing_in": "Signing in…",
+  "portal_prompt": "Patient?",
+  "portal_link": "Portal sign in",
+  "authorized_only": "Authorized access only · activity is logged",
+  "visiting_doctor_link": "Visiting doctor sign in (VD1–VD20)",
+  "default_subtitle": "An integrated HMS",
+  "copyright_line": "© {{year}} An integrated HMS",
+  "invalid_credentials": "Invalid username or password.",
+  "server_error": "A server error occurred. Please try again."
+}

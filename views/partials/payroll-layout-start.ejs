@@ -1,0 +1,63 @@
+<%
+if (typeof paySelfServiceOnly !== 'undefined' && paySelfServiceOnly) {
+  locals.paySelfServiceOnly = paySelfServiceOnly;
+}
+var _paySelfOnly = String(locals.paySelfServiceOnly || '').toLowerCase();
+%>
+<%- include('header') %>
+<% var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; }); %>
+<link rel="stylesheet" href="/css/payroll.css">
+<%
+var _up = locals.userPerms || [];
+function payHasP() {
+  if (_up.includes('*')) return true;
+  for (var i = 0; i < arguments.length; i++) {
+    if (_up.includes(arguments[i])) return true;
+  }
+  return false;
+}
+var _role = String((locals.user && locals.user.role) || '');
+locals.payIsAdmin = _role === '1' || _role === '99';
+locals.payCanWrite = locals.payIsAdmin || payHasP('payroll.write');
+locals.payCanSettings = locals.payCanWrite || (typeof canPayrollSettings !== 'undefined' && canPayrollSettings);
+locals.payShowLeaveAdmin = (typeof showHrLeaveAdmin !== 'undefined' && showHrLeaveAdmin) || locals.payIsAdmin || payHasP('hr.leave.approve');
+locals.payCanTaxHub = (typeof canTaxHub !== 'undefined' && canTaxHub) || payHasP('accounting.read', 'accounting.write');
+locals.payNav = locals.payNavActive || 'dashboard';
+locals._fmtXaf = function(n){ return (Number(n)||0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+var _tl = function (key, fallback, opts) {
+  var o = { ns: 'legacy', defaultValue: fallback };
+  if (opts && typeof opts === 'object') { for (var pk in opts) { if (Object.prototype.hasOwnProperty.call(opts, pk)) o[pk] = opts[pk]; } }
+  return _t(key, o);
+};
+var _odooMod = String(locals.hmsOdooModule || '').toLowerCase();
+if (!_odooMod) {
+  _odooMod = (_paySelfOnly === 'payslips' || _paySelfOnly === 'leave') ? 'hr' : 'payroll';
+}
+%>
+<%- include('hms-module-odoo-start', { odooModule: _odooMod }) %>
+<div class="page-wrapper pay-module pay-module--odoo"><div class="content">
+<div class="pay-main pay-main--odoo">
+<% if(locals.flash){ %>
+<div class="alert alert-success alert-dismissible border-0 mb-3 d-flex align-items-center pay-flash-msg"
+     style="border-radius:10px;background:#d1fae5;color:#065f46;font-weight:500;" role="alert">
+  <i class="fa fa-check-circle mr-2" style="font-size:1.1rem;flex-shrink:0;"></i>
+  <span style="flex:1;"><%= locals.flash %></span>
+  <button type="button" class="close ml-2" data-dismiss="alert" aria-label="<%= _t('common.close', { ns: 'payroll', defaultValue: 'Close' }) %>" style="color:#065f46;">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+<% } %>
+<% if(locals.error){ %>
+<div class="alert alert-danger alert-dismissible border-0 mb-3 d-flex align-items-center"
+     style="border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:500;" role="alert">
+  <i class="fa fa-exclamation-circle mr-2" style="font-size:1.1rem;flex-shrink:0;"></i>
+  <span style="flex:1;"><%= locals.error %></span>
+  <button type="button" class="close ml-2" data-dismiss="alert" aria-label="<%= _t('common.close', { ns: 'payroll', defaultValue: 'Close' }) %>" style="color:#991b1b;">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+<% } %>
+<script>
+// Auto-dismiss success flash after 5 s
+(function(){ var el = document.querySelector('.pay-flash-msg'); if(el){ setTimeout(function(){ if(typeof $ !== 'undefined'){ $(el).alert('close'); } else { el.style.display='none'; } }, 5000); } })();
+</script>

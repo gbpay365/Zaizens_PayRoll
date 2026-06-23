@@ -1,0 +1,20 @@
+<%
+if (typeof _t !== 'function') {
+  var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+}
+var _mod = String(locals.hmsOdooModule || odooModule || '').toLowerCase();
+if (!_mod) _mod = 'payroll';
+%>
+<link rel="stylesheet" href="/css/hms-odoo.css?v=2">
+<link rel="stylesheet" href="/css/hms-module-odoo.css?v=1">
+<div class="hms-module-odoo-app hms-odoo-app" id="hmsModuleOdooApp" data-odoo-module="<%= _mod %>">
+<%- include('hms-odoo-apps') %>
+<% if (_mod === 'payroll') { %>
+<%- include('payroll-odoo-nav') %>
+<% } else { %>
+<%- include('hr-odoo-nav') %>
+<% } %>
+<main class="o_action_manager">
+<% if (typeof flash === 'string' && flash) { %><div class="o_flash o_flash_success"><%= flash %></div><% } %>
+<% if (typeof error === 'string' && error) { %><div class="o_flash o_flash_error"><%= error %></div><% } %>
+<div class="o_module_content">

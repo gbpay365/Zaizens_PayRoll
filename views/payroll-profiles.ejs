@@ -1,0 +1,358 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'profiles' }) %>
+<% var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; }); %>
+
+<style>
+  /* Pay profiles page — wider canvas so staff names and column headers stay on one line. */
+  .pay-module--odoo.pay-profiles-wide .pay-main--odoo { max-width: 1760px; }
+  .pay-profiles-wide .pay-panel { width: 100%; }
+  .pay-profiles-wide .pay-table-wrap { overflow-x: auto; }
+  .pay-profiles-wide .pay-table { width: 100%; }
+  .pay-profiles-wide .pay-table th,
+  .pay-profiles-wide .pay-table td { white-space: nowrap; }
+  .pay-profiles-wide .pay-staff-name { white-space: nowrap; }
+</style>
+<script>
+  (function () {
+    var mod = document.querySelector('.pay-module');
+    if (mod) mod.classList.add('pay-profiles-wide');
+  })();
+</script>
+
+<div class="pay-hero">
+  <h1><%= _t('profiles.title', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></h1>
+  <div class="pay-hero-actions no-print">
+    <a href="/payroll/monthly" class="btn btn-light btn-sm font-weight-bold"><i class="fa fa-calculator mr-1"></i> <%= _t('profiles.monthly_payroll', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></a>
+  </div>
+</div>
+
+<%
+  var _fSector = locals.facilitySector || 'medical';
+  var _sectorLabel = (locals.allSectors || {})[ _fSector ] || _fSector;
+%>
+<form method="POST" action="/payroll/profiles/save" class="pay-panel" data-hms-server-search-form="0">
+  <% var _pg = locals.pager || {}; %>
+  <input type="hidden" name="_return_p" value="<%= _pg.page || 1 %>">
+  <input type="hidden" name="_return_q" value="<%= typeof searchQ === 'string' ? searchQ : '' %>">
+  <input type="hidden" name="facility_sector" value="<%= _fSector %>">
+  <div class="pay-panel-head">
+    <h2><%= _t('profiles.compensation', { ns: 'payroll', defaultValue: 'Employee compensation' }) %></h2>
+    <div class="pay-toolbar no-print">
+      <input type="search" class="pay-search" data-hms-server-search="/payroll/profiles" value="<%= typeof searchQ === 'string' ? searchQ : '' %>" placeholder="<%= _t('profiles.search_placeholder', { ns: 'payroll', defaultValue: 'Search staff…' }) %>" aria-label="<%= _t('profiles.search_aria', { ns: 'payroll', defaultValue: 'Search pay profiles' }) %>" autocomplete="off" form="">
+      <button type="submit" class="hms-btn-primary"><i class="fa fa-save mr-1"></i> <%= _t('profiles.save_page', { ns: 'payroll', defaultValue: 'Save this page' }) %></button>
+    </div>
+  </div>
+<%
+  var ONCALL_ROLES_LEGACY = ['2'];
+  var NIGHT_ROLES_LEGACY  = ['4','5','6','7','8'];
+  function _roleText(em) { return String((em && em.role_title) || '').toLowerCase(); }
+  function isDoctor(em) {
+    var rt = _roleText(em), rk = String((em && em.role) || '');
+    return /(doctor|physician|m[ée]decin|specialist|sp[ée]cialiste)/i.test(rt)
+        || ONCALL_ROLES_LEGACY.indexOf(rk) !== -1;
+  }
+  function isNightStaff(em) {
+    var rt = _roleText(em), rk = String((em && em.role) || '');
+    return /(nurse|infirm|midwife|sage|lab|pharm|radio|aide|nursing aid|infirmi[eè]re)/i.test(rt)
+        || NIGHT_ROLES_LEGACY.indexOf(rk) !== -1;
+  }
+  function canOnCall(em) { return isDoctor(em); }
+  function canNight(em)  { return isNightStaff(em); }
+%>
+  <div class="pay-table-wrap" style="overflow-x:auto;">
+    <table class="pay-table" style="min-width:1500px;table-layout:auto;">
+      <thead>
+        <tr>
+          <th style="min-width:200px;"><%= _t('common.staff', { ns: 'payroll', defaultValue: 'Staff' }) %></th>
+          <th><%= _t('common.matricule', { ns: 'payroll', defaultValue: 'Matricule' }) %></th>
+          <th title="<%= _t('profiles.role_from_record', { ns: 'payroll', defaultValue: 'From employee record (system role)' }) %>"><%= _t('common.role', { ns: 'payroll', defaultValue: 'Role' }) %></th>
+          <th style="min-width:110px;"><%= _t('common.basic_xaf', { ns: 'payroll', defaultValue: 'Basic (XAF)' }) %></th>
+          <th style="min-width:90px;"><%= _t('common.housing', { ns: 'payroll', defaultValue: 'Housing' }) %></th>
+          <th style="min-width:90px;"><%= _t('common.transport', { ns: 'payroll', defaultValue: 'Transport' }) %></th>
+          <th style="min-width:120px;" title="<%= _t('profiles.risk_premium_title', { ns: 'payroll', defaultValue: 'Medical Risk / Hardship Premium — flat monthly XAF (Prime de Risque Médical)' }) %>">
+            <%= _t('profiles.risk_premium', { ns: 'payroll', defaultValue: 'Risk Premium' }) %> <i class="fa fa-info-circle text-muted" style="font-size:.8em;"></i>
+          </th>
+          <th style="min-width:120px;" title="<%= _t('profiles.responsibility_title', { ns: 'payroll', defaultValue: 'Responsibility / Specialist Supplement — flat monthly XAF (Indemnité de Responsabilité / Spécialité)' }) %>">
+            <%= _t('profiles.responsibility', { ns: 'payroll', defaultValue: 'Responsibility' }) %> <i class="fa fa-info-circle text-muted" style="font-size:.8em;"></i>
+          </th>
+          <th style="min-width:120px;" title="<%= _t('profiles.hire_date_title', { ns: 'payroll', defaultValue: "Date of joining from employee record — Seniority Bonus (Prime d'Ancienneté). Edit under Employees." }) %>">
+            <%= _t('profiles.hire_date', { ns: 'payroll', defaultValue: 'Hire Date' }) %> <i class="fa fa-info-circle text-muted" style="font-size:.8em;"></i>
+          </th>
+          <th style="min-width:110px;text-align:center;"
+              title="<%= _t('profiles.night_shifts_title', { ns: 'payroll', defaultValue: 'Night shifts / month — for nurses and clinical staff (Indemnité de Garde de Nuit)' }) %>">
+            <%= _t('profiles.night_shifts', { ns: 'payroll', defaultValue: 'Night Shifts' }) %>
+          </th>
+          <th style="min-width:130px;text-align:center;"
+              title="<%= _t('profiles.on_call_title', { ns: 'payroll', defaultValue: "On-call sessions / month — for doctors only (Prime d'Astreinte)" }) %>">
+            <%= _t('profiles.on_call', { ns: 'payroll', defaultValue: 'On-Call Sessions' }) %>
+          </th>
+          <th style="min-width:110px;text-align:center;"
+              title="<%= _t('profiles.specialist_title', { ns: 'payroll', defaultValue: 'Specialist-grade doctor — enables Specialist Research Allowance (15% of basic) on top of Medical Responsibility (25%)' }) %>">
+            <%= _t('profiles.specialist', { ns: 'payroll', defaultValue: 'Specialist' }) %> <small class="text-muted"><%= _t('profiles.specialist_pct', { ns: 'payroll', defaultValue: '(+15%)' }) %></small>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+      <% profiles.forEach(function(em){
+        var eid = em.id;
+        var p = em.pay || {};
+        var rk = String(em.role||'');
+        var roleLab = (em.role_title || roleLabels[rk] || rk || '—');
+        var allowNight  = canNight(em);
+        var allowOnCall = canOnCall(em);
+        var canBeSpecialist = isDoctor(em);
+        var fullName = (em.first_name || '') + ' ' + (em.last_name || '');
+      %>
+        <tr>
+          <td class="font-weight-bold pay-staff-name">
+            <%= em.first_name %> <%= em.last_name %>
+            <button type="button" class="btn btn-link btn-sm p-0 ml-1 pay-calc-btn"
+                    data-eid="<%= eid %>"
+                    data-name="<%= fullName.trim().replace(/"/g, '&quot;') %>"
+                    data-role="<%= roleLab.replace(/"/g, '&quot;') %>"
+                    title="<%= _t('profiles.calc_btn_title', { ns: 'payroll', defaultValue: 'Auto-calculate compensation from Gross or Net' }) %>">
+              <i class="fa fa-calculator" style="color:#7c3aed;font-size:.9rem;"></i>
+            </button>
+          </td>
+          <td><small class="text-muted"><%= em.employee_ref || em.id %></small></td>
+          <td><span class="pay-badge pay-badge-pending" title="<%= _t('profiles.role_badge_title', { ns: 'payroll', defaultValue: 'Role {{id}} from employee record' }).replace('{{id}}', rk) %>"><%= roleLab %></span></td>
+          <td><input class="form-control form-control-sm pay-input-xaf hms-input" name="basic_<%= eid %>"
+                value="<%= p.basic_salary != null ? p.basic_salary : '' %>" inputmode="numeric"></td>
+          <td><input class="form-control form-control-sm pay-input-xaf hms-input" name="housing_<%= eid %>"
+                value="<%= p.housing_allowance != null ? p.housing_allowance : '' %>" inputmode="numeric"></td>
+          <td><input class="form-control form-control-sm pay-input-xaf hms-input" name="transport_<%= eid %>"
+                value="<%= p.transport_allowance != null ? p.transport_allowance : '' %>" inputmode="numeric"></td>
+          <td><input class="form-control form-control-sm pay-input-xaf hms-input" name="med_risk_<%= eid %>"
+                value="<%= p.medical_risk_allowance || 0 %>" inputmode="numeric"
+                title="<%= _t('profiles.med_risk_title', { ns: 'payroll', defaultValue: 'Flat monthly Medical Risk Premium (Prime de Risque Médical)' }) %>"></td>
+          <td><input class="form-control form-control-sm pay-input-xaf hms-input" name="responsibility_<%= eid %>"
+                value="<%= p.responsibility_allowance || 0 %>" inputmode="numeric"
+                title="<%= _t('profiles.resp_title', { ns: 'payroll', defaultValue: 'Flat monthly Responsibility / Specialist Supplement (Indemnité de Responsabilité)' }) %>"></td>
+          <input type="hidden" name="other_<%= eid %>" value="0">
+          <td>
+            <span class="small text-nowrap" title="<%= _t('profiles.hire_from_record', { ns: 'payroll', defaultValue: 'From employee record (Date of Joining). Edit under Employees.' }) %>">
+              <%= p.hire_date_display || '—' %>
+            </span>
+          </td>
+          <td style="text-align:center;">
+            <% if (allowNight) { %>
+            <input type="number" min="0" max="31"
+                   class="form-control form-control-sm text-center hms-input"
+                   name="night_shifts_<%= eid %>"
+                   value="<%= p.night_shifts_per_month || 0 %>"
+                   inputmode="numeric"
+                   style="width:64px;margin:0 auto;font-weight:600;"
+                   title="<%= _t('profiles.night_input_title', { ns: 'payroll', defaultValue: 'Night shifts this month — nurses & clinical staff only' }) %>">
+            <% } else { %>
+            <input type="hidden" name="night_shifts_<%= eid %>" value="0">
+            <span class="text-muted small" title="<%= allowOnCall ? _t('profiles.oncall_instead', { ns: 'payroll', defaultValue: 'Doctors use On-Call sessions instead' }) : _t('profiles.not_applicable', { ns: 'payroll', defaultValue: 'Not applicable for this role' }) %>"
+                  style="display:block;text-align:center;padding-top:6px;">
+              <i class="fa fa-lock" style="color:#ccc;"></i>
+            </span>
+            <% } %>
+          </td>
+          <td style="text-align:center;">
+            <% if (allowOnCall) { %>
+            <input type="number" min="0" max="31"
+                   class="form-control form-control-sm text-center hms-input"
+                   name="on_call_<%= eid %>"
+                   value="<%= p.on_call_per_month || 0 %>"
+                   inputmode="numeric"
+                   style="width:64px;margin:0 auto;font-weight:600;"
+                   title="<%= _t('profiles.oncall_input_title', { ns: 'payroll', defaultValue: 'On-call sessions this month — doctors only' }) %>">
+            <% } else { %>
+            <input type="hidden" name="on_call_<%= eid %>" value="0">
+            <span class="text-muted small" title="<%= allowNight ? _t('profiles.night_instead', { ns: 'payroll', defaultValue: 'Nurses & clinical staff use Night Shifts instead' }) : _t('profiles.not_applicable', { ns: 'payroll', defaultValue: 'Not applicable for this role' }) %>"
+                  style="display:block;text-align:center;padding-top:6px;">
+              <i class="fa fa-lock" style="color:#ccc;"></i>
+            </span>
+            <% } %>
+          </td>
+          <td style="text-align:center;vertical-align:middle;">
+            <% if (canBeSpecialist) { %>
+            <input type="checkbox"
+                   name="is_specialist_<%= eid %>"
+                   value="1"
+                   <%= p.is_specialist ? 'checked' : '' %>
+                   title="<%= _t('profiles.specialist_check_title', { ns: 'payroll', defaultValue: 'Tick for specialist-grade doctors (Surgeon, Cardiologist, etc.) — adds 15% Specialist Research Allowance on top of 25% Medical Responsibility' }) %>"
+                   style="width:18px;height:18px;cursor:pointer;">
+            <% } else { %>
+            <span class="text-muted small" title="<%= _t('profiles.specialist_only', { ns: 'payroll', defaultValue: 'Only applicable to doctors' }) %>"
+                  style="display:block;text-align:center;padding-top:6px;">
+              <i class="fa fa-lock" style="color:#ccc;"></i>
+            </span>
+            <% } %>
+          </td>
+        </tr>
+      <% }); %>
+      <% if (!profiles.length) { %>
+        <tr><td colspan="12" class="text-center text-muted py-5"><%= _t('profiles.no_staff_match', { ns: 'payroll', defaultValue: 'No staff match your search.' }) %></td></tr>
+      <% } %>
+      </tbody>
+    </table>
+  </div>
+  <%- include('partials/pagination', { pager: locals.pager, pagerBase: '/payroll/profiles', pagerQuery: (typeof searchQ === 'string' && searchQ) ? { q: searchQ } : {} }) %>
+  <div class="pay-panel-body border-top no-print">
+    <button type="submit" class="hms-btn-primary"><i class="fa fa-save mr-1"></i> <%= _t('profiles.save_page', { ns: 'payroll', defaultValue: 'Save this page' }) %></button>
+  </div>
+</form>
+
+<script>
+(function () {
+  var PAY_I18N = <%- JSON.stringify({
+    swalMissing: _t('profiles.swal_missing', { ns: 'payroll', defaultValue: 'SweetAlert not loaded — refresh the page.' }),
+    calcTitle: _t('profiles.calc_title', { ns: 'payroll', defaultValue: 'Auto-calculate compensation' }),
+    calcRole: _t('profiles.calc_role', { ns: 'payroll', defaultValue: 'Role:' }),
+    calcEnterAs: _t('profiles.calc_enter_as', { ns: 'payroll', defaultValue: 'Enter amount as' }),
+    calcGross: _t('profiles.calc_gross', { ns: 'payroll', defaultValue: 'Gross salary (before deductions)' }),
+    calcNet: _t('profiles.calc_net', { ns: 'payroll', defaultValue: 'Net salary (take-home)' }),
+    calcAmount: _t('profiles.calc_amount', { ns: 'payroll', defaultValue: 'Amount (XAF)' }),
+    calcAmountPh: _t('profiles.calc_amount_ph', { ns: 'payroll', defaultValue: 'e.g. 500000' }),
+    calcHint: _t('profiles.calc_hint', { ns: 'payroll', defaultValue: 'Housing is set to 15% of Basic and Transport to 10% of Basic. Statutory allowances (Medical Responsibility, Specialist Research, Risk, Technical, Seniority, etc.) are computed from role and hire date.' }),
+    calcValidAmount: _t('profiles.calc_valid_amount', { ns: 'payroll', defaultValue: 'Enter an amount greater than 0' }),
+    calculate: _t('common.calculate', { ns: 'payroll', defaultValue: 'Calculate' }),
+    cancel: _t('common.cancel', { ns: 'payroll', defaultValue: 'Cancel' }),
+    calcLoading: _t('profiles.calc_loading', { ns: 'payroll', defaultValue: 'Calculating…' }),
+    calcFailed: _t('profiles.calc_failed', { ns: 'payroll', defaultValue: 'Calculation failed' }),
+    noEngineAllowances: _t('profiles.no_engine_allowances', { ns: 'payroll', defaultValue: 'No engine allowances for this role.' }),
+    basicSalary: _t('profiles.basic_salary', { ns: 'payroll', defaultValue: 'Basic salary' }),
+    housingPct: _t('profiles.housing_pct', { ns: 'payroll', defaultValue: 'Housing (15%)' }),
+    transportPct: _t('profiles.transport_pct', { ns: 'payroll', defaultValue: 'Transport (10%)' }),
+    gross: _t('profiles.gross', { ns: 'payroll', defaultValue: 'Gross' }),
+    totalDeductions: _t('profiles.total_deductions', { ns: 'payroll', defaultValue: 'Total deductions' }),
+    net: _t('profiles.net', { ns: 'payroll', defaultValue: 'Net' }),
+    calcSavedHint: _t('profiles.calc_saved_hint', { ns: 'payroll', defaultValue: 'Values have been filled into the row. Click <strong>Save this page</strong> to persist.' }),
+    calcDoneTitle: _t('profiles.calc_done_title', { ns: 'payroll', defaultValue: 'Compensation calculated' }),
+    done: _t('common.done', { ns: 'payroll', defaultValue: 'Done' }),
+    networkError: _t('profiles.network_error', { ns: 'payroll', defaultValue: 'Network error' })
+  }) %>;
+
+  function fmt(n) { return Math.round(Number(n) || 0).toLocaleString('fr-FR'); }
+  function setInputValue(name, val) {
+    var el = document.querySelector('[name="' + name + '"]');
+    if (!el) return false;
+    el.value = (val == null ? '' : Math.round(Number(val) || 0));
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  }
+
+  async function openCalc(eid, name, role) {
+    if (typeof Swal === 'undefined') {
+      alert(PAY_I18N.swalMissing);
+      return;
+    }
+    var formResp = await Swal.fire({
+      title: PAY_I18N.calcTitle,
+      width: 520,
+      html:
+        '<div style="text-align:left;font-size:.9rem;">' +
+          '<div class="mb-3">' +
+            '<div class="font-weight-bold" style="color:#1e1b4b;">' + name + '</div>' +
+            '<div class="small text-muted">' + PAY_I18N.calcRole + ' ' + role + '</div>' +
+          '</div>' +
+          '<div class="form-group mb-2">' +
+            '<label class="small font-weight-bold mb-1" style="color:#475569;">' + PAY_I18N.calcEnterAs + '</label>' +
+            '<select id="calcMode" class="form-control form-control-sm hms-input">' +
+              '<option value="gross">' + PAY_I18N.calcGross + '</option>' +
+              '<option value="net">' + PAY_I18N.calcNet + '</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="form-group mb-2">' +
+            '<label class="small font-weight-bold mb-1" style="color:#475569;">' + PAY_I18N.calcAmount + '</label>' +
+            '<input id="calcAmount" type="number" min="0" step="1000" inputmode="numeric"' +
+                  ' class="form-control form-control-sm hms-input" placeholder="' + PAY_I18N.calcAmountPh + '" autofocus>' +
+          '</div>' +
+          '<small class="text-muted">' + PAY_I18N.calcHint + '</small>' +
+        '</div>',
+      showCancelButton: true,
+      confirmButtonText: PAY_I18N.calculate,
+      cancelButtonText: PAY_I18N.cancel,
+      confirmButtonColor: '#7c3aed',
+      focusConfirm: false,
+      preConfirm: function () {
+        var mode = (document.getElementById('calcMode') || {}).value || 'gross';
+        var amount = parseFloat((document.getElementById('calcAmount') || {}).value);
+        if (!amount || amount <= 0) {
+          Swal.showValidationMessage(PAY_I18N.calcValidAmount);
+          return false;
+        }
+        return { mode: mode, amount: amount };
+      }
+    });
+    if (!formResp.value) return;
+    var payload = formResp.value;
+
+    Swal.fire({
+      title: PAY_I18N.calcLoading,
+      didOpen: function () { Swal.showLoading(); },
+      allowOutsideClick: false,
+      showConfirmButton: false
+    });
+
+    try {
+      var res = await fetch('/payroll/profiles/auto-compute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ employee_id: eid, mode: payload.mode, amount: payload.amount })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok || data.error) {
+        Swal.close();
+        HMS.alert(PAY_I18N.calcFailed, data.error || ('HTTP ' + res.status), 'error');
+        return;
+      }
+
+      setInputValue('basic_' + eid, data.basic_salary);
+      setInputValue('housing_' + eid, data.housing_allowance);
+      setInputValue('transport_' + eid, data.transport_allowance);
+      setInputValue('med_risk_' + eid, data.medical_risk_allowance);
+      setInputValue('responsibility_' + eid, data.responsibility_allowance);
+
+      var ded = data.deductions || {};
+      var lines = (data.allowance_lines || []).map(function (l) {
+        return '<tr><td style="padding:3px 8px;">' + (l.label || l.code) + '</td>' +
+               '<td style="padding:3px 8px;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(l.amount) + '</td></tr>';
+      }).join('');
+      if (!lines) lines = '<tr><td colspan="2" class="text-muted small" style="padding:3px 8px;">' + PAY_I18N.noEngineAllowances + '</td></tr>';
+
+      var html =
+        '<div style="text-align:left;font-size:.85rem;">' +
+          '<table style="width:100%;font-size:.85rem;border-collapse:collapse;">' +
+            '<tbody>' +
+              '<tr><td style="padding:3px 8px;">' + PAY_I18N.basicSalary + '</td><td style="padding:3px 8px;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data.basic_salary) + '</td></tr>' +
+              '<tr><td style="padding:3px 8px;">' + PAY_I18N.housingPct + '</td><td style="padding:3px 8px;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data.housing_allowance) + '</td></tr>' +
+              '<tr><td style="padding:3px 8px;">' + PAY_I18N.transportPct + '</td><td style="padding:3px 8px;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data.transport_allowance) + '</td></tr>' +
+              lines +
+              '<tr style="border-top:1px solid #cbd5e1;font-weight:600;"><td style="padding:5px 8px;">' + PAY_I18N.gross + '</td><td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data.gross) + '</td></tr>' +
+              (ded.total != null ? '<tr><td style="padding:3px 8px;color:#be185d;">' + PAY_I18N.totalDeductions + '</td><td style="padding:3px 8px;text-align:right;color:#be185d;font-variant-numeric:tabular-nums;">−' + fmt(ded.total) + '</td></tr>' : '') +
+              (data.net != null ? '<tr style="border-top:1px solid #cbd5e1;font-weight:700;color:#065f46;"><td style="padding:5px 8px;">' + PAY_I18N.net + '</td><td style="padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data.net) + '</td></tr>' : '') +
+            '</tbody>' +
+          '</table>' +
+          '<div class="small text-muted mt-2">' + PAY_I18N.calcSavedHint + '</div>' +
+        '</div>';
+
+      Swal.fire({
+        title: PAY_I18N.calcDoneTitle,
+        html: html,
+        icon: 'success',
+        confirmButtonColor: '#15803d',
+        confirmButtonText: PAY_I18N.done
+      });
+    } catch (err) {
+      Swal.close();
+      HMS.alert(PAY_I18N.networkError, String((err && err.message) || err), 'error');
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('.pay-calc-btn');
+    if (!btn) return;
+    e.preventDefault();
+    var eid = parseInt(btn.getAttribute('data-eid'), 10);
+    var name = btn.getAttribute('data-name') || '';
+    var role = btn.getAttribute('data-role') || '';
+    if (eid > 0) openCalc(eid, name, role);
+  });
+})();
+</script>
+
+<%- include('partials/payroll-layout-end') %>

@@ -1,0 +1,74 @@
+<%- include('hms-perm-helpers') %>
+<%
+var _payNav = locals.payNav || locals.payNavActive || '';
+var _up = locals.userPerms || [];
+function payHasP() {
+  if (_up.includes('*')) return true;
+  for (var i = 0; i < arguments.length; i++) {
+    if (_up.includes(arguments[i])) return true;
+  }
+  return false;
+}
+var _role = String((locals.user && locals.user.role) || '');
+var _payIsAdmin = _role === '1' || _role === '99';
+var _payCanWrite = locals.payCanWrite || _payIsAdmin || payHasP('payroll.write');
+var _payShowLeaveAdmin = locals.payShowLeaveAdmin || _payIsAdmin || payHasP('hr.leave.approve');
+var _payCanTaxHub = locals.payCanTaxHub || payHasP('accounting.read', 'accounting.write');
+function _payActive(keys) {
+  if (!Array.isArray(keys)) keys = [keys];
+  for (var i = 0; i < keys.length; i++) {
+    if (_payNav === keys[i]) return ' active';
+  }
+  return '';
+}
+if (typeof _t !== 'function') {
+  var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+}
+%>
+<header class="o_web_navbar">
+  <button type="button" class="o_nav_home" id="hmsOdooAppsBtn" title="<%= _t('nav.all_apps', { ns: 'payroll', defaultValue: 'All applications' }) %>" aria-label="<%= _t('nav.apps', { ns: 'payroll', defaultValue: 'Applications' }) %>"><i class="fa fa-th"></i></button>
+  <a href="/payroll" class="o_nav_module"><%= _t('nav.module', { ns: 'payroll', defaultValue: 'Payroll' }) %></a>
+  <nav class="o_nav_menu" aria-label="<%= _t('nav.aria_label', { ns: 'payroll', defaultValue: 'Payroll and HR' }) %>">
+    <a href="/payroll" class="o_nav_link<%= _payActive('dashboard') %>"><%= _t('nav.dashboard', { ns: 'payroll', defaultValue: 'Dashboard' }) %></a>
+    <a href="/payroll/monthly" class="o_nav_link<%= _payActive('monthly') %>"><%= _t('nav.monthly_payroll', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></a>
+    <% if(_payCanWrite){ %>
+    <a href="/payroll/profiles" class="o_nav_link<%= _payActive('profiles') %>"><%= _t('nav.pay_profiles', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></a>
+    <a href="/payroll/settings" class="o_nav_link<%= _payActive('settings') %>"><%= _t('nav.tax_settings', { ns: 'payroll', defaultValue: 'Tax settings' }) %></a>
+    <a href="/payroll/integrations" class="o_nav_link<%= _payActive('integrations') %>"><%= _t('nav.integrations', { ns: 'payroll', defaultValue: 'Integrations' }) %></a>
+    <% } %>
+    <% if(payHasP('hr.self.read','payroll.read','payroll.write')){ %>
+    <div class="o_nav_dropdown<%= _payActive(['payslips','leave','attendance','leavebal']) %>">
+      <button type="button" class="o_nav_link o_nav_drop_btn"><%= _t('nav.employees', { ns: 'payroll', defaultValue: 'Employees' }) %> <i class="fa fa-caret-down"></i></button>
+      <div class="o_nav_drop_panel">
+        <a href="/hr/my-payslips"><%= _t('nav.my_payslips', { ns: 'payroll', defaultValue: 'My payslips' }) %></a>
+        <a href="/hr/request-leave"><%= _t('nav.request_leave', { ns: 'payroll', defaultValue: 'Request leave' }) %></a>
+        <a href="/hr/my-attendance"><%= _t('nav.my_attendance', { ns: 'payroll', defaultValue: 'My attendance' }) %></a>
+        <a href="/hr/my-leave-balance"><%= _t('nav.my_leave_balance', { ns: 'payroll', defaultValue: 'My leave balance' }) %></a>
+      </div>
+    </div>
+    <% } %>
+    <% if(_payIsAdmin || _payCanWrite){ %>
+    <div class="o_nav_dropdown<%= _payActive(['hratt']) %>">
+      <button type="button" class="o_nav_link o_nav_drop_btn"><%= _t('nav.operations', { ns: 'payroll', defaultValue: 'Operations' }) %> <i class="fa fa-caret-down"></i></button>
+      <div class="o_nav_drop_panel">
+        <a href="/staff"><%= _t('nav.staff_directory', { ns: 'payroll', defaultValue: 'Staff directory' }) %></a>
+        <a href="/hr/attendance"><%= _t('nav.attendance', { ns: 'payroll', defaultValue: 'Attendance' }) %></a>
+      </div>
+    </div>
+    <% } %>
+    <% if(_payShowLeaveAdmin){ %>
+    <div class="o_nav_dropdown<%= _payActive(['leaveadmin']) %>">
+      <button type="button" class="o_nav_link o_nav_drop_btn"><%= _t('nav.leave', { ns: 'payroll', defaultValue: 'Leave' }) %> <i class="fa fa-caret-down"></i></button>
+      <div class="o_nav_drop_panel">
+        <a href="/hr/leave-requests"><%= _t('nav.approvals', { ns: 'payroll', defaultValue: 'Approvals' }) %></a>
+        <a href="/hr/leave-balances"><%= _t('nav.leave_balances', { ns: 'payroll', defaultValue: 'Leave balances' }) %></a>
+        <a href="/hr/holidays"><%= _t('nav.holidays', { ns: 'payroll', defaultValue: 'Holidays' }) %></a>
+      </div>
+    </div>
+    <% } %>
+    <% if(_payCanTaxHub){ %>
+    <a href="/tax" class="o_nav_link<%= _payActive('tax') %>"><%= _t('nav.tax_hub', { ns: 'payroll', defaultValue: 'Tax hub' }) %></a>
+    <% } %>
+  </nav>
+  <%- include('odoo-nav-user-menu') %>
+</header>

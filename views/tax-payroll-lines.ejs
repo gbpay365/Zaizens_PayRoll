@@ -1,0 +1,42 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'tax', canTaxHub: true }) %>
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+ <div>
+ <h4 class="page-title font-weight-bold text-dark mb-1"><%= _tl('tax_payroll_lines.title', 'Payroll tax lines') %></h4>
+ </div>
+ <a href="/tax" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _tl('tax_payroll_lines.tax_hub', 'Tax hub') %></a>
+ </div>
+
+ <div class="card border-0 shadow-sm" style="border-radius:14px;">
+ <div class="card-body p-0 table-responsive">
+ <table class="table table-sm table-striped mb-0" data-hms-table-paginate="10">
+ <thead><tr><th><%= _tl('tax_payroll_lines.col_employee', 'Employee') %></th><th><%= _tl('tax_payroll_lines.col_period', 'Period') %></th><th><%= _tl('tax_payroll_lines.col_gross', 'Gross') %></th><th><%= _tl('tax_payroll_lines.col_cnps', 'CNPS') %></th><th><%= _tl('tax_payroll_lines.col_irpp', 'IRPP') %></th><th><%= _tl('tax_payroll_lines.col_net', 'Net') %></th><th><%= _tl('tax_payroll_lines.col_status', 'Status') %></th></tr></thead>
+ <tbody>
+ <% if(!rows || !rows.length){ %>
+ <tr><td colspan="7" class="text-center text-muted py-4"><%= _tl('tax_payroll_lines.no_records', 'No payroll records.') %></td></tr>
+ <% } %>
+ <% (rows||[]).forEach(function(r){
+ var mid = parseInt(r.month,10)||0;
+ var paySt = String(r.payout_status||'pending').toLowerCase().trim();
+ %>
+ <tr>
+ <td><%= r.first_name %> <%= r.last_name %></td>
+ <td><%= months[mid] || mid %> <%= r.year %></td>
+ <td><%= Number(r.gross_salary||0).toLocaleString('fr-FR',{maximumFractionDigits:0}) %></td>
+ <td><%= Number(r.cnps_employee||0).toLocaleString('fr-FR',{maximumFractionDigits:0}) %></td>
+ <td><%= Number(r.income_tax||0).toLocaleString('fr-FR',{maximumFractionDigits:0}) %></td>
+ <td><strong><%= Number(r.net_salary||0).toLocaleString('fr-FR',{maximumFractionDigits:0}) %></strong></td>
+ <td>
+ <% if(paySt==='paid'){ %><span class="badge badge-success"><%= _tl('tax_payroll_lines.paid', 'Paid') %></span>
+ <% } else if(paySt==='pending'){ %><span class="badge badge-secondary"><%= _tl('tax_payroll_lines.pending', 'Pending') %></span>
+ <% } else { %><span class="badge badge-light text-dark"><%= paySt %></span><% } %>
+ </td>
+ </tr>
+ <% }); %>
+ </tbody>
+ </table>
+ </div>
+ </div>
+ </div>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

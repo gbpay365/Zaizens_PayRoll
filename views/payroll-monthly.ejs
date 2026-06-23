@@ -1,0 +1,158 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'monthly', canPayrollSettings: locals.canPayrollSettings }) %>
+<%
+var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+var m = locals.metrics || {};
+%>
+
+<div class="pay-hero">
+  <h1><%= _t('monthly.title', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></h1>
+  <% if(isAdmin){ %>
+  <div class="pay-hero-actions no-print">
+    <button type="button" class="btn btn-light btn-sm font-weight-bold" data-hms-payroll-modal="process"><i class="fa fa-calculator mr-1"></i> <%= _t('monthly.process_month', { ns: 'payroll', defaultValue: 'Process month' }) %></button>
+    <button type="button" class="btn btn-outline-light btn-sm font-weight-bold" data-hms-payroll-modal="mark-paid"><i class="fa fa-check mr-1"></i> <%= _t('monthly.mark_period_paid', { ns: 'payroll', defaultValue: 'Mark period paid' }) %></button>
+    <button type="button" class="btn btn-outline-light btn-sm font-weight-bold" data-hms-payroll-modal="resync"><i class="fa fa-cloud-upload mr-1"></i> <%= _t('monthly.sync_account_core', { ns: 'payroll', defaultValue: 'Sync to Account_Core' }) %></button>
+    <a href="/payroll/profiles" class="btn btn-outline-light btn-sm font-weight-bold"><i class="fa fa-id-card-o mr-1"></i> <%= _t('monthly.pay_profiles', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></a>
+  </div>
+  <% } %>
+</div>
+
+<div class="pay-kpi-row no-print">
+  <div class="pay-kpi">
+    <div class="pay-kpi-label"><%= _t('monthly.lines_current_month', { ns: 'payroll', defaultValue: 'Lines (current month)' }) %></div>
+    <div class="pay-kpi-value"><%= (m.pendingCount || 0) + (m.paidCount || 0) %></div>
+  </div>
+  <div class="pay-kpi">
+    <div class="pay-kpi-label"><%= _t('monthly.pending_payout', { ns: 'payroll', defaultValue: 'Pending payout' }) %></div>
+    <div class="pay-kpi-value"><%= m.pendingCount != null ? m.pendingCount : '—' %></div>
+  </div>
+  <div class="pay-kpi">
+    <div class="pay-kpi-label"><%= _t('monthly.paid', { ns: 'payroll', defaultValue: 'Paid' }) %></div>
+    <div class="pay-kpi-value"><%= m.paidCount != null ? m.paidCount : '—' %></div>
+  </div>
+  <div class="pay-kpi">
+    <div class="pay-kpi-label"><%= _t('monthly.net_this_month', { ns: 'payroll', defaultValue: 'Net this month (XAF)' }) %></div>
+    <div class="pay-kpi-value"><%= _fmtXaf(m.periodNet) %></div>
+  </div>
+</div>
+
+<div class="pay-panel">
+  <div class="pay-panel-head">
+    <h2><%= _t('monthly.payroll_lines', { ns: 'payroll', defaultValue: 'Payroll lines' }) %></h2>
+    <div class="pay-toolbar no-print">
+      <input type="search" name="q" id="payrollLinesSearch" class="pay-search" data-hms-server-search="/payroll/monthly" value="<%= typeof searchQ === 'string' ? searchQ : '' %>" placeholder="<%= _t('monthly.search_placeholder', { ns: 'payroll', defaultValue: 'Search employee…' }) %>" aria-label="<%= _t('monthly.search_aria', { ns: 'payroll', defaultValue: 'Search payroll lines' }) %>" autocomplete="off">
+      <% if(isAdmin && rows.length){ %>
+      <button type="button" id="payBulkDeleteBtn" class="btn btn-sm btn-danger font-weight-bold" disabled
+              title="<%= _t('monthly.delete_selected_title', { ns: 'payroll', defaultValue: 'Delete selected payroll lines' }) %>"
+              data-pay-bulk-delete-confirm="<%= _t('monthly.bulk_delete_confirm', { ns: 'payroll', defaultValue: 'Delete {{count}} selected payroll line(s)? They can be re-processed after deletion.' }) %>">
+        <i class="fa fa-trash mr-1"></i><%= _t('monthly.delete_selected', { ns: 'payroll', defaultValue: 'Delete selected' }) %> <span id="payBulkDeleteCount">(0)</span>
+      </button>
+      <% var _allIds = Array.isArray(locals.allDeletableIds) ? locals.allDeletableIds : []; var _showAll = _allIds.length > rows.length; %>
+      <% if(_showAll){ %>
+      <button type="button" id="payBulkSelectAllResults" class="btn btn-sm hms-btn-secondary" data-total="<%= _allIds.length %>"
+              data-label-select="<%= _t('monthly.select_all', { ns: 'payroll', defaultValue: 'Select all' }) %> <%= _allIds.length %> <%= _t('common.lines', { ns: 'payroll', defaultValue: 'lines' }) %>"
+              data-label-clear="<%= _t('monthly.clear_selection', { ns: 'payroll', defaultValue: 'Clear selection' }) %>">
+        <%= _t('monthly.select_all', { ns: 'payroll', defaultValue: 'Select all' }) %> <%= _allIds.length %> <%= _t('common.lines', { ns: 'payroll', defaultValue: 'lines' }) %>
+      </button>
+      <% } %>
+      <% } %>
+      <% if(locals.canPayrollSettings){ %>
+      <a href="/payroll/settings" class="hms-btn-secondary btn-sm"><%= _t('monthly.tax_settings', { ns: 'payroll', defaultValue: 'Tax settings' }) %></a>
+      <% } %>
+      <% if(locals.payCanTaxHub){ %>
+      <a href="/tax" class="hms-btn-secondary btn-sm"><%= _t('monthly.tax_hub', { ns: 'payroll', defaultValue: 'Tax hub' }) %></a>
+      <% } %>
+    </div>
+  </div>
+  <% if(isAdmin){ %>
+  <form id="payBulkDeleteForm" method="POST" action="/payroll/delete-records" class="d-none">
+    <input type="hidden" name="_return_q" value="<%= typeof searchQ === 'string' ? searchQ : '' %>">
+    <input type="hidden" name="_return_p" value="<%= (locals.pager && locals.pager.page) ? locals.pager.page : 1 %>">
+    <div id="payBulkDeleteIds"></div>
+  </form>
+  <% } %>
+  <div class="pay-table-wrap">
+    <table class="pay-table" id="payrollLinesTable"
+      <% if(isAdmin && Array.isArray(locals.allDeletableIds) && locals.allDeletableIds.length){ %>
+      data-all-deletable-ids="<%= JSON.stringify(locals.allDeletableIds) %>"
+      <% } %>>
+      <thead>
+        <tr>
+          <% if(isAdmin){ %>
+          <th class="pay-col-check no-print" scope="col">
+            <input type="checkbox" id="paySelectAllPage" class="pay-row-check" title="<%= _t('common.select_all_page', { ns: 'payroll', defaultValue: 'Select all on this page' }) %>" aria-label="<%= _t('common.select_all_page', { ns: 'payroll', defaultValue: 'Select all on this page' }) %>">
+          </th>
+          <% } %>
+          <th><%= _t('common.employee', { ns: 'payroll', defaultValue: 'Employee' }) %></th>
+          <th><%= _t('common.period', { ns: 'payroll', defaultValue: 'Period' }) %></th>
+          <th class="text-right"><%= _t('col_gross', { ns: 'payroll', defaultValue: 'Gross (XAF)' }) %></th>
+          <th class="text-right"><%= _t('col_irpp', { ns: 'payroll', defaultValue: 'IRPP' }) %></th>
+          <th class="text-right"><%= _t('col_net', { ns: 'payroll', defaultValue: 'Net' }) %></th>
+          <th><%= _t('common.status', { ns: 'payroll', defaultValue: 'Status' }) %></th>
+          <th class="text-right no-print"><%= _t('common.actions', { ns: 'payroll', defaultValue: 'Actions' }) %></th>
+        </tr>
+      </thead>
+      <tbody>
+      <% if(!rows.length){ %>
+        <tr><td colspan="<%= isAdmin ? 8 : 7 %>" class="text-center text-muted py-5"><%= _t('monthly.no_records', { ns: 'payroll', defaultValue: 'No payroll records yet.' }) %></td></tr>
+      <% } %>
+      <% rows.forEach(function(r){
+        var mid = parseInt(r.month,10)||0;
+        var pid = parseInt(r.id,10)||0;
+        var eidRow = parseInt(r.employee_id,10)||0;
+        var canSlip = isAdmin || (sessionUid > 0 && eidRow === sessionUid);
+        var paySt = String(r.payout_status||'pending').toLowerCase().trim();
+        var searchKey = (r.first_name + ' ' + r.last_name + ' ' + (months[mid]||'') + ' ' + r.year).toLowerCase();
+      %>
+        <tr data-pay-row="1" data-pay-search="<%= searchKey %>" data-payroll-id="<%= pid %>">
+          <% if(isAdmin){ %>
+          <td class="pay-col-check no-print">
+            <% if(pid > 0){ %>
+            <input type="checkbox" class="pay-row-check pay-line-select" value="<%= pid %>" aria-label="<%= _t('monthly.select_employee', { ns: 'payroll', defaultValue: 'Select' }) %> <%= r.first_name %> <%= r.last_name %>">
+            <% } %>
+          </td>
+          <% } %>
+          <td class="font-weight-bold"><%= r.first_name %> <%= r.last_name %></td>
+          <td><%= months[mid] || '' %> <%= r.year %></td>
+          <td class="pay-num"><%= _fmtXaf(r.gross_salary) %></td>
+          <td class="pay-num"><%= _fmtXaf(r.income_tax) %></td>
+          <td class="pay-num"><strong><%= _fmtXaf(r.net_salary) %></strong></td>
+          <td>
+            <% if(paySt==='paid'){ %><span class="pay-badge pay-badge-paid"><%= _t('status_paid', { ns: 'payroll', defaultValue: 'Paid' }) %></span>
+            <% } else if(paySt==='pending'){ %><span class="pay-badge pay-badge-pending"><%= _t('status_pending', { ns: 'payroll', defaultValue: 'Pending' }) %></span>
+            <% } else { %><span class="pay-badge"><%= paySt %></span><% } %>
+          </td>
+          <td class="text-right text-nowrap no-print">
+            <% var _hasSlip = canSlip && pid > 0; var _hasMark = isAdmin && paySt==='pending' && pid > 0; var _canDel = isAdmin && pid > 0; %>
+            <% if(_hasSlip){ %>
+            <a href="/payroll/payslip/<%= pid %>" target="_blank" rel="noopener" class="btn btn-sm hms-btn-secondary"><%= _t('monthly.payslip', { ns: 'payroll', defaultValue: 'Payslip' }) %></a>
+            <% } %>
+            <% if(_hasMark){ %>
+            <form method="POST" action="/payroll/mark-paid" class="d-inline ml-1" data-pay-confirm="<%= _t('monthly.mark_paid_confirm', { ns: 'payroll', defaultValue: 'Mark this line as paid?' }) %>">
+              <input type="hidden" name="payroll_record_id" value="<%= pid %>">
+              <button type="submit" class="btn btn-sm btn-success font-weight-bold"><%= _t('monthly.mark_paid', { ns: 'payroll', defaultValue: 'Mark paid' }) %></button>
+            </form>
+            <% } %>
+            <% if(_canDel){ %>
+            <form method="POST" action="/payroll/delete-record" class="d-inline ml-1"
+                  data-pay-confirm="<%= _t('monthly.delete_confirm_prefix', { ns: 'payroll', defaultValue: 'Delete this payroll record for' }) %> <%= r.first_name %> <%= r.last_name %> (<%= months[mid]||'' %> <%= r.year %>)?&#10;&#10;<%= _t('monthly.delete_confirm_suffix', { ns: 'payroll', defaultValue: 'The record will be permanently removed so you can re-process this period.' }) %>">
+              <input type="hidden" name="payroll_record_id" value="<%= pid %>">
+              <input type="hidden" name="_return_q" value="<%= typeof searchQ === 'string' ? searchQ : '' %>">
+              <button type="submit" class="btn btn-sm btn-danger font-weight-bold"
+                      title="<%= _t('monthly.delete_title', { ns: 'payroll', defaultValue: 'Delete record and allow re-generation' }) %>"
+                      style="opacity:<%= paySt==='paid' ? '0.65' : '1' %>">
+                <i class="fa fa-trash"></i>
+              </button>
+            </form>
+            <% } %>
+            <% if(!_hasSlip && !_hasMark && !_canDel){ %><span class="text-muted small">—</span><% } %>
+          </td>
+        </tr>
+      <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <%- include('partials/pagination', { pager: locals.pager, pagerBase: '/payroll/monthly', pagerQuery: (typeof searchQ === 'string' && searchQ) ? { q: searchQ } : {} }) %>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

@@ -1,0 +1,96 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'integrations', canPayrollSettings: true }) %>
+<% var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; }); %>
+
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <h4 class="page-title font-weight-bold text-dark mb-1">Integration &amp; API settings</h4>
+    <p class="text-muted small mb-0">Configure cross-platform URLs and API keys per facility. Use public HTTPS URLs when apps run on different servers.</p>
+  </div>
+</div>
+
+<% if(locals.flash){ %>
+<div class="alert alert-success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+<% } %>
+<% if(locals.error){ %>
+<div class="alert alert-danger border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+<% } %>
+
+<form method="POST" action="/payroll/integrations" class="mb-4">
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-body p-4">
+      <h2 class="h6 font-weight-bold mb-3">Facility (tenant)</h2>
+      <div class="form-row">
+        <div class="form-group col-md-4">
+          <label class="small font-weight-bold text-muted text-uppercase">Facility</label>
+          <select name="facility_id" class="form-control" onchange="location.href='/payroll/integrations?facility_id='+this.value">
+            <% (facilities || []).forEach(function(f){ %>
+            <option value="<%= f.id %>" <%= selectedId == f.id ? 'selected' : '' %>><%= f.name || ('Facility ' + f.id) %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="form-group col-md-8">
+          <label class="small font-weight-bold text-muted text-uppercase">This app public URL</label>
+          <input type="url" name="public_base_url" class="form-control" value="<%= settings.public_base_url || '' %>" placeholder="https://payroll.example.com">
+          <small class="text-muted">HMS uses this to push employees. No trailing slash.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-body p-4">
+      <h2 class="h6 font-weight-bold mb-3">Account_Core (outbound payroll sync)</h2>
+      <div class="form-group">
+        <div class="custom-control custom-checkbox mb-3">
+          <input type="checkbox" class="custom-control-input" id="coreSync" name="core_account_sync_enabled" value="1" <%= settings.core_account_sync_enabled ? 'checked' : '' %>>
+          <label class="custom-control-label" for="coreSync">Enable payroll sync to Account_Core</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label class="small font-weight-bold text-muted text-uppercase">Account_Core API URL</label>
+          <input type="url" name="core_account_url" class="form-control" value="<%= settings.core_account_url || '' %>" placeholder="https://accounting.example.com:5072">
+        </div>
+        <div class="form-group col-md-6">
+          <label class="small font-weight-bold text-muted text-uppercase">Outbound API key (X-API-Key)</label>
+          <input type="text" name="core_account_api_key" class="form-control" value="<%= settings.core_account_api_key || '' %>" autocomplete="off">
+        </div>
+      </div>
+      <button type="submit" formaction="/payroll/integrations/test-core" formmethod="POST" class="btn btn-outline-secondary btn-sm">Test Account_Core</button>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-body p-4">
+      <h2 class="h6 font-weight-bold mb-3">HMS (inbound employee replication)</h2>
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label class="small font-weight-bold text-muted text-uppercase">HMS URL (for health checks)</label>
+          <input type="url" name="hms_url" class="form-control" value="<%= settings.hms_url || '' %>" placeholder="http://127.0.0.1:3003">
+          <small class="text-muted">Local HMS runs on port <strong>3003</strong> in this install (not 3000).</small>
+        </div>
+        <div class="form-group col-md-6">
+          <label class="small font-weight-bold text-muted text-uppercase">Inbound API key (HMS must send this)</label>
+          <input type="text" name="hms_api_key_inbound" class="form-control" value="<%= settings.hms_api_key_inbound || '' %>" autocomplete="off">
+        </div>
+      </div>
+      <button type="submit" formaction="/payroll/integrations/test-hms" formmethod="POST" class="btn btn-outline-secondary btn-sm">Test HMS</button>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-body p-4">
+      <h2 class="h6 font-weight-bold mb-3">Inbound endpoints (configure in HMS)</h2>
+      <p class="small text-muted">Send header <code>X-API-Key</code> and <code>X-Facility-Id: <%= selectedId %></code></p>
+      <ul class="small mb-0">
+        <li><code>GET <%= inboundEndpoints.health %></code></li>
+        <li><code>POST <%= inboundEndpoints.employees %></code></li>
+        <li><code>POST <%= inboundEndpoints.employeesBulk %></code></li>
+      </ul>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-success font-weight-bold">Save integration settings</button>
+</form>
+
+<%- include('partials/payroll-layout-end') %>

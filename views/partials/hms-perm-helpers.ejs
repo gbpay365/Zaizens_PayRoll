@@ -1,0 +1,26 @@
+<%
+var role = String((locals.user && locals.user.role) || '0');
+var isAdminOrSuper = (role === '1' || role === '99');
+var _up = locals.userPerms || [];
+if (typeof hasP !== 'function') {
+  hasP = function () {
+    if (_up.includes('*')) return true;
+    for (var i = 0; i < arguments.length; i++) {
+      if (_up.includes(arguments[i])) return true;
+    }
+    return false;
+  };
+}
+if (typeof sbHidden !== 'function') {
+  sbHidden = function () { return false; };
+}
+if (typeof uiVisible !== 'function') {
+  uiVisible = function () { return false; };
+}
+if (typeof canHospitalDashboard !== 'function') {
+  canHospitalDashboard = function () { return false; };
+}
+locals.hasP = hasP;
+locals.isAdminOrSuper = isAdminOrSuper;
+locals.role = role;
+%>

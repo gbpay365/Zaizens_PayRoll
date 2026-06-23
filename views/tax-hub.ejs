@@ -1,0 +1,162 @@
+<%- include('partials/tax-hub-page-start', { finNavActive: 'tax_hub' }) %>
+<% var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; }); %>
+ <% if(locals.flash){ %>
+ <div class="alert alert-success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+ <% } %>
+ <% if(locals.error){ %>
+ <div class="alert alert-danger border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
+ <% } %>
+
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+ <div>
+ <h4 class="page-title font-weight-bold text-dark mb-1"><%= _t('tax_hub_page.title', { ns: 'legacy', defaultValue: 'Tax & compliance hub' }) %></h4>
+ <p class="text-muted small mb-0"><%= _t('tax_hub_page.subtitle', { ns: 'legacy', defaultValue: 'Payroll-related filings and exports. Validate formats with CNPS / DGI before official submission.' }) %></p>
+ </div>
+ </div>
+
+ <% if(lastDipe){ %>
+ <div class="alert alert-light border small mb-4" style="border-radius:12px;">
+ <strong><%= _t('tax_hub_page.latest_dipe', { ns: 'legacy', defaultValue: 'Latest DIPE:' }) %></strong> <%= months[lastDipe.month] %> <%= lastDipe.year %> — <code><%= lastDipe.filename %></code>
+ <a class="btn btn-sm btn-outline-primary ml-2" href="/tax/dipe/<%= lastDipe.id %>/download"><%= _t('tax_hub_page.download', { ns: 'legacy', defaultValue: 'Download' }) %></a>
+ </div>
+ <% } %>
+
+ <div class="row">
+ <div class="col-md-12 mb-4">
+ <div class="card border-0 shadow-sm" style="border-radius:14px;background:linear-gradient(120deg,#eef2ff 0%, #fdf4ff 100%);">
+ <div class="card-body p-4">
+ <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+ <div class="d-flex align-items-start">
+ <div class="rounded-lg d-flex align-items-center justify-content-center mr-3" style="width:54px;height:54px;background:#fff;color:#312e81;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+ <i class="fa fa-file-pdf-o fa-lg"></i>
+ </div>
+ <div>
+ <h5 class="font-weight-bold mb-1" style="color:#1e1b4b;"><%= _t('tax_hub_page.statutory_title', { ns: 'legacy', defaultValue: 'Statutory Payroll Declarations' }) %></h5>
+ <p class="small text-muted mb-0"><%= _t('tax_hub_page.statutory_desc', { ns: 'legacy', defaultValue: 'Printable, signed-and-stamped reports for the 4 official Cameroon filings: CNPS Monthly, DGI Monthly, CNPS Annual, and DGI Annual.' }) %></p>
+ </div>
+ </div>
+ <a href="/tax/statutory-reports" class="btn font-weight-bold rounded-pill" style="background:#312e81;color:#fff;white-space:nowrap;"><i class="fa fa-external-link mr-1"></i><%= _t('tax_hub_page.open_declarations', { ns: 'legacy', defaultValue: 'Open declarations' }) %></a>
+ </div>
+ </div>
+ </div>
+ </div>
+ <div class="col-md-6 mb-4">
+ <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+ <div class="card-body p-4">
+ <div class="d-flex align-items-start mb-3">
+ <div class="rounded-lg d-flex align-items-center justify-content-center mr-3" style="width:48px;height:48px;background:#eff6ff;color:#1d4ed8;">
+ <i class="fa fa-file-text-o fa-lg"></i>
+ </div>
+ <div>
+ <h5 class="font-weight-bold mb-1"><%= _t('tax_hub_page.cnps_title', { ns: 'legacy', defaultValue: 'CNPS / DIPE' }) %></h5>
+ <p class="small text-muted mb-0"><%= _t('tax_hub_page.cnps_desc', { ns: 'legacy', defaultValue: 'Generate fixed-width export from monthly payroll.' }) %></p>
+ </div>
+ </div>
+ <a href="/tax/cnps" class="btn btn-outline-primary font-weight-bold rounded-pill"><%= _t('tax_hub_page.open_cnps', { ns: 'legacy', defaultValue: 'Open CNPS export' }) %></a>
+ </div>
+ </div>
+ </div>
+ <div class="col-md-6 mb-4">
+ <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+ <div class="card-body p-4">
+ <div class="d-flex align-items-start mb-3">
+ <div class="rounded-lg d-flex align-items-center justify-content-center mr-3" style="width:48px;height:48px;background:#f0fdf4;color:#15803d;">
+ <i class="fa fa-table fa-lg"></i>
+ </div>
+ <div>
+ <h5 class="font-weight-bold mb-1"><%= _t('tax_hub_page.payroll_lines_title', { ns: 'legacy', defaultValue: 'Payroll tax lines' }) %></h5>
+ <p class="small text-muted mb-0"><%= _t('tax_hub_page.payroll_lines_desc', { ns: 'legacy', defaultValue: 'Facility-wide gross, IRPP, CNPS, net (read-only).' }) %></p>
+ </div>
+ </div>
+ <a href="/tax/payroll-lines" class="btn btn-outline-success font-weight-bold rounded-pill"><%= _t('tax_hub_page.view_lines', { ns: 'legacy', defaultValue: 'View lines' }) %></a>
+ </div>
+ </div>
+ </div>
+ <div class="col-md-6 mb-4">
+ <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+ <div class="card-body p-4">
+ <div class="d-flex align-items-start mb-3">
+ <div class="rounded-lg d-flex align-items-center justify-content-center mr-3" style="width:48px;height:48px;background:#fef2f2;color:#b91c1c;">
+ <i class="fa fa-download fa-lg"></i>
+ </div>
+ <div>
+ <h5 class="font-weight-bold mb-1"><%= _t('tax_hub_page.dgi_title', { ns: 'legacy', defaultValue: 'DGI declaration CSV' }) %></h5>
+ <p class="small text-muted mb-0"><%= _t('tax_hub_page.dgi_desc', { ns: 'legacy', defaultValue: 'Semicolon format: monthly declaration and annual summary.' }) %></p>
+ </div>
+ </div>
+ <a href="/tax/dgi" class="btn font-weight-bold rounded-pill" style="border-color:#b91c1c;color:#b91c1c;"><%= _t('tax_hub_page.open_dgi', { ns: 'legacy', defaultValue: 'Open DGI exports' }) %></a>
+ </div>
+ </div>
+ </div>
+ </div>
+
+ <div class="row">
+ <div class="col-md-6 mb-4">
+ <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+ <div class="card-body p-4">
+ <div class="d-flex align-items-start mb-3">
+ <div class="rounded-lg d-flex align-items-center justify-content-center mr-3" style="width:48px;height:48px;background:#fffbeb;color:#b45309;">
+ <i class="fa fa-calendar fa-lg"></i>
+ </div>
+ <div>
+ <h5 class="font-weight-bold mb-1"><%= _t('tax_hub_page.compliance_title', { ns: 'legacy', defaultValue: 'Compliance calendar' }) %></h5>
+ <p class="small text-muted mb-0"><%= _t('tax_hub_page.compliance_desc', { ns: 'legacy', defaultValue: 'Months with payroll headcount and paid share.' }) %></p>
+ </div>
+ </div>
+ <a href="/tax/compliance" class="btn btn-outline-warning font-weight-bold rounded-pill"><%= _t('tax_hub_page.open_calendar', { ns: 'legacy', defaultValue: 'Open calendar' }) %></a>
+ </div>
+ </div>
+ </div>
+ <div class="col-md-6 mb-4">
+ <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
+ <div class="card-body p-4">
+ <div class="d-flex align-items-start mb-3">
+ <div class="rounded-lg d-flex align-items-center justify-content-center mr-3" style="width:48px;height:48px;background:#faf5ff;color:#7e22ce;">
+ <i class="fa fa-percent fa-lg"></i>
+ </div>
+ <div>
+ <h5 class="font-weight-bold mb-1"><%= _t('tax_hub_page.tax_params_title', { ns: 'legacy', defaultValue: 'Company tax parameters' }) %></h5>
+ <p class="small text-muted mb-0"><%= _t('tax_hub_page.tax_params_desc', { ns: 'legacy', defaultValue: 'NIU, employer CNPS number, and deduction rates (payroll settings).' }) %></p>
+ </div>
+ </div>
+ <a href="/payroll/settings?tab=employer" class="btn font-weight-bold rounded-pill" style="border-color:#7e22ce;color:#7e22ce;"><%= _t('tax_hub_page.open_tax_params', { ns: 'legacy', defaultValue: 'Open tax parameters' }) %></a>
+ </div>
+ </div>
+ </div>
+ </div>
+
+ <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+ <div class="card-header bg-white font-weight-bold py-3"><%= _t('tax_hub_page.csv_alt_title', { ns: 'legacy', defaultValue: 'Quick comma CSV (alternate layout)' }) %></div>
+ <div class="card-body">
+ <p class="small text-muted mb-3"><%= _t('tax_hub_page.csv_alt_desc', { ns: 'legacy', defaultValue: 'Comma-separated extract (gross, IRPP, CNPS, council, net). For the semicolon DGI-style file, use DGI payroll exports.' }) %> <a href="/tax/dgi"><%= _t('tax_hub_page.csv_alt_link', { ns: 'legacy', defaultValue: 'DGI payroll exports' }) %></a>.</p>
+ <form method="GET" action="/tax/dgi-export" class="form-row align-items-end">
+ <div class="form-group col-md-3">
+ <label class="small font-weight-bold"><%= _t('tax_hub_page.month', { ns: 'legacy', defaultValue: 'Month' }) %></label>
+ <select name="month" class="form-control">
+ <% for(var n=1;n<=12;n++){ %>
+ <option value="<%=n%>" <%= n===new Date().getMonth()+1 ? 'selected' : '' %>><%= months[n] %></option>
+ <% } %>
+ </select>
+ </div>
+ <div class="form-group col-md-3">
+ <label class="small font-weight-bold"><%= _t('tax_hub_page.year', { ns: 'legacy', defaultValue: 'Year' }) %></label>
+ <select name="year" class="form-control">
+ <% for(var y = cy - 1; y <= cy + 1; y++){ %>
+ <option value="<%=y%>" <%= y===cy ? 'selected' : '' %>><%=y%></option>
+ <% } %>
+ </select>
+ </div>
+ <div class="form-group col-md-4">
+ <button type="submit" class="btn btn-dark font-weight-bold"><%= _t('tax_hub_page.download_csv', { ns: 'legacy', defaultValue: 'Download CSV' }) %></button>
+ </div>
+ </form>
+ </div>
+ </div>
+
+ <div class="alert alert-light border small mb-0" style="border-radius:12px;">
+ <i class="fa fa-info-circle mr-1 text-muted"></i>
+ <%= _t('tax_hub_page.access_note', { ns: 'legacy', defaultValue: 'Access is controlled by accounting.read / accounting.write. Generating DIPE requires write.' }) %>
+ </div>
+ </div>
+
+<%- include('partials/tax-hub-page-end') %>

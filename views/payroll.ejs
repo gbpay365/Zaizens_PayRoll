@@ -1,0 +1,105 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'dashboard', showHrLeaveAdmin: locals.showHrLeaveAdmin, canTaxHub: locals.canTaxHub, canPayrollSettings: locals.canPayrollSettings }) %>
+<%
+var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+var m = locals.metrics || {};
+var profilesGap = Math.max(0, (m.staffActive || headcount || 0) - (m.profilesConfigured || 0));
+var _staffCount = Number(headcount || m.staffActive || 0);
+var _thisMonth = _t('common.this_month', { ns: 'payroll', defaultValue: 'This month' });
+%>
+
+<div class="pay-hero">
+  <h1><%= _t('dashboard.title', { ns: 'payroll', defaultValue: 'Payroll & HR' }) %></h1>
+  <div class="pay-hero-actions no-print">
+    <a href="/payroll/monthly" class="btn btn-light btn-sm font-weight-bold"><i class="fa fa-money mr-1"></i> <%= _t('dashboard.monthly_payroll', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></a>
+    <% if(locals.payCanWrite){ %>
+    <a href="/payroll/profiles" class="btn btn-outline-light btn-sm font-weight-bold"><i class="fa fa-id-card-o mr-1"></i> <%= _t('dashboard.pay_profiles', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></a>
+    <% } %>
+    <% if(locals.canPayrollSettings){ %>
+    <a href="/payroll/settings" class="btn btn-outline-light btn-sm font-weight-bold"><i class="fa fa-sliders mr-1"></i> <%= _t('dashboard.tax_settings', { ns: 'payroll', defaultValue: 'Tax settings' }) %></a>
+    <% } %>
+  </div>
+</div>
+
+<div class="pay-kpi-row">
+  <div class="pay-kpi">
+    <div class="pay-kpi-label"><%= _t('dashboard.active_staff', { ns: 'payroll', defaultValue: 'Active staff' }) %></div>
+    <div class="pay-kpi-value"><%= _staffCount.toLocaleString('fr-FR') %></div>
+  </div>
+  <div class="pay-kpi">
+    <div class="pay-kpi-label"><%= m.monthLabel || _thisMonth %> <%= _t('dashboard.pending_suffix', { ns: 'payroll', defaultValue: '· pending' }) %></div>
+    <div class="pay-kpi-value"><%= m.pendingCount != null ? m.pendingCount : '—' %></div>
+  </div>
+  <div class="pay-kpi">
+    <div class="pay-kpi-label"><%= m.monthLabel || _thisMonth %> <%= _t('dashboard.paid_suffix', { ns: 'payroll', defaultValue: '· paid' }) %></div>
+    <div class="pay-kpi-value"><%= m.paidCount != null ? m.paidCount : '—' %></div>
+  </div>
+  <div class="pay-kpi">
+    <div class="pay-kpi-label"><%= _t('dashboard.period_net_xaf', { ns: 'payroll', defaultValue: 'Period net (XAF)' }) %></div>
+    <div class="pay-kpi-value"><%= _fmtXaf(m.periodNet) %> <small><%= _t('common.gross_lower', { ns: 'payroll', defaultValue: 'gross' }) %> <%= _fmtXaf(m.periodGross) %></small></div>
+  </div>
+  <% if(locals.payCanWrite && profilesGap > 0){ %>
+  <div class="pay-kpi" style="border-color:#fde68a;background:#fffbeb;">
+    <div class="pay-kpi-label"><%= _t('dashboard.profiles_to_configure', { ns: 'payroll', defaultValue: 'Profiles to configure' }) %></div>
+    <div class="pay-kpi-value" style="color:#b45309;"><%= profilesGap %></div>
+  </div>
+  <% } %>
+</div>
+
+<h2 class="h6 font-weight-bold text-muted text-uppercase mb-3" style="letter-spacing:0.06em;"><%= _t('dashboard.quick_links', { ns: 'payroll', defaultValue: 'Quick links' }) %></h2>
+<div class="pay-tile-grid">
+  <a href="/payroll/monthly" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#ecfdf5;color:#059669;"><i class="fa fa-money"></i></div>
+    <h3><%= _t('dashboard.monthly_payroll', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></h3>
+</a>
+  <% if(locals.payCanWrite){ %>
+  <a href="/payroll/profiles" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#f5f3ff;color:#7c3aed;"><i class="fa fa-id-card-o"></i></div>
+    <h3><%= _t('dashboard.salary_profiles', { ns: 'payroll', defaultValue: 'Salary profiles' }) %></h3>
+</a>
+  <a href="/payroll/settings" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#fff7ed;color:#c2410c;"><i class="fa fa-sliders"></i></div>
+    <h3><%= _t('dashboard.tax_settings', { ns: 'payroll', defaultValue: 'Tax settings' }) %></h3>
+</a>
+  <% } %>
+  <% if (locals.paySelfServiceEnabled) { %>
+  <a href="/hr/my-payslips" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#eff6ff;color:#2563eb;"><i class="fa fa-file-text-o"></i></div>
+    <h3><%= _t('dashboard.my_payslips', { ns: 'payroll', defaultValue: 'My payslips' }) %></h3>
+</a>
+  <% } %>
+  <a href="/hr/request-leave" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#faf5ff;color:#7c3aed;"><i class="fa fa-paper-plane"></i></div>
+    <h3><%= _t('dashboard.request_leave', { ns: 'payroll', defaultValue: 'Request leave' }) %></h3>
+</a>
+  <a href="/staff" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#eef2ff;color:#4338ca;"><i class="fa fa-users"></i></div>
+    <h3><%= _t('dashboard.staff_directory', { ns: 'payroll', defaultValue: 'Staff directory' }) %></h3>
+</a>
+  <a href="/hr/attendance" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#ecfdf5;color:#15803d;"><i class="fa fa-clock-o"></i></div>
+    <h3><%= _t('dashboard.attendance', { ns: 'payroll', defaultValue: 'Attendance' }) %></h3>
+</a>
+  <% if(locals.showHrLeaveAdmin){ %>
+  <a href="/hr/leave-requests" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#fff1f2;color:#be123c;"><i class="fa fa-inbox"></i></div>
+    <h3><%= _t('dashboard.leave_approvals', { ns: 'payroll', defaultValue: 'Leave approvals' }) %></h3>
+</a>
+  <a href="/hr/leave-balances" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#ecfeff;color:#0e7490;"><i class="fa fa-balance-scale"></i></div>
+    <h3><%= _t('dashboard.leave_balances', { ns: 'payroll', defaultValue: 'Leave balances' }) %></h3>
+</a>
+  <a href="/hr/holidays" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#fef3c7;color:#b45309;"><i class="fa fa-calendar"></i></div>
+    <h3><%= _t('dashboard.public_holidays', { ns: 'payroll', defaultValue: 'Public holidays' }) %></h3>
+</a>
+  <% } %>
+  <% if(locals.canTaxHub){ %>
+  <a href="/tax" class="pay-tile">
+    <div class="pay-tile-icon" style="background:#eff6ff;color:#1d4ed8;"><i class="fa fa-institution"></i></div>
+    <h3><%= _t('dashboard.tax_compliance', { ns: 'payroll', defaultValue: 'Tax & compliance' }) %></h3>
+</a>
+  <% } %>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

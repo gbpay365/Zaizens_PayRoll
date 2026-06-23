@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="<%= locals.lang || 'en' %>">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><%= title %></title>
+<link rel="stylesheet" href="/css/font-awesome.min.css">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 24px; color: #0f172a; background: #f8fafc; }
+  .toolbar { margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .toolbar a, .toolbar button {
+    border: 1px solid #cbd5e1; background: #fff; color: #0f172a; border-radius: 8px;
+    padding: 10px 16px; font-weight: 600; cursor: pointer; text-decoration: none; font-size: 14px;
+  }
+  .toolbar button.primary { background: <%= meta.accent %>; color: #fff; border-color: <%= meta.accent %>; }
+  .page { max-width: 980px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
+  th { background: #f1f5f9; font-weight: 700; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin: 16px 0; }
+  .summary-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; background: #f8fafc; }
+  .summary-card .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .04em; }
+  .summary-card .value { font-size: 18px; font-weight: 800; margin-top: 4px; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; margin: 12px 0 4px; }
+  .meta-row strong { color: #334155; }
+  .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 48px; }
+  .sig-box { border-top: 1px solid #94a3b8; padding-top: 8px; min-height: 70px; font-size: 12px; color: #475569; }
+  .footnote { margin-top: 24px; font-size: 11px; color: #64748b; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .no-print { display: none !important; }
+    .page { border: 0; border-radius: 0; padding: 0; max-width: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+  <a href="/tax/statutory-reports">&larr; <%= _tl('tax_statutory.back', 'Declarations hub') %></a>
+  <button type="button" class="primary" onclick="window.print()"><i class="fa fa-print"></i> <%= _tl('tax_statutory.print_pdf', 'Print / Save as PDF') %></button>
+</div>
+
+<div class="page">
+  <%- include('partials/print-letterhead', {
+    docTitle: meta.title,
+    docNumber: periodLabel,
+    docDate: printDate,
+    accent: meta.accent,
+    tagline: orgName
+  }) %>
+
+  <div class="meta-row">
+    <div><strong><%= _tl('tax_statutory.employer_niu', 'Employer NIU') %>:</strong> <%= employer.employerNiu || '—' %></div>
+    <div><strong><%= _tl('tax_statutory.employer_cnps', 'CNPS employer no.') %>:</strong> <%= employer.employerCnps || '—' %></div>
+    <div><strong><%= _tl('tax_statutory.period', 'Period') %>:</strong> <%= periodLabel %></div>
+    <div><strong><%= _tl('tax_statutory.headcount', 'Headcount') %>:</strong> <%= summary.emp_cnt || 0 %></div>
+  </div>
+
+  <div class="summary-grid">
+    <div class="summary-card"><div class="label"><%= _tl('tax_statutory.gross', 'Gross payroll') %></div><div class="value"><%= fmtMoney(summary.gross) %> FCFA</div></div>
+    <div class="summary-card"><div class="label"><%= _tl('tax_statutory.cnps_employee', 'CNPS (employee)') %></div><div class="value"><%= fmtMoney(summary.cnps_employee) %> FCFA</div></div>
+    <div class="summary-card"><div class="label"><%= _tl('tax_statutory.cnps_employer', 'CNPS (employer)') %></div><div class="value"><%= fmtMoney(summary.cnps_employer) %> FCFA</div></div>
+    <div class="summary-card"><div class="label"><%= _tl('tax_statutory.irpp', 'IRPP') %></div><div class="value"><%= fmtMoney(summary.irpp) %> FCFA</div></div>
+    <div class="summary-card"><div class="label"><%= _tl('tax_statutory.net', 'Net payroll') %></div><div class="value"><%= fmtMoney(summary.net) %> FCFA</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th><%= _tl('tax_statutory.col_matricule', 'Matricule') %></th>
+        <th><%= _tl('tax_statutory.col_name', 'Employee') %></th>
+        <th><%= _tl('tax_statutory.col_cnps_ref', 'CNPS ref') %></th>
+        <th class="num"><%= _tl('tax_statutory.col_gross', 'Gross') %></th>
+        <th class="num"><%= _tl('tax_statutory.col_cnps', 'CNPS') %></th>
+        <th class="num"><%= _tl('tax_statutory.col_irpp', 'IRPP') %></th>
+        <th class="num"><%= _tl('tax_statutory.col_net', 'Net') %></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!lines.length) { %>
+      <tr><td colspan="7" class="text-center text-muted"><%= _tl('tax_statutory.no_lines', 'No payroll lines for this period.') %></td></tr>
+      <% } %>
+      <% lines.forEach(function(row){ %>
+      <tr>
+        <td><%= row.employee_id || '—' %></td>
+        <td><%= [row.last_name, row.first_name].filter(Boolean).join(' ') %></td>
+        <td><%= row.cnps_ref || '—' %></td>
+        <td class="num"><%= fmtMoney(row.gross_salary) %></td>
+        <td class="num"><%= fmtMoney(row.cnps_employee) %></td>
+        <td class="num"><%= fmtMoney(row.income_tax) %></td>
+        <td class="num"><%= fmtMoney(row.net_salary) %></td>
+      </tr>
+      <% }); %>
+    </tbody>
+  </table>
+
+  <div class="signatures">
+    <div class="sig-box"><%= _tl('tax_statutory.sig_preparer', 'Prepared by (name & signature)') %></div>
+    <div class="sig-box"><%= _tl('tax_statutory.sig_director', 'Director / Accountant (stamp & signature)') %></div>
+  </div>
+
+  <p class="footnote"><%= _tl('tax_statutory.disclaimer', 'Indicative report generated from HMS payroll. Confirm totals and layout with CNPS / DGI before filing.') %></p>
+</div>
+
+</body>
+</html>

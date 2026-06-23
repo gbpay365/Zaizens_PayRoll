@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<%
+if (typeof _tl !== 'function') {
+  var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+  var _tl = function (key, fallback, opts) {
+    var o = { ns: 'legacy', defaultValue: fallback };
+    if (opts && typeof opts === 'object') { for (var pk in opts) { if (Object.prototype.hasOwnProperty.call(opts, pk)) o[pk] = opts[pk]; } }
+    return _t(key, o);
+  };
+}
+%>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <style>
+    /* ════════════════════════════════════════════════════
+       PROFESSIONAL PAYSLIP — Navy & Gold Theme
+       Primary  : #0d2137  (deep navy)
+       Accent   : #c9a84c  (warm gold)
+       Surface  : #f4f6f9  (cool white-grey)
+       Danger   : #c0392b  (deduction red)
+    ════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+      font-size: 11px;
+      color: #1a202c;
+      background: #dde3ec;
+      padding: 24px 16px;
+    }
+
+    /* ── Page wrapper ── */
+    .payslip-doc {
+      background: #ffffff;
+      width: 780px;
+      margin: 0 auto;
+      box-shadow: 0 4px 24px rgba(13,33,55,.22);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    /* ── Gold top-bar accent ── */
+    .ps-topbar {
+      height: 5px;
+      background: linear-gradient(90deg, #c9a84c 0%, #f0d080 50%, #c9a84c 100%);
+    }
+
+    /* ── HEADER ── */
+    .ps-header {
+      background: #0d2137;
+      color: #ffffff;
+      text-align: center;
+      padding: 18px 24px 14px;
+      position: relative;
+    }
+    .ps-header::after {
+      content: '';
+      display: block;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #c9a84c, transparent);
+      margin-top: 12px;
+    }
+    .ps-header .org-name {
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #ffffff;
+    }
+    .ps-header .org-dept {
+      font-size: 11px;
+      margin-top: 4px;
+      color: #c9a84c;
+      font-weight: 600;
+      letter-spacing: .6px;
+    }
+    .ps-header .org-addr {
+      font-size: 10px;
+      margin-top: 3px;
+      color: rgba(255,255,255,.70);
+      letter-spacing: .3px;
+    }
+
+    /* ── TITLE ROW ── */
+    .ps-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px 9px;
+      background: #f4f6f9;
+      border-bottom: 2px solid #c9a84c;
+    }
+    .ps-title-row .slip-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #0d2137;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      border-left: 4px solid #c9a84c;
+      padding-left: 8px;
+    }
+    .ps-title-row .slip-sub {
+      font-size: 10px;
+      color: #4a5568;
+      margin-top: 3px;
+      padding-left: 12px;
+    }
+    .ps-title-row .slip-meta {
+      text-align: right;
+      font-size: 10px;
+      color: #2d3748;
+      line-height: 1.8;
+      background: #ffffff;
+      border: 1px solid #d0d9e8;
+      border-radius: 4px;
+      padding: 5px 12px;
+    }
+    .ps-title-row .slip-meta strong { color: #0d2137; }
+
+    /* ── EMPLOYEE INFO TABLE ── */
+    .ps-info-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 0;
+    }
+    .ps-info-table thead tr th {
+      background: #0d2137;
+      color: #c9a84c;
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 6px 14px;
+      letter-spacing: .8px;
+    }
+    .ps-info-table tbody tr:nth-child(odd) td  { background: #f7f9fc; }
+    .ps-info-table tbody tr:nth-child(even) td { background: #ffffff; }
+    .ps-info-table tbody tr td {
+      padding: 5px 14px;
+      font-size: 10.5px;
+      vertical-align: middle;
+      border-bottom: 1px solid #e8edf4;
+    }
+    .ps-info-table tbody tr:last-child td { border-bottom: none; }
+    .ps-info-table .info-label {
+      color: #4a5568;
+      font-weight: 700;
+      white-space: nowrap;
+      width: 130px;
+    }
+    .ps-info-table .info-value {
+      color: #0d2137;
+      font-weight: 500;
+      width: 240px;
+    }
+
+    /* ── MAIN PAY TABLE ── */
+    .ps-pay-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+    }
+    .ps-pay-table thead tr th {
+      background: #0d2137;
+      color: #c9a84c;
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 7px 12px;
+      text-align: left;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+    }
+    .ps-pay-table thead tr th:not(:first-child) { text-align: right; }
+
+    .ps-pay-table tbody tr:nth-child(odd)  td { background: #f7f9fc; }
+    .ps-pay-table tbody tr:nth-child(even) td { background: #ffffff; }
+    .ps-pay-table tbody tr td {
+      padding: 5px 12px;
+      font-size: 10.5px;
+      border-bottom: 1px solid #edf0f5;
+      vertical-align: middle;
+      color: #1a202c;
+    }
+    .ps-pay-table tbody tr td:not(:first-child) { text-align: right; }
+
+    /* Section sub-header rows (EARNINGS / DEDUCTIONS) */
+    .ps-pay-table .section-hdr td {
+      background: #1a3a5c !important;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      padding: 6px 12px;
+      border-left: 4px solid #c9a84c;
+      border-bottom: none;
+    }
+    .ps-pay-table .section-hdr.section-earnings td,
+    .ps-pay-table .section-hdr.section-deductions td {
+      font-size: 12.5px;
+      padding: 8px 12px;
+      letter-spacing: .7px;
+    }
+    .ps-pay-table tr.pay-earnings-line td,
+    .ps-pay-table tr.pay-deductions-line td {
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+    .ps-pay-table tr.pay-earnings-line.subtotal-row td,
+    .ps-pay-table tr.pay-deductions-line.subtotal-row td {
+      font-size: 12.5px;
+      padding: 8px 12px;
+    }
+    .ps-pay-table tr.pay-earnings-line.subtotal-row td:last-child,
+    .ps-pay-table tr.pay-deductions-line.subtotal-row td:last-child {
+      font-size: 13px;
+    }
+
+    /* Subtotal rows */
+    .ps-pay-table .subtotal-row td {
+      background: #0d2137 !important;
+      color: #ffffff !important;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 7px 12px;
+      border-top: none;
+      border-bottom: none;
+    }
+    .ps-pay-table .subtotal-row td:last-child {
+      color: #c9a84c !important;
+      font-size: 12px;
+    }
+
+    /* Deduction amount */
+    .ps-pay-table .ded-amt { color: #c0392b !important; font-weight: 600; }
+
+    /* ── NET PAY BANNER ── */
+    .ps-net-banner {
+      background: linear-gradient(135deg, #0d2137 0%, #1a3a5c 100%);
+      color: #fff;
+      text-align: center;
+      padding: 18px 20px 15px;
+      border-top: 3px solid #c9a84c;
+    }
+    .ps-net-banner .net-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.85);
+    }
+    .ps-net-banner .net-amount {
+      font-size: 26px;
+      font-weight: 700;
+      color: #c9a84c;
+      margin-top: 4px;
+      letter-spacing: 1px;
+    }
+    .ps-net-banner .net-words {
+      font-size: 10px;
+      color: rgba(255,255,255,.72);
+      margin-top: 4px;
+      font-style: italic;
+      letter-spacing: .3px;
+    }
+
+    /* ── EMPLOYER CONTRIBUTION NOTE ── */
+    /* ── FOOTER ── */
+    .ps-footer {
+      padding: 9px 20px 11px;
+      background: #0d2137;
+      text-align: center;
+      font-size: 9px;
+      color: rgba(255,255,255,.55);
+      line-height: 1.7;
+      border-top: 2px solid #c9a84c;
+    }
+    .ps-footer .footer-brand { color: #c9a84c; font-weight: 600; }
+
+    /* ── PRINT BUTTON BAR (screen only) ── */
+    .ps-print-bar {
+      text-align: center;
+      padding: 16px 0;
+    }
+    .ps-print-bar button {
+      background: linear-gradient(135deg, #0d2137, #1a3a5c);
+      color: #c9a84c;
+      border: 1px solid #c9a84c;
+      padding: 9px 30px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 5px;
+      margin: 0 6px;
+      letter-spacing: .4px;
+      transition: background .2s;
+    }
+    .ps-print-bar button:hover { background: #c9a84c; color: #0d2137; }
+    .ps-print-bar a {
+      background: #4a5568;
+      color: #fff;
+      padding: 9px 22px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 5px;
+      margin: 0 6px;
+      text-decoration: none;
+      display: inline-block;
+      letter-spacing: .3px;
+    }
+    .ps-print-bar a:hover { background: #2d3748; }
+
+    @media print {
+      body { background: none; padding: 0; }
+      .payslip-doc { box-shadow: none; width: 100%; border-radius: 0; }
+      .ps-print-bar { display: none !important; }
+      .ps-pay-table tbody tr { page-break-inside: avoid; }
+      .ps-net-banner { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .ps-header     { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .ps-pay-table thead tr th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .ps-pay-table .section-hdr td  { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .ps-pay-table .subtotal-row td { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .ps-footer     { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+<%
+  /* ── Helpers ── */
+  const xaf = n => Math.round(n || 0).toLocaleString('fr-FR');
+
+  function numberToWords(num) {
+    const n = Math.round(num) || 0;
+    if (n === 0) return 'Zero';
+    const ones = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine',
+                  'Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen',
+                  'Seventeen','Eighteen','Nineteen'];
+    const tens = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+    function below1k(x) {
+      if (x < 20) return ones[x];
+      if (x < 100) return tens[Math.floor(x/10)] + (x%10 ? ' ' + ones[x%10] : '');
+      return ones[Math.floor(x/100)] + ' Hundred' + (x%100 ? ' ' + below1k(x%100) : '');
+    }
+    let r = '', rem = n;
+    if (rem >= 1000000) { r += below1k(Math.floor(rem/1000000)) + ' Million '; rem %= 1000000; }
+    if (rem >= 1000)    { r += below1k(Math.floor(rem/1000)) + ' Thousand '; rem %= 1000; }
+    if (rem > 0)        { r += below1k(rem); }
+    return r.trim();
+  }
+
+  const net = gross - ded;
+  const netWords = numberToWords(net) + ' Francs CFA';
+  const orgName  = brand.slipHeader || brand.orgName || brand.facilityName || 'Hospital';
+  const empAddr        = (empSettings.employer_address || '').trim();
+  const empPhone       = (empSettings.employer_phone  || '').trim();
+  const empCNPS        = (empSettings.employer_cnps_number || '').trim(); /* footer: employer CNPS code */
+  const empNIU         = (empSettings.employer_niu || '').trim();          /* footer: employer NIU */
+  const fullName = (String(row.first_name||'').trim() + ' ' + String(row.last_name||'').trim()).trim();
+  const show = v => (String(v || '').trim() || '—');
+%>
+
+<!-- ── Print Button Bar ── -->
+<div class="ps-print-bar">
+  <button onclick="window.print()">&#128424; <%= _tl('payslip.print_pdf', 'Print / Save PDF') %></button>
+  <a href="/payroll/monthly">&#8592; <%= _tl('payslip.back_payroll', 'Back to Payroll') %></a>
+</div>
+
+<div class="payslip-doc">
+  <div class="ps-topbar"></div>
+
+  <!-- ── HEADER ── -->
+  <div class="ps-header">
+    <div class="org-name"><%- orgName %></div>
+    <div class="org-dept"><%= _tl('payslip.hr_dept', 'Human Resources Department – Payroll Unit') %></div>
+    <% if (empAddr || empPhone) { %>
+    <div class="org-addr">
+      <%= empAddr %><% if (empAddr && empPhone) { %> &nbsp;|&nbsp; <% } %>
+      <% if (empPhone) { %><%= _tl('payslip.tel', 'Tel:') %> <%= empPhone %><% } %>
+    </div>
+    <% } %>
+  </div>
+
+  <!-- ── TITLE ROW ── -->
+  <div class="ps-title-row">
+    <div>
+      <div class="slip-label"><%= _tl('payslip.slip_title', 'Employee Payslip / Fiche de Paie') %></div>
+      <div class="slip-sub"><%= _tl('payslip.pay_period', 'Pay Period:') %> <%= period %></div>
+    </div>
+    <div class="slip-meta">
+      <div><strong><%= _tl('payslip.pay_date', 'Pay Date:') %></strong> <%= payDateStr %></div>
+      <div><strong><%= _tl('payslip.slip_no', 'Payslip No:') %></strong> <%= slipNo %></div>
+      <% if (printed) { %><div><strong><%= _tl('payslip.printed', 'Printed:') %></strong> <%= printed %></div><% } %>
+    </div>
+  </div>
+
+  <!-- ── EMPLOYEE INFORMATION ── -->
+  <table class="ps-info-table">
+    <thead>
+      <tr><th colspan="4"><%= _tl('payslip.employee_info', 'Employee Information / Informations de l\'employé') %></th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="info-label"><%= _tl('payslip.name', 'Name / Nom:') %></td>
+        <td class="info-value"><strong><%= fullName || _tl('payslip.dash', '—') %></strong></td>
+        <td class="info-label"><%= _tl('payslip.staff_no', 'Staff No / Matricule:') %></td>
+        <td class="info-value"><%= row.emp_matricule || _tl('payslip.dash', '—') %></td>
+      </tr>
+      <tr>
+        <td class="info-label"><%= _tl('payslip.position', 'Position / Poste:') %></td>
+        <td class="info-value"><%= position || _tl('payslip.dash', '—') %></td>
+        <td class="info-label"><%= _tl('payslip.department', 'Department:') %></td>
+        <td class="info-value"><%= dept || _tl('payslip.dash', '—') %></td>
+      </tr>
+      <tr>
+        <td class="info-label"><%= _tl('payslip.hire_date', 'Date of Hire:') %></td>
+        <td class="info-value"><%= hireDateDisplay %></td>
+        <td class="info-label"><%= _tl('payslip.nic', 'NIC No:') %></td>
+        <td class="info-value"><%= show(empNic) %></td>
+      </tr>
+      <tr>
+        <td class="info-label"><%= _tl('payslip.cnps', 'CNPS No:') %></td>
+        <td class="info-value"><%= show(empCnps) %></td>
+        <td class="info-label"><%= _tl('payslip.tax_niu', 'Tax ID / NIU:') %></td>
+        <td class="info-value"><%= show(empTaxNiu) %></td>
+      </tr>
+      <tr>
+        <td class="info-label"><%= _tl('payslip.bank', 'Bank / Banque:') %></td>
+        <td class="info-value"><%= show(empBank) %></td>
+        <td class="info-label"><%= _tl('payslip.account', 'Account No:') %></td>
+        <td class="info-value"><%= empAccountMasked %></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ── EARNINGS & DEDUCTIONS TABLE ── -->
+  <table class="ps-pay-table">
+    <thead>
+      <tr>
+        <th style="width:45%"><%= _tl('payslip.th_description', 'Description') %></th>
+        <th style="width:15%"><%= _tl('payslip.th_qty', 'Qty / Days') %></th>
+        <th style="width:20%"><%= _tl('payslip.th_rate', 'Rate (FCFA)') %></th>
+        <th style="width:20%"><%= _tl('payslip.th_amount', 'Amount (FCFA)') %></th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- EARNINGS HEADER -->
+      <tr class="section-hdr section-earnings">
+        <td colspan="4"><%= _tl('payslip.earnings', 'Earnings / Revenus') %></td>
+      </tr>
+
+      <!-- Basic Salary -->
+      <tr class="pay-earnings-line">
+        <td><%= _tl('payslip.basic_salary', 'Basic Salary (Salaire de Base)') %></td>
+        <td><%= _tl('payslip.one_month', '1 Month') %></td>
+        <td><%= xaf(b) %></td>
+        <td><strong><%= xaf(b) %></strong></td>
+      </tr>
+
+      <!-- Housing -->
+      <% if (h > 0) { %>
+      <tr class="pay-earnings-line">
+        <td><%= _tl('payslip.housing', 'Housing Allowance (Indemnité de Logement)') %></td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td><%= xaf(h) %></td>
+      </tr>
+      <% } %>
+
+      <!-- Transport -->
+      <% if (t > 0) { %>
+      <tr class="pay-earnings-line">
+        <td><%= _tl('payslip.transport', 'Transport Allowance (Indemnité de Transport)') %></td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td><%= xaf(t) %></td>
+      </tr>
+      <% } %>
+
+      <%# other_allowances is a legacy field replaced by Risk Premium & Responsibility columns — not shown %>
+
+      <!-- Taxable Allowance Lines (everything except roster-driven night_duty / on_call).
+           Falls back to the full allowanceLines list when the route hasn't yet been reloaded
+           with the tax-free split (i.e. server hasn't restarted since the new code was added). -->
+      <% var __taxableLines = (typeof taxableAllowanceLines !== 'undefined' && Array.isArray(taxableAllowanceLines))
+                                ? taxableAllowanceLines
+                                : (Array.isArray(allowanceLines) ? allowanceLines : []); %>
+      <% __taxableLines.forEach(function(al) { %>
+      <tr class="pay-earnings-line">
+        <td><%= al.label %><% if (al.label_fr && al.label_fr !== al.label) { %> <em>(<%= al.label_fr %>)</em><% } %></td>
+        <td><%= al.qty_label || '—' %></td>
+        <td><%= al.rate_label || '—' %></td>
+        <td><%= xaf(al.amount) %></td>
+      </tr>
+      <% }); %>
+
+      <!-- TAXABLE GROSS subtotal (basis for CNPS / CFC / CRTV / IRPP / CAC) -->
+      <tr class="subtotal-row pay-earnings-line">
+        <td colspan="3" style="text-align:right;text-transform:uppercase;letter-spacing:.5px;"><%= _tl('payslip.taxable_gross', 'Taxable Gross / Salaire Brut Imposable') %></td>
+        <td><%= xaf(typeof taxableGross !== 'undefined' ? taxableGross : gross) %></td>
+      </tr>
+
+      <!-- DEDUCTIONS HEADER -->
+      <tr class="section-hdr section-deductions">
+        <td colspan="4"><%= _tl('payslip.statutory_deductions', 'Statutory Deductions / Retenues Légales') %></td>
+      </tr>
+
+      <!-- CNPS employee (Vieillesse) 4.2 % -->
+      <% const cnpsEmp = parseFloat(row.cnps_employee)||0; %>
+      <% if (cnpsEmp > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.cnps_pension', 'CNPS – Old Age Pension (Vieillesse)') %></td>
+        <td><%= xaf(Math.min(gross, 750000)) %></td>
+        <td>4.20%</td>
+        <td class="ded-amt"><%= xaf(cnpsEmp) %></td>
+      </tr>
+      <% } %>
+
+      <!-- CFC (Crédit Foncier) 1.0 % — stored in cimr_employee column -->
+      <% const cfcEmp = parseFloat(row.cimr_employee)||0; %>
+      <% if (cfcEmp > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.cfc', 'CFC – Crédit Foncier (Housing Fund)') %></td>
+        <td><%= xaf(gross) %></td>
+        <td>1.00%</td>
+        <td class="ded-amt"><%= xaf(cfcEmp) %></td>
+      </tr>
+      <% } %>
+
+      <!-- FNE 1.0 % — stored in development_tax_deduction column -->
+      <% const devTax = parseFloat(row.development_tax_deduction)||0; %>
+      <% if (devTax > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.fne', 'FNE – Fonds National de l\'Emploi') %></td>
+        <td><%= xaf(gross) %></td>
+        <td>1.00%</td>
+        <td class="ded-amt"><%= xaf(devTax) %></td>
+      </tr>
+      <% } %>
+
+      <!-- CRTV / RAV — fixed scale -->
+      <% const crtv = parseFloat(row.crtv_deduction)||0; %>
+      <% if (crtv > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.crtv', 'CRTV – RAV (Redevance Audiovisuelle)') %></td>
+        <td><%= _tl('payslip.fixed_scale', 'Fixed scale') %></td>
+        <td>&mdash;</td>
+        <td class="ded-amt"><%= xaf(crtv) %></td>
+      </tr>
+      <% } %>
+
+      <!-- Council Tax (Taxe Communale) — fixed scale -->
+      <% const councilTax = parseFloat(row.council_tax_deduction)||0; %>
+      <% if (councilTax > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.council_tax', 'Taxe Communale (Council Tax)') %></td>
+        <td><%= _tl('payslip.fixed_scale', 'Fixed scale') %></td>
+        <td>&mdash;</td>
+        <td class="ded-amt"><%= xaf(councilTax) %></td>
+      </tr>
+      <% } %>
+
+      <!-- IRPP — pure income tax (CAC shown separately below) -->
+      <% const irpp = parseFloat(row.income_tax)||0; %>
+      <% if (irpp > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.irpp', 'IRPP (Income Tax / Impôt sur le Revenu)') %></td>
+        <td><%= _tl('payslip.taxable_base', 'Taxable Base') %></td>
+        <td>&mdash;</td>
+        <td class="ded-amt"><%= xaf(irpp) %></td>
+      </tr>
+      <% } %>
+
+      <!-- CAC — 10% surcharge on IRPP (stored in cnhc_deduction column) -->
+      <% const cnhc = parseFloat(row.cnhc_deduction)||0; %>
+      <% if (cnhc > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.cac', 'CAC (Centimes Additionnels Communaux)') %></td>
+        <td>&mdash;</td>
+        <td><%= _tl('payslip.cac_rate', '10% of IRPP') %></td>
+        <td class="ded-amt"><%= xaf(cnhc) %></td>
+      </tr>
+      <% } %>
+
+      <!-- TOTAL DEDUCTIONS subtotal -->
+      <tr class="subtotal-row pay-deductions-line">
+        <td colspan="3" style="text-align:right;text-transform:uppercase;letter-spacing:.5px;"><%= _tl('payslip.total_deductions', 'Total Deductions / Total Retenues') %></td>
+        <td class="ded-amt"><%= xaf(ded) %></td>
+      </tr>
+
+      <% if (typeof taxFreeAllowanceLines !== 'undefined' && Array.isArray(taxFreeAllowanceLines) && taxFreeAllowanceLines.length > 0) { %>
+      <!-- TAX-FREE ALLOWANCES (roster-driven Night Duty / On-Call — Labour Code Art.80) -->
+      <tr class="section-hdr">
+        <td colspan="4"><%= _tl('payslip.tax_free_hdr', 'Tax-Free Allowances / Indemnités Non Imposables (Roster-based — not subject to CNPS / IRPP)') %></td>
+      </tr>
+      <% taxFreeAllowanceLines.forEach(function(al) { %>
+      <tr>
+        <td><%= al.label %><% if (al.label_fr && al.label_fr !== al.label) { %> <em>(<%= al.label_fr %>)</em><% } %></td>
+        <td><%= al.qty_label || '—' %></td>
+        <td><%= al.rate_label || '—' %></td>
+        <td><%= xaf(al.amount) %></td>
+      </tr>
+      <% }); %>
+      <tr class="subtotal-row">
+        <td colspan="3" style="text-align:right;text-transform:uppercase;letter-spacing:.5px;"><%= _tl('payslip.total_tax_free', 'Total Tax-Free / Total Non Imposable') %></td>
+        <td><%= xaf(taxFreeAllowancesTotal) %></td>
+      </tr>
+      <% } %>
+
+    </tbody>
+  </table>
+
+  <!-- ── NET PAY BANNER ── -->
+  <div class="ps-net-banner">
+    <div class="net-label"><%= _tl('payslip.net_pay', 'Net Pay / Salaire Net') %></div>
+    <div class="net-amount">FCFA &nbsp;<%= xaf(net) %></div>
+    <div class="net-words"><%= netWords %></div>
+  </div>
+
+  <!-- ── FOOTER ── -->
+  <div class="ps-footer">
+    <div><%= _tl('payslip.footer_generated', 'This payslip is computer generated and does not require a signature. Ce bulletin est généré par ordinateur et ne nécessite pas de signature.') %></div>
+    <div style="margin-top:4px;">
+      <span class="footer-brand"><%- orgName %></span>
+      <% if (empCNPS) { %> &nbsp;&bull;&nbsp; <%= _tl('payslip.employer_cnps', 'Employer CNPS:') %> <strong style="color:#c9a84c"><%= empCNPS %></strong><% } %>
+      <% if (empNIU)  { %> &nbsp;&bull;&nbsp; <%= _tl('payslip.employer_niu', 'Employer NIU:') %> <strong style="color:#c9a84c"><%= empNIU %></strong><% } %>
+    </div>
+  </div>
+
+</div><!-- /.payslip-doc -->
+
+<!-- Print bar (bottom) -->
+<div class="ps-print-bar" style="margin-top:16px;">
+  <button onclick="window.print()">&#128424; <%= _tl('payslip.print_pdf', 'Print / Save PDF') %></button>
+  <a href="/payroll/monthly">&#8592; <%= _tl('payslip.back_payroll', 'Back to Payroll') %></a>
+</div>
+
+</body>
+</html>

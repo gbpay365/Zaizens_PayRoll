@@ -1,0 +1,73 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leave', paySelfServiceOnly: 'leave' }) %>
+
+<div class="pay-hero">
+  <h1><%= _t('hr_request_leave.title', { ns: 'legacy', defaultValue: 'Request leave' }) %></h1>
+  <p><%= _t('hr_request_leave.subtitle', { ns: 'legacy', defaultValue: 'Submit dates and type for HR approval. Track status in your recent requests.' }) %></p>
+</div>
+
+<div class="row">
+  <div class="col-lg-5 mb-4">
+    <div class="pay-panel h-100">
+      <div class="pay-panel-head"><h2><%= _t('hr_request_leave.new_request', { ns: 'legacy', defaultValue: 'New request' }) %></h2></div>
+      <div class="pay-panel-body">
+        <form method="POST" action="/hr/request-leave">
+          <div class="form-group">
+            <label class="small font-weight-bold"><%= _t('hr_request_leave.leave_type', { ns: 'legacy', defaultValue: 'Leave type' }) %></label>
+            <select name="leave_type" class="hms-input w-full">
+              <option value="annual"><%= _t('hr_request_leave.type_annual', { ns: 'legacy', defaultValue: 'Annual' }) %></option>
+              <option value="sick"><%= _t('hr_request_leave.type_sick', { ns: 'legacy', defaultValue: 'Sick' }) %></option>
+              <option value="unpaid"><%= _t('hr_request_leave.type_unpaid', { ns: 'legacy', defaultValue: 'Unpaid' }) %></option>
+              <option value="other"><%= _t('hr_request_leave.type_other', { ns: 'legacy', defaultValue: 'Other' }) %></option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="small font-weight-bold"><%= _t('hr_request_leave.start_date', { ns: 'legacy', defaultValue: 'Start date' }) %></label>
+            <input type="date" name="start_date" class="hms-input w-full" required>
+          </div>
+          <div class="form-group">
+            <label class="small font-weight-bold"><%= _t('hr_request_leave.end_date', { ns: 'legacy', defaultValue: 'End date' }) %></label>
+            <input type="date" name="end_date" class="hms-input w-full" required>
+          </div>
+          <div class="form-group">
+            <label class="small font-weight-bold"><%= _t('hr_request_leave.reason', { ns: 'legacy', defaultValue: 'Reason (optional)' }) %></label>
+            <textarea name="reason" class="hms-input w-full" rows="3" maxlength="2000" placeholder="<%= _t('hr_request_leave.reason_ph', { ns: 'legacy', defaultValue: 'Short note for approver' }) %>"></textarea>
+          </div>
+          <button type="submit" class="hms-btn-primary font-weight-bold"><%= _t('hr_request_leave.submit', { ns: 'legacy', defaultValue: 'Submit request' }) %></button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-7 mb-4">
+    <div class="pay-panel h-100">
+      <div class="pay-panel-head"><h2><%= _t('hr_request_leave.recent', { ns: 'legacy', defaultValue: 'Your recent requests' }) %></h2></div>
+      <div class="pay-table-wrap">
+        <table class="pay-table" data-hms-table-paginate="6">
+          <thead><tr><th><%= _t('hr_request_leave.col_type', { ns: 'legacy', defaultValue: 'Type' }) %></th><th><%= _t('hr_request_leave.col_from', { ns: 'legacy', defaultValue: 'From' }) %></th><th><%= _t('hr_request_leave.col_to', { ns: 'legacy', defaultValue: 'To' }) %></th><th><%= _t('hr_request_leave.col_days', { ns: 'legacy', defaultValue: 'Days' }) %></th><th><%= _t('hr_request_leave.col_submitted_to', { ns: 'legacy', defaultValue: 'Submitted to' }) %></th><th><%= _t('hr_request_leave.col_status', { ns: 'legacy', defaultValue: 'Status' }) %></th></tr></thead>
+          <tbody>
+          <% if(!mine || !mine.length){ %>
+            <tr><td colspan="6" class="text-center text-muted py-4"><%= _t('hr_request_leave.none', { ns: 'legacy', defaultValue: 'No requests yet.' }) %></td></tr>
+          <% } %>
+          <% (mine||[]).forEach(function(r){
+            var st = String(r.status||'').toLowerCase();
+          %>
+            <tr>
+              <td class="text-capitalize"><%= r.leave_type %></td>
+              <td><%= r.start_date_fmt || r.start_date %></td>
+              <td><%= r.end_date_fmt || r.end_date %></td>
+              <td><%= r.days_requested %></td>
+              <td class="small"><%= r.submitted_to || '—' %></td>
+              <td>
+                <% if(st==='pending'){ %><span class="pay-badge pay-badge-pending"><%= _t('hr_request_leave.status_pending', { ns: 'legacy', defaultValue: 'Pending' }) %></span>
+                <% } else if(st==='approved'){ %><span class="pay-badge pay-badge-paid"><%= _t('hr_request_leave.status_approved', { ns: 'legacy', defaultValue: 'Approved' }) %></span>
+                <% } else { %><span class="pay-badge"><%= st %></span><% } %>
+              </td>
+            </tr>
+          <% }); %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

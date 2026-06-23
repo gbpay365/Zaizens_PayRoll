@@ -1,0 +1,59 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'payslips', paySelfServiceOnly: 'payslips' }) %>
+<%
+var _t = typeof t === 'function' ? t : function (k) { return k; };
+var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+%>
+
+<div class="pay-hero">
+  <h1><%= _t('my_payslips', { ns: 'payroll', defaultValue: 'My payslips' }) %></h1>
+  <p><%= _t('my_payslips_sub', { ns: 'payroll', defaultValue: 'Monthly payroll snapshots stored for your account. Open any row to print or save as PDF.' }) %></p>
+</div>
+
+<div class="pay-panel">
+  <div class="pay-panel-head">
+    <h2><%= _t('payroll_history', { ns: 'payroll', defaultValue: 'Payroll history' }) %></h2>
+  </div>
+  <div class="pay-table-wrap">
+    <table class="pay-table" data-hms-table-paginate="8">
+      <thead>
+        <tr>
+          <th><%= _t('col_period', { ns: 'payroll', defaultValue: 'Period' }) %></th>
+          <th class="text-right"><%= _t('col_gross', { ns: 'payroll', defaultValue: 'Gross (XAF)' }) %></th>
+          <th class="text-right"><%= _t('col_irpp', { ns: 'payroll', defaultValue: 'IRPP' }) %></th>
+          <th class="text-right"><%= _t('col_net', { ns: 'payroll', defaultValue: 'Net' }) %></th>
+          <th><%= _t('col_status', { ns: 'payroll', defaultValue: 'Status' }) %></th>
+          <th class="text-right no-print"><%= _t('col_payslip', { ns: 'payroll', defaultValue: 'Payslip' }) %></th>
+        </tr>
+      </thead>
+      <tbody>
+      <% if(!rows || !rows.length){ %>
+        <tr><td colspan="6" class="text-center text-muted py-5"><%= _t('empty', { ns: 'payroll', defaultValue: 'No payroll lines yet.' }) %></td></tr>
+      <% } %>
+      <% (rows||[]).forEach(function(r){
+        var mid = parseInt(r.month,10)||0;
+        var paySt = String(r.payout_status||'pending').toLowerCase().trim();
+        var pid = parseInt(r.id,10)||0;
+      %>
+        <tr>
+          <td class="font-weight-bold"><%= months[mid] || mid %> <%= r.year %></td>
+          <td class="pay-num"><%= _fmtXaf(r.gross_salary) %></td>
+          <td class="pay-num"><%= _fmtXaf(r.income_tax) %></td>
+          <td class="pay-num"><strong><%= _fmtXaf(r.net_salary) %></strong></td>
+          <td>
+            <% if(paySt==='paid'){ %><span class="pay-badge pay-badge-paid"><%= _t('status_paid', { ns: 'payroll', defaultValue: 'Paid' }) %></span>
+            <% } else if(paySt==='pending'){ %><span class="pay-badge pay-badge-pending"><%= _t('status_pending', { ns: 'payroll', defaultValue: 'Pending' }) %></span>
+            <% } else { %><span class="pay-badge"><%= paySt %></span><% } %>
+          </td>
+          <td class="text-right no-print">
+            <% if(pid > 0){ %>
+            <a href="/payroll/payslip/<%= pid %>" target="_blank" rel="noopener" class="btn btn-sm hms-btn-secondary"><%= _t('view_print', { ns: 'payroll', defaultValue: 'View / Print' }) %></a>
+            <% } else { %><span class="text-muted small">—</span><% } %>
+          </td>
+        </tr>
+      <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

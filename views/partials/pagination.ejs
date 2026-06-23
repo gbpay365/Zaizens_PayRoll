@@ -1,0 +1,56 @@
+<!--
+  Locals: pager, pagerBase, pagerQuery, pagerParam
+  pager: { page, totalPages, total, pageSize, from, to, hasPrev, hasNext, pageParam?, basePath?, query? }
+-->
+<% var pg = (typeof pager !== 'undefined' && pager) || (locals && locals.pager) || null; %>
+<% var _pgShow = typeof t === 'function' ? function(from, to, total) { return t('pagination.showing', { ns: 'common', from: from, to: to, total: total, defaultValue: 'Showing ' + from + '–' + to + ' of ' + total }); } : function(from, to, total) { return 'Showing ' + from + '–' + to + ' of ' + total; }; %>
+<% var _pgPageOf = typeof t === 'function' ? function(page, totalPages) { return t('pagination.page_of', { ns: 'common', page: page, totalPages: totalPages, defaultValue: 'Page ' + page + ' of ' + totalPages }); } : function(page, totalPages) { return 'Page ' + page + ' of ' + totalPages; }; %>
+<% var _pgPrev = typeof t === 'function' ? t('pagination.prev', { ns: 'common', defaultValue: 'Prev' }) : 'Prev'; %>
+<% var _pgNext = typeof t === 'function' ? t('pagination.next', { ns: 'common', defaultValue: 'Next' }) : 'Next'; %>
+<% var _pgAria = typeof t === 'function' ? t('pagination.aria', { ns: 'common', defaultValue: 'Pagination' }) : 'Pagination'; %>
+<% if (pg) {
+     var base = locals.pagerBase || pg.basePath || '';
+     var qry = locals.pagerQuery || pg.query || {};
+     var pkey = locals.pagerParam || pg.pageParam || 'p';
+     var showNav = (pg.totalPages || 1) > 1 || (pg.total || 0) > (pg.pageSize || 5);
+   } %>
+<% if (pg && !showNav) { %>
+<div class="hms-list-pager d-flex justify-content-between align-items-center small text-muted py-2 px-3 border-top bg-light" data-hms-pager-base="<%= base %>" data-hms-page-param="<%= pkey %>">
+ <span><%= _pgShow(pg.from || 0, pg.to || 0, pg.total || 0) %></span>
+</div>
+<% } else if (pg) { %>
+<div class="hms-list-pager d-flex flex-wrap justify-content-between align-items-center gap-2 py-2 px-3 border-top bg-light" data-hms-pager-base="<%= base %>" data-hms-page-param="<%= pkey %>">
+ <span class="small text-muted mb-0">
+  <%= _pgShow(pg.from || 0, pg.to || 0, pg.total || 0) %>
+  · <%= _pgPageOf(pg.page, pg.totalPages) %>
+ </span>
+ <nav aria-label="<%= _pgAria %>">
+  <ul class="pagination pagination-sm mb-0">
+   <li class="page-item <%= pg.hasPrev ? '' : 'disabled' %>">
+    <% if (pg.hasPrev) { %>
+    <a class="page-link" href="<%= typeof buildPageUrl === 'function' ? buildPageUrl(base, pg.page - 1, qry, { pageParam: pkey }) : '#' %>"><%= _pgPrev %></a>
+    <% } else { %><span class="page-link"><%= _pgPrev %></span><% } %>
+   </li>
+   <% var _start = Math.max(1, pg.page - 2); var _end = Math.min(pg.totalPages, pg.page + 2); %>
+   <% if (_start > 1) { %>
+   <li class="page-item"><a class="page-link" href="<%= typeof buildPageUrl === 'function' ? buildPageUrl(base, 1, qry, { pageParam: pkey }) : '#' %>">1</a></li>
+   <% if (_start > 2) { %><li class="page-item disabled"><span class="page-link">…</span></li><% } %>
+   <% } %>
+   <% for (var i = _start; i <= _end; i++) { %>
+   <li class="page-item <%= i === pg.page ? 'active' : '' %>">
+    <a class="page-link" href="<%= typeof buildPageUrl === 'function' ? buildPageUrl(base, i, qry, { pageParam: pkey }) : '#' %>"><%= i %></a>
+   </li>
+   <% } %>
+   <% if (_end < pg.totalPages) { %>
+   <% if (_end < pg.totalPages - 1) { %><li class="page-item disabled"><span class="page-link">…</span></li><% } %>
+   <li class="page-item"><a class="page-link" href="<%= typeof buildPageUrl === 'function' ? buildPageUrl(base, pg.totalPages, qry, { pageParam: pkey }) : '#' %>"><%= pg.totalPages %></a></li>
+   <% } %>
+   <li class="page-item <%= pg.hasNext ? '' : 'disabled' %>">
+    <% if (pg.hasNext) { %>
+    <a class="page-link" href="<%= typeof buildPageUrl === 'function' ? buildPageUrl(base, pg.page + 1, qry, { pageParam: pkey }) : '#' %>"><%= _pgNext %></a>
+    <% } else { %><span class="page-link"><%= _pgNext %></span><% } %>
+   </li>
+  </ul>
+ </nav>
+</div>
+<% } %>

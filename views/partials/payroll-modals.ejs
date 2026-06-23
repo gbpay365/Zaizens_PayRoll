@@ -1,0 +1,118 @@
+<% if (typeof months !== 'undefined' && months && typeof cy !== 'undefined') {
+if (typeof _t !== 'function') {
+  var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+}
+var _curMonth = new Date().getMonth() + 1;
+function _monthOptions(selected) {
+  var out = '';
+  for (var mi = 1; mi <= 12; mi++) {
+    out += '<option value="' + mi + '"' + (mi === selected ? ' selected' : '') + '>' + (months[mi] || mi) + '</option>';
+  }
+  return out;
+}
+%>
+<div class="modal fade" id="hmsPayrollProcessModal" tabindex="-1" role="dialog" aria-labelledby="hmsPayrollProcessTitle" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form method="POST" action="/payroll/process-month">
+        <div class="modal-header">
+          <h5 class="modal-title font-weight-bold" id="hmsPayrollProcessTitle"><%= _t('modals.process_title', { ns: 'payroll', defaultValue: 'Process monthly payroll' }) %></h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="<%= _t('common.close', { ns: 'payroll', defaultValue: 'Close' }) %>">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3"><%= _t('modals.process_confirm', { ns: 'payroll', defaultValue: 'Calculate and save payroll for this period? Existing rows for the same employee and period are skipped.' }) %></p>
+          <div class="form-group">
+            <label class="font-weight-bold small text-uppercase text-muted"><%= _t('common.period', { ns: 'payroll', defaultValue: 'Period' }) %></label>
+            <div class="row">
+              <div class="col-7">
+                <select name="month" class="form-control" required aria-label="<%= _t('common.period', { ns: 'payroll', defaultValue: 'Period' }) %>">
+                  <%- _monthOptions(_curMonth) %>
+                </select>
+              </div>
+              <div class="col-5">
+                <input type="number" name="year" class="form-control" value="<%= cy %>" min="2000" max="2100" required aria-label="<%= _t('settings.tax_year', { ns: 'payroll', defaultValue: 'Year' }) %>">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= _t('common.cancel', { ns: 'payroll', defaultValue: 'Cancel' }) %></button>
+          <button type="submit" class="btn btn-success font-weight-bold"><i class="fa fa-calculator mr-1"></i><%= _t('modals.calculate_save', { ns: 'payroll', defaultValue: 'Calculate & save' }) %></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="hmsPayrollMarkPaidModal" tabindex="-1" role="dialog" aria-labelledby="hmsPayrollMarkPaidTitle" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form method="POST" action="/payroll/mark-period-paid">
+        <div class="modal-header">
+          <h5 class="modal-title font-weight-bold" id="hmsPayrollMarkPaidTitle"><%= _t('modals.mark_title', { ns: 'payroll', defaultValue: 'Mark period as paid' }) %></h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="<%= _t('common.close', { ns: 'payroll', defaultValue: 'Close' }) %>">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3"><%= _t('modals.mark_confirm', { ns: 'payroll', defaultValue: 'Mark every pending payroll line for this period as Paid?' }) %></p>
+          <div class="form-group">
+            <label class="font-weight-bold small text-uppercase text-muted"><%= _t('common.period', { ns: 'payroll', defaultValue: 'Period' }) %></label>
+            <div class="row">
+              <div class="col-7">
+                <select name="month" class="form-control" required aria-label="<%= _t('common.period', { ns: 'payroll', defaultValue: 'Period' }) %>">
+                  <%- _monthOptions(_curMonth) %>
+                </select>
+              </div>
+              <div class="col-5">
+                <input type="number" name="year" class="form-control" value="<%= cy %>" min="2000" max="2100" required aria-label="<%= _t('settings.tax_year', { ns: 'payroll', defaultValue: 'Year' }) %>">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= _t('common.cancel', { ns: 'payroll', defaultValue: 'Cancel' }) %></button>
+          <button type="submit" class="btn btn-success font-weight-bold"><i class="fa fa-check mr-1"></i><%= _t('modals.mark_all_pending', { ns: 'payroll', defaultValue: 'Mark all pending as paid' }) %></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="hmsPayrollResyncModal" tabindex="-1" role="dialog" aria-labelledby="hmsPayrollResyncTitle" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form method="POST" action="/payroll/resync-period">
+        <div class="modal-header">
+          <h5 class="modal-title font-weight-bold" id="hmsPayrollResyncTitle"><%= _t('modals.resync_title', { ns: 'payroll', defaultValue: 'Sync to Account_Core' }) %></h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="<%= _t('common.close', { ns: 'payroll', defaultValue: 'Close' }) %>">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3"><%= _t('modals.resync_confirm', { ns: 'payroll', defaultValue: 'Push payroll lines and department totals for this period to Account_Core (no recalculation).' }) %></p>
+          <div class="form-group">
+            <label class="font-weight-bold small text-uppercase text-muted"><%= _t('common.period', { ns: 'payroll', defaultValue: 'Period' }) %></label>
+            <div class="row">
+              <div class="col-7">
+                <select name="month" class="form-control" required aria-label="<%= _t('common.period', { ns: 'payroll', defaultValue: 'Period' }) %>">
+                  <%- _monthOptions(_curMonth) %>
+                </select>
+              </div>
+              <div class="col-5">
+                <input type="number" name="year" class="form-control" value="<%= cy %>" min="2000" max="2100" required aria-label="<%= _t('settings.tax_year', { ns: 'payroll', defaultValue: 'Year' }) %>">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= _t('common.cancel', { ns: 'payroll', defaultValue: 'Cancel' }) %></button>
+          <button type="submit" class="btn btn-primary font-weight-bold"><i class="fa fa-cloud-upload mr-1"></i><%= _t('modals.resync_submit', { ns: 'payroll', defaultValue: 'Sync now' }) %></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<% } %>

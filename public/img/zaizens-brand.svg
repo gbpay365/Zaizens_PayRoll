@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 56" role="img" aria-label="Zaizens">
+  <defs>
+    <linearGradient id="zaizens-mark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d9488"/>
+      <stop offset="100%" stop-color="#1e40af"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="4" width="44" height="44" rx="10" fill="url(#zaizens-mark)"/>
+  <text x="22" y="34" text-anchor="middle" fill="#ffffff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="700">Z</text>
+  <text x="54" y="30" fill="#0f172a" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="26" font-weight="700" letter-spacing="-0.03em">ZAIZENS</text>
+  <text x="54" y="46" fill="#64748b" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="8.5" font-weight="600" letter-spacing="0.14em">DIGITAL INTELLIGENCE REDEFINED</text>
+</svg>

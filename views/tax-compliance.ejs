@@ -1,0 +1,37 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'tax', canTaxHub: true }) %>
+ <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
+ <div>
+ <h4 class="page-title font-weight-bold text-dark mb-1"><%= _tl('tax_compliance.title', 'Payroll compliance calendar') %></h4>
+ <p class="text-muted small mb-0"><%= _tl('tax_compliance.subtitle', 'Headcount per month and how many lines are marked paid.') %></p>
+ </div>
+ <a href="/tax" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _tl('tax_compliance.tax_hub', 'Tax hub') %></a>
+ </div>
+
+ <div class="card border-0 shadow-sm" style="border-radius:14px;">
+ <div class="card-body p-0 table-responsive">
+ <table class="table table-sm table-striped mb-0" data-hms-table-paginate="12">
+ <thead><tr><th><%= _tl('tax_compliance.col_period', 'Period') %></th><th class="text-right"><%= _tl('tax_compliance.col_headcount', 'Headcount') %></th><th class="text-right"><%= _tl('tax_compliance.col_paid', 'Paid') %></th><th class="text-right"><%= _tl('tax_compliance.col_csv', 'CSV') %></th></tr></thead>
+ <tbody>
+ <% if(!rows || !rows.length){ %>
+ <tr><td colspan="4" class="text-center text-muted py-4"><%= _tl('tax_compliance.no_data', 'No grouped payroll data.') %></td></tr>
+ <% } %>
+ <% (rows||[]).forEach(function(r){
+ var mid = parseInt(r.month,10)||0;
+ %>
+ <tr>
+ <td><%= months[mid] || mid %> <%= r.year %></td>
+ <td class="text-right"><%= r.headcount %></td>
+ <td class="text-right"><%= r.paid_count %></td>
+ <td class="text-right">
+ <a class="btn btn-sm btn-outline-dark" href="/tax/dgi-export?month=<%= mid %>&year=<%= r.year %>"><%= _tl('tax_compliance.dgi_csv', 'DGI CSV') %></a>
+ </td>
+ </tr>
+ <% }); %>
+ </tbody>
+ </table>
+ </div>
+ </div>
+ </div>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

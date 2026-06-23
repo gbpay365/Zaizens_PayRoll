@@ -1,0 +1,1135 @@
+/**
+ * HMS — Odoo 17 Hospital Management shell (global)
+ * Purple brand, horizontal module menu, control panel, list/kanban views.
+ */
+body.hms-body--odoo #hms-sidebar,
+body.hms-body--odoo .hms-topbar {
+  display: none !important;
+}
+
+body.hms-body--odoo {
+  --hms-brand: #10b981;
+  --hms-brand-hover: #059669;
+  --hms-brand-soft: rgba(16, 185, 129, 0.12);
+  font-family: 'Roboto', 'Inter', 'Segoe UI', sans-serif;
+}
+
+body.hms-body--odoo .main-wrapper {
+  margin-left: 0 !important;
+  min-height: 100vh;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+}
+
+body.hms-body--odoo .hms-odoo-app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+body.hms-body--odoo .hms-odoo-app > .main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: transparent;
+}
+
+body.hms-body--odoo .o_action_manager {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+body.hms-body--odoo .page-wrapper,
+body.hms-body--odoo .page-wrapper > .content {
+  padding: 0 !important;
+  margin: 0 !important;
+  max-width: none !important;
+  width: 100% !important;
+}
+
+body.hms-body--odoo .main-wrapper .page-wrapper {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+body.hms-body--odoo .o_action_manager > .page-wrapper > .content,
+body.hms-body--odoo .hms-dashboard-page {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+body.hms-body--odoo .hms-page-nav-bar {
+  max-width: none !important;
+  margin: 0 !important;
+  width: 100%;
+  padding: 12px 16px 0;
+  justify-content: flex-start;
+}
+
+body.hms-body--odoo .hms-react-page {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+body.hms-body--odoo #hms-react-root.hms-react-root {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+body.hms-body--odoo .hms-dashboard-page .o_content {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hms-odoo-app {
+  --o-brand: #10b981;
+  --o-brand-hover: #059669;
+  --o-border: #dee2e6;
+  --o-text: #212529;
+  --o-muted: #6c757d;
+  --o-surface: #ffffff;
+  --o-bg: #f8f9fa;
+  font-family: 'Inter', 'Roboto', 'Segoe UI', sans-serif;
+  color: var(--o-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Top navbar (Odoo horizontal menu) ── */
+.hms-odoo-app .o_web_navbar {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: var(--o-surface);
+  border-bottom: 1px solid var(--o-border);
+  height: 46px;
+  min-height: 46px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  overflow: visible;
+  flex-wrap: nowrap;
+}
+
+.hms-odoo-app .o_nav_back_slot {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
+.hms-odoo-app .o_nav_back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0 14px;
+  border: none;
+  border-right: 1px solid var(--o-border);
+  background: transparent;
+  color: var(--o-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.hms-odoo-app .o_nav_back:hover {
+  background: var(--o-bg);
+  color: var(--o-brand);
+}
+
+.hms-odoo-app .o_nav_back svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.hms-odoo-app .o_nav_home,
+.hms-odoo-app button.o_nav_home {
+  width: 46px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  color: var(--o-muted);
+  border-right: 1px solid var(--o-border);
+  text-decoration: none;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.hms-odoo-app .o_nav_home:hover {
+  background: var(--o-bg);
+  color: var(--o-text);
+}
+
+.hms-odoo-app .o_nav_module {
+  display: inline-flex;
+  align-items: center;
+  align-self: stretch;
+  height: 46px;
+  padding: 0 16px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: var(--o-brand);
+  text-decoration: none;
+  border-right: 1px solid var(--o-border);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.hms-odoo-app .o_nav_menu {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  flex-wrap: nowrap;
+  /* Must stay visible so .o_nav_drop_panel (position:absolute) is not clipped */
+  overflow: visible;
+  position: relative;
+  z-index: 210;
+}
+
+.hms-odoo-app .o_nav_link,
+.hms-odoo-app .o_nav_drop_btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0 14px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--o-text);
+  text-decoration: none;
+  white-space: nowrap;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.hms-odoo-app .o_nav_link:hover,
+.hms-odoo-app .o_nav_link.active,
+.hms-odoo-app .o_nav_dropdown.active > .o_nav_drop_btn,
+.hms-odoo-app .o_nav_dropdown.active .o_nav_drop_btn {
+  background: var(--o-bg);
+  color: var(--o-brand);
+}
+
+.hms-odoo-app .o_nav_dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  height: 46px;
+  flex-shrink: 0;
+}
+
+.hms-odoo-app .o_nav_drop_btn i {
+  font-size: 0.65rem;
+  margin-left: 2px;
+  line-height: 1;
+}
+
+.hms-odoo-app .o_nav_drop_panel {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 220px;
+  background: var(--o-surface);
+  border: 1px solid var(--o-border);
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  padding: 6px 0;
+  z-index: 1200;
+  pointer-events: auto;
+}
+
+.hms-odoo-app .o_nav_dropdown:hover .o_nav_drop_panel,
+.hms-odoo-app .o_nav_dropdown:focus-within .o_nav_drop_panel,
+.hms-odoo-app .o_nav_dropdown.is-open .o_nav_drop_panel,
+.hms-odoo-app .o_nav_dropdown.is-open > .o_nav_drop_panel {
+  display: block !important;
+}
+
+.hms-odoo-app .o_nav_drop_panel a {
+  display: block;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  color: var(--o-text);
+  text-decoration: none;
+}
+
+.hms-odoo-app .o_nav_drop_panel a:hover {
+  background: var(--o-bg);
+  color: var(--o-brand);
+}
+
+.hms-odoo-app .o_nav_drop_heading {
+  display: block;
+  padding: 8px 16px 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--o-muted);
+}
+
+.hms-odoo-app .o_nav_badge {
+  background: #e11d48;
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+
+.hms-odoo-app .o_nav_right,
+.hms-module-odoo-app .o_nav_right {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  height: 46px;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  margin-left: auto;
+  margin-right: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.hms-odoo-app .o_nav_right_link,
+.hms-module-odoo-app .o_nav_right_link {
+  font-size: 0.82rem;
+  color: var(--o-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.hms-odoo-app .o_nav_home_link,
+.hms-module-odoo-app .o_nav_home_link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff !important;
+  font-weight: 700;
+  font-size: 0.76rem;
+}
+
+.hms-odoo-app .hms-lang-form--odoo,
+.hms-module-odoo-app .hms-lang-form--odoo {
+  gap: 4px;
+}
+
+.hms-odoo-app .o_nav_lang_label,
+.hms-module-odoo-app .o_nav_lang_label {
+  font-size: 0.72rem;
+  color: var(--o-muted);
+  white-space: nowrap;
+}
+
+.hms-odoo-app .o_nav_lang_btn,
+.hms-module-odoo-app .o_nav_lang_btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: #fff;
+  color: #334155;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.hms-odoo-app .o_nav_lang_btn.is-active,
+.hms-module-odoo-app .o_nav_lang_btn.is-active {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.hms-odoo-app .o_nav_lang_btn:hover,
+.hms-module-odoo-app .o_nav_lang_btn:hover {
+  border-color: #16a34a;
+}
+
+.hms-odoo-app .o_nav_home_link:hover,
+.hms-module-odoo-app .o_nav_home_link:hover {
+  color: #fff !important;
+  opacity: 0.92;
+  text-decoration: none;
+}
+
+.hms-odoo-app .o_nav_user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--o-text);
+  max-width: min(240px, 32vw);
+}
+
+.hms-odoo-app .o_nav_user_name,
+.hms-module-odoo-app .o_nav_user_name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.hms-odoo-app .o_nav_logout,
+.hms-module-odoo-app .o_nav_logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--o-border);
+  background: var(--o-surface, #fff);
+  color: var(--o-muted);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.hms-odoo-app .o_nav_logout:hover,
+.hms-module-odoo-app .o_nav_logout:hover {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.hms-module-odoo-app .o_nav_user.dropdown-toggle {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+/* ── Action manager ── */
+.hms-odoo-app .o_action_manager {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--o-bg);
+}
+
+.hms-odoo-app .o_flash,
+.hms-module-odoo-app .o_flash {
+  margin: 8px 16px 0;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.hms-odoo-app .o_flash_success,
+.hms-module-odoo-app .o_flash_success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.hms-odoo-app .o_flash_error,
+.hms-module-odoo-app .o_flash_error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ── Control panel (Odoo style) ── */
+.hms-odoo-app .o_control_panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 16px;
+  background: var(--o-surface);
+  border-bottom: 1px solid var(--o-border);
+  flex-shrink: 0;
+}
+
+.hms-odoo-app .o_cp_new {
+  background: var(--o-brand);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 7px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hms-odoo-app .o_cp_new:hover {
+  background: var(--o-brand-hover);
+  color: #fff;
+}
+
+.hms-odoo-app .o_cp_breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--o-text);
+}
+
+.hms-odoo-app .o_cp_breadcrumb .fa-cog {
+  font-size: 0.85rem;
+  color: var(--o-muted);
+  cursor: pointer;
+}
+
+.hms-odoo-app .o_cp_search_wrap {
+  flex: 1;
+  min-width: 200px;
+  max-width: 520px;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--o-border);
+  border-radius: 4px;
+  background: #fff;
+  padding: 0 8px;
+  margin: 0 auto;
+}
+
+.hms-odoo-app .o_cp_search_chip {
+  background: #e9ecef;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--o-text);
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+.hms-odoo-app .o_cp_search_wrap input {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: 7px 4px;
+  font-size: 0.85rem;
+  min-width: 80px;
+}
+
+.hms-odoo-app .o_cp_search_wrap .fa-search {
+  color: var(--o-muted);
+  font-size: 0.85rem;
+}
+
+.hms-odoo-app .o_cp_pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--o-muted);
+}
+
+.hms-odoo-app .o_cp_pager button {
+  border: none;
+  background: transparent;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: var(--o-muted);
+}
+
+.hms-odoo-app .o_cp_pager button:hover {
+  color: var(--o-text);
+}
+
+.hms-odoo-app .o_cp_view_switcher {
+  display: inline-flex;
+  border: 1px solid var(--o-border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.hms-odoo-app .o_cp_view_switcher button {
+  border: none;
+  background: transparent;
+  padding: 7px 11px;
+  color: var(--o-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.hms-odoo-app .o_cp_view_switcher button.active {
+  background: #e9ecef;
+  color: var(--o-text);
+}
+
+.hms-odoo-app .o_cp_extra {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.hms-odoo-app .o_btn_link {
+  font-size: 0.82rem;
+  color: var(--o-brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* ── Content ── */
+.hms-odoo-app .o_content {
+  flex: 1;
+  overflow: auto;
+}
+
+.hms-odoo-app .o_view_panel {
+  display: none;
+}
+
+.hms-odoo-app .o_view_panel.active {
+  display: block;
+}
+
+/* ── Product kanban (Odoo Products grid) ── */
+.hms-odoo-app .o_product_kanban {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0;
+  padding: 8px;
+  background: var(--o-bg);
+}
+
+.hms-odoo-app .o_product_card {
+  background: var(--o-surface);
+  border: 1px solid var(--o-border);
+  margin: -1px 0 0 -1px;
+  padding: 12px 12px 12px 10px;
+  min-height: 118px;
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  grid-template-rows: auto auto 1fr;
+  gap: 2px 10px;
+  cursor: pointer;
+  position: relative;
+  transition: box-shadow 0.12s, z-index 0.12s;
+}
+
+.hms-odoo-app .o_product_card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 2;
+}
+
+.hms-odoo-app .o_product_fav {
+  grid-column: 1;
+  color: #ced4da;
+  font-size: 0.9rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.hms-odoo-app .o_product_fav.is-fav {
+  color: #f59e0b;
+}
+
+.hms-odoo-app .o_product_name {
+  grid-column: 1;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--o-text);
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.hms-odoo-app .o_product_meta {
+  grid-column: 1;
+  font-size: 0.8rem;
+  color: var(--o-muted);
+  line-height: 1.45;
+}
+
+.hms-odoo-app .o_product_meta strong {
+  color: var(--o-text);
+  font-weight: 500;
+}
+
+.hms-odoo-app .o_product_thumb {
+  grid-column: 2;
+  grid-row: 1 / span 4;
+  width: 64px;
+  height: 64px;
+  align-self: start;
+  border-radius: 4px;
+  background: #f1f3f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid #e9ecef;
+}
+
+.hms-odoo-app .o_product_thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hms-odoo-app .o_product_thumb i {
+  font-size: 1.75rem;
+  color: #adb5bd;
+}
+
+/* ── Odoo list view (Sales / Dispensing) ── */
+.hms-odoo-app .o_list_renderer {
+  background: var(--o-surface);
+}
+
+.hms-odoo-app .o_list_table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.hms-odoo-app .o_list_table thead th {
+  background: var(--o-surface);
+  border-bottom: 2px solid var(--o-border);
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: var(--o-muted);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.hms-odoo-app .o_list_table tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eee;
+  vertical-align: middle;
+}
+
+.hms-odoo-app .o_list_table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.hms-odoo-app .o_list_table tfoot td {
+  padding: 12px;
+  font-weight: 700;
+  border-top: 2px solid var(--o-border);
+  background: #fafafa;
+}
+
+.hms-odoo-app .o_avatar_cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hms-odoo-app .o_avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: #fbbf24;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hms-odoo-app .o_status_pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.hms-odoo-app .o_status_sales {
+  background: #198754;
+  color: #fff;
+}
+
+.hms-odoo-app .o_status_pending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.hms-odoo-app .o_status_preparing {
+  background: #cfe2ff;
+  color: #084298;
+}
+
+.hms-odoo-app .o_list_empty {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--o-muted);
+}
+
+.hms-odoo-app .o_list_empty i {
+  font-size: 2.5rem;
+  opacity: 0.25;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.hms-odoo-app .d-none {
+  display: none !important;
+}
+
+/* Dashboard KPI tiles */
+.hms-odoo-app .o_dashboard.o_dashboard--tiles,
+body.hms-body--odoo .hms-dashboard-page .o_dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+body.hms-body--odoo .hms-dashboard-page .row {
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.hms-odoo-app .o_stat_card {
+  background: var(--o-surface);
+  border: 1px solid var(--o-border);
+  border-radius: 6px;
+  padding: 16px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.hms-odoo-app .o_stat_card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  text-decoration: none;
+  color: inherit;
+}
+
+.hms-odoo-app .o_stat_value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--o-brand);
+}
+
+.hms-odoo-app .o_stat_label {
+  font-size: 0.78rem;
+  color: var(--o-muted);
+  font-weight: 600;
+}
+
+.hms-odoo-app .o_form_sheet {
+  background: var(--o-surface);
+  border: 1px solid var(--o-border);
+  border-radius: 6px;
+  margin: 16px;
+  padding: 20px;
+}
+
+.hms-odoo-app .o_form_statusbar {
+  display: flex;
+  margin-bottom: 16px;
+  border: 1px solid var(--o-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hms-odoo-app .o_form_statusbar span {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: var(--o-muted);
+}
+
+.hms-odoo-app .o_form_statusbar span.done {
+  background: var(--o-brand);
+  color: #fff;
+}
+
+/* ── Apps launcher (Odoo app switcher) ── */
+.hms-odoo-app .o_apps_overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  padding: 56px 24px 24px;
+  overflow-y: auto;
+}
+
+.hms-odoo-app .o_apps_overlay.is-open {
+  display: block;
+}
+
+.hms-odoo-app .o_apps_panel {
+  max-width: 920px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  padding: 20px 24px 28px;
+}
+
+.hms-odoo-app .o_apps_panel h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--o-brand);
+  margin: 0 0 16px;
+}
+
+.hms-odoo-app .o_apps_grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 8px;
+}
+
+.hms-odoo-app .o_app_tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--o-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  transition: background 0.15s;
+}
+
+.hms-odoo-app .o_app_tile:hover {
+  background: #f3f4f6;
+  text-decoration: none;
+  color: var(--o-text);
+}
+
+.hms-odoo-app .o_app_icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  color: #fff;
+}
+
+.hms-odoo-app .o_nav_menu_toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  height: 46px;
+  min-width: 42px;
+  border: none;
+  background: transparent;
+  padding: 0 12px;
+  font-size: 1.1rem;
+  color: var(--o-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* ── Global content: Odoo forms, lists, cards ── */
+body.hms-body--odoo .page-wrapper > .content {
+  padding: 0 !important;
+}
+
+body.hms-body--odoo .btn-primary,
+body.hms-body--odoo .btn-primary:hover {
+  background: var(--o-brand, #10b981) !important;
+  border-color: var(--o-brand, #10b981) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  font-weight: 600;
+}
+
+body.hms-body--odoo .btn-outline-primary {
+  color: var(--o-brand, #10b981) !important;
+  border-color: var(--o-brand, #10b981) !important;
+  border-radius: 4px !important;
+}
+
+body.hms-body--odoo .card {
+  border-radius: 6px !important;
+  border: 1px solid #dee2e6 !important;
+  box-shadow: none !important;
+}
+
+body.hms-body--odoo .card-header {
+  background: #fff !important;
+  border-bottom: 1px solid #dee2e6 !important;
+  font-weight: 600;
+}
+
+body.hms-body--odoo .table thead th {
+  background: #fff;
+  border-bottom: 2px solid #dee2e6;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #6c757d;
+  text-transform: none;
+}
+
+body.hms-body--odoo .table tbody td {
+  border-bottom: 1px solid #eee;
+  font-size: 0.86rem;
+  vertical-align: middle;
+}
+
+body.hms-body--odoo .table-hover tbody tr:hover {
+  background: #f8f9fa;
+}
+
+body.hms-body--odoo .alert {
+  border-radius: 4px;
+  border-width: 1px;
+  font-size: 0.88rem;
+}
+
+body.hms-body--odoo .form-control,
+body.hms-body--odoo .custom-select {
+  border-radius: 4px;
+  border-color: #ced4da;
+  font-size: 0.88rem;
+}
+
+body.hms-body--odoo .form-control:focus {
+  border-color: var(--o-brand, #10b981);
+  box-shadow: 0 0 0 0.15rem rgba(113, 75, 103, 0.2);
+}
+
+body.hms-body--odoo .nav-tabs .nav-link.active {
+  color: var(--o-brand, #10b981);
+  border-color: #dee2e6 #dee2e6 #fff;
+  font-weight: 600;
+}
+
+body.hms-body--odoo .badge-primary {
+  background: var(--o-brand, #10b981);
+}
+
+body.hms-body--odoo .hms-dashboard-page .o_hms_home {
+  padding: 0;
+}
+
+body.hms-body--odoo .text-primary {
+  color: var(--o-brand, #10b981) !important;
+}
+
+@media (max-width: 992px) {
+  .hms-odoo-app .o_nav_menu_toggle {
+    display: flex;
+    align-items: center;
+  }
+  .hms-odoo-app .o_nav_menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    height: auto;
+    max-height: 70vh;
+    background: #fff;
+    border-bottom: 1px solid var(--o-border);
+    overflow-y: auto;
+    z-index: 400;
+  }
+  .hms-odoo-app .o_nav_menu .o_nav_link,
+  .hms-odoo-app .o_nav_menu .o_nav_drop_btn {
+    width: 100%;
+    justify-content: flex-start;
+    height: 44px;
+    min-height: 44px;
+  }
+  .hms-odoo-app .o_nav_menu .o_nav_dropdown {
+    width: 100%;
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .hms-odoo-app .o_nav_menu.is-mobile-open {
+    display: flex;
+  }
+  .hms-odoo-app .o_nav_dropdown .o_nav_drop_panel {
+    position: static;
+    display: none;
+    box-shadow: none;
+    border: none;
+    padding-left: 12px;
+  }
+  .hms-odoo-app .o_nav_dropdown.is-open .o_nav_drop_panel {
+    display: block;
+  }
+}
+
+@media (max-width: 768px) {
+  .hms-odoo-app .o_product_kanban {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}

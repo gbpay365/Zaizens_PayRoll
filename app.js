@@ -5,15 +5,24 @@ const fs = require('fs');
 const express = require('express');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
-const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 const { loadEnv } = require('./lib/loadEnv');
+const { createDbPool, resolveDbConfig } = require('./lib/dbPool');
 const { flashT } = require('./lib/flashI18n');
 const { pageTitle } = require('./lib/pageTitle');
 const hmsI18n = require('./lib/payrollI18n');
 const pagination = require('./lib/pagination');
 
 loadEnv();
+
+const DB_BOOT_CONFIG = resolveDbConfig();
+let pool;
+try {
+  pool = createDbPool();
+} catch (e) {
+  console.error('[Zaizens_PayRoll] DB config error:', e.message);
+  pool = null;
+}
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3010', 10);
@@ -37,20 +46,46 @@ app.use(
   })
 );
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'zaizens_payroll',
-  charset: 'utf8mb4',
-  waitForConnections: true,
-  connectionLimit: 5,
-});
-
-app.locals.db = pool;
+if (!pool) {
+  app.get('/__health', (req, res) => {
+    res.status(503).json({ ok: false, error: DB_BOOT_CONFIG.error || 'Database not configured' });
+  });
+} else {
+  app.locals.db = pool;
+  app.get('/__health', async (req, res) => {
+    try {
+      await pool.query('SELECT 1');
+      res.json({
+        ok: true,
+        db: `${DB_BOOT_CONFIG.host}/${DB_BOOT_CONFIG.database}`,
+        source: DB_BOOT_CONFIG.source,
+      });
+    } catch (e) {
+      res.status(503).json({ ok: false, error: e.message });
+    }
+  });
+}
 
 app.use(hmsI18n.middleware());
+app.use((req, res, next) => {
+  if (!pool && req.path !== '/__health') {
+    const msg = DB_BOOT_CONFIG.error || 'Database not configured for Railway. Set MySQL variables from the MySQL plugin.';
+    if (req.method === 'GET' && (req.path === '/' || req.path === '/login')) {
+      return res.render('login', {
+        title: 'Login — Zaizens Payroll',
+        error: msg,
+        pageData: {
+          error: msg,
+          msg: null,
+          brand: { name: 'Zaizens Payroll', logoPath: '/img/zaizens-brand.svg', faviconPath: '/img/zaizens-favicon.svg' },
+        },
+      });
+    }
+    return res.status(503).send(msg);
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   res.locals.brand = { name: 'Zaizens Payroll', logoPath: '/img/zaizens-brand.svg', faviconPath: '/img/zaizens-favicon.svg' };
   res.locals.user = req.session.user || null;
@@ -226,18 +261,20 @@ require('./routes/statutoryReports')(app, pool, requireAuth, { requirePerm });
 require('./routes/integrationSettings')(app, pool, requireAuth, { requireAdminOrSuper });
 
 async function boot() {
-  try {
-    await require('./lib/ensurePayrollBootstrapSchema')(pool);
-    await require('./lib/ensureEmployeeHrSchema')(pool);
-    await require('./lib/ensureHrPayrollSchema')(pool);
-    await require('./lib/ensureFacilityIntegrationSchema')(pool);
-    await require('./lib/ensureAclSchema')(pool).catch((e) => console.warn('[acl]', e.message));
-    console.log('[Zaizens_PayRoll] schema ready');
-  } catch (e) {
-    console.warn('[Zaizens_PayRoll] schema:', e.message);
+  if (pool) {
+    try {
+      await require('./lib/ensurePayrollBootstrapSchema')(pool);
+      await require('./lib/ensureEmployeeHrSchema')(pool);
+      await require('./lib/ensureHrPayrollSchema')(pool);
+      await require('./lib/ensureFacilityIntegrationSchema')(pool);
+      await require('./lib/ensureAclSchema')(pool).catch((e) => console.warn('[acl]', e.message));
+      console.log('[Zaizens_PayRoll] schema ready');
+    } catch (e) {
+      console.warn('[Zaizens_PayRoll] schema:', e.message);
+    }
   }
-  app.listen(PORT, () => {
-    console.log(`Zaizens Payroll running at http://127.0.0.1:${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Zaizens Payroll listening on port ${PORT}`);
   });
 }
 

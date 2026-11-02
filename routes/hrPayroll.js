@@ -1513,6 +1513,34 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   }
  });
 
+ app.post('/hr/leave-balances/apply-default', requireAuth, requireHrLeaveAdmin, async (req, res) => {
+  const fid = facilityId(req);
+  const year = Math.max(2000, Math.min(2100, parseInt(req.body.year, 10) || new Date().getFullYear()));
+  const raw = String(req.body.default_days == null ? '' : req.body.default_days).trim();
+  const days = Number(raw.replace(',', '.'));
+  const back = '/hr/leave-balances?year=' + year;
+  if (!raw || !Number.isFinite(days) || days < 0 || days > 365) {
+   return res.redirect(back + '&err=' + encodeURIComponent('Enter a default entitlement between 0 and 365 days.'));
+  }
+  try {
+   await ensureHrPayrollSchema(pool);
+   const staff = await activeStaff();
+   for (const em of staff) {
+    await pool.query(
+     `INSERT INTO tbl_hms_leave_balance (facility_id, employee_id, leave_type, year, balance)
+      VALUES (?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE balance = VALUES(balance)`,
+     [fid, em.id, 'annual', year, days]
+    );
+   }
+   res.redirect(
+    back + '&msg=' + encodeURIComponent(`Default entitlement of ${days} day(s) applied to ${staff.length} employee(s).`)
+   );
+  } catch (e) {
+   res.redirect(back + '&err=' + encodeURIComponent(e.message));
+  }
+ });
+
  app.post('/hr/leave-balances/save', requireAuth, requireHrLeaveAdmin, async (req, res) => {
   const fid = facilityId(req);
   const year = Math.max(2000, Math.min(2100, parseInt(req.body.year, 10) || new Date().getFullYear()));

@@ -50,7 +50,13 @@ var _totals = totals || { entitled: 0, used: 0, pending: 0, remaining: 0 };
 <section class="sage-card">
   <div class="sage-card-head">
     <div><h2>Annual entitlement <%= year %></h2><p class="sage-card-sub">Enter days; the remaining column updates when you save</p></div>
-    <div class="pay-toolbar no-print">
+    <div class="pay-toolbar no-print" style="flex-wrap:wrap;gap:10px;">
+      <form method="POST" action="/hr/leave-balances/apply-default" class="d-flex align-items-center mb-0" style="gap:6px;">
+        <input type="hidden" name="year" value="<%= year %>">
+        <label for="defaultDays" class="mb-0 sage-muted" style="font-size:12px;white-space:nowrap;">Default days</label>
+        <input type="number" id="defaultDays" name="default_days" min="0" max="365" step="0.5" class="form-control form-control-sm" style="width:90px;" placeholder="18" aria-label="Default annual entitlement in days">
+        <button type="submit" class="btn btn-sage-ghost btn-sm" title="Write this entitlement to every active employee"><i class="fa fa-users mr-1"></i>Apply to all</button>
+      </form>
       <input type="search" id="balanceSearch" class="pay-search" placeholder="Filter employee…" aria-label="Filter employees" autocomplete="off">
     </div>
   </div>

@@ -70,7 +70,7 @@ The application shell uses the ZAIZENS identity: a light navigation rail with gr
 
 Employees can be deleted one at a time or in bulk from the Employees register; deleting an employee also removes their login account, pay profile, payroll lines, leave records and attendance. Super Admin accounts and your own account are protected, and every deletion is written to the admin audit trail.
 
-Leave balances show entitlement, days taken (approved), days pending and the remaining balance. Employee records in `/payroll/employees/:id` show the same leave/attendance data next to the salary breakdown, and payslips, payroll runs and tax declarations all read the same payroll tables. Non-admin users land on `/hr` after sign-in and are redirected there if they open a payroll-only page.
+Leave balances show entitlement, days taken (approved), days pending and the remaining balance; a default-entitlement control writes the same annual days to every active employee in one step. Employee records in `/payroll/employees/:id` show the same leave/attendance data next to the salary breakdown, and payslips, payroll runs and tax declarations all read the same payroll tables. Non-admin users land on `/hr` after sign-in and are redirected there if they open a payroll-only page.
 
 ## Admin module
 

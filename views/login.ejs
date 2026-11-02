@@ -11,7 +11,7 @@ var msg = (locals.pageData && locals.pageData.msg) || locals.msg || null;
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0c2f25">
-  <title>Sign in — Zaizens Payroll</title>
+  <title>Sign in — ZAIZENS PAY</title>
   <link rel="icon" type="image/svg+xml" href="<%= b.faviconPath || '/img/zaizens-favicon.svg' %>">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
@@ -20,21 +20,32 @@ var msg = (locals.pageData && locals.pageData.msg) || locals.msg || null;
 <body>
   <div class="sage-login">
     <section class="sage-login-brand">
-      <div class="sage-login-mark"><span>Z</span> Zaizens Payroll</div>
+      <div class="sage-login-mark">
+        <img src="/img/zaizens-pay-mark.svg" alt="" width="40" height="40">
+        <span class="sage-login-wordmark">ZAIZENS <b>PAY</b></span>
+      </div>
+
       <div class="sage-login-copy">
-        <h1>Payroll that keeps Cameroon compliance in step.</h1>
-        <p>Run monthly payroll, produce payslips and file CNPS, DGI and statutory returns from one register.</p>
+        <p class="sage-login-eyebrow">Payroll &middot; HR &middot; Compliance</p>
+        <h1>One register for payroll, people and compliance.</h1>
+        <p>Run monthly payroll, publish payslips and file CNPS, DGI and statutory returns from a single staff record.</p>
         <ul class="sage-login-points">
           <li><i class="fa fa-check-circle"></i> CNPS, CFC, CRTV, FNE, IRPP and CAC calculated automatically</li>
           <li><i class="fa fa-check-circle"></i> Gross to net, with housing, transport and role allowances</li>
-          <li><i class="fa fa-check-circle"></i> Payslips, payroll runs and tax declarations in one place</li>
+          <li><i class="fa fa-check-circle"></i> Roles, permissions and password policy under your control</li>
         </ul>
       </div>
-      <p class="sage-login-foot">&copy; <%= new Date().getFullYear() %> Zaizens Payroll &middot; Cameroon</p>
+
+      <p class="sage-login-foot">&copy; <%= new Date().getFullYear() %> ZAIZENS PAY &middot; Payroll &amp; HR</p>
     </section>
 
     <section class="sage-login-panel">
       <div class="sage-login-form">
+        <div class="sage-login-form-brand">
+          <img src="/img/zaizens-pay-mark.svg" alt="" width="34" height="34">
+          <span>ZAIZENS <b>PAY</b></span>
+        </div>
+
         <h2>Sign in</h2>
         <p class="sage-login-sub">Use your payroll account to continue.</p>
 

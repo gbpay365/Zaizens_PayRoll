@@ -71,41 +71,39 @@ body.hms-body--odoo .sage-main.o_action_manager {
 .sage-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 18px 20px 16px;
+  gap: 11px;
+  padding: 20px 18px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: radial-gradient(120% 140% at 0% 0%, rgba(0, 166, 81, 0.22), transparent 62%);
 }
 
 .sage-brand-mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  background: var(--sage-green-bright);
-  color: #06251b;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  font-size: 16px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   flex-shrink: 0;
+  display: block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 .sage-brand-text strong {
   display: block;
   color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .sage-brand-text small {
   display: block;
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
-  margin-top: 3px;
+  letter-spacing: 0.16em;
+  margin-top: 4px;
 }
 
 .sage-nav {
@@ -118,12 +116,20 @@ body.hms-body--odoo .sage-main.o_action_manager {
 .sage-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 3px; }
 
 .sage-nav-label {
-  margin: 14px 10px 6px;
-  font-size: 10px;
+  margin: 18px 10px 7px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.34);
+}
+
+.sage-nav > .sage-nav-label:first-child {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .sage-nav a {
@@ -142,10 +148,11 @@ body.hms-body--odoo .sage-main.o_action_manager {
 }
 
 .sage-nav a i {
-  width: 16px;
+  width: 18px;
   text-align: center;
   font-size: 14px;
-  opacity: 0.8;
+  opacity: 0.72;
+  flex-shrink: 0;
 }
 
 .sage-nav a:hover {
@@ -154,8 +161,9 @@ body.hms-body--odoo .sage-main.o_action_manager {
 }
 
 .sage-nav a.active {
-  background: rgba(0, 166, 81, 0.18);
-  border-left-color: var(--sage-green-bright);
+  background: linear-gradient(90deg, rgba(0, 166, 81, 0.3), rgba(0, 166, 81, 0.1));
+  border-left-color: transparent;
+  box-shadow: inset 3px 0 0 var(--sage-green-bright);
   color: #fff !important;
   font-weight: 600;
 }
@@ -185,6 +193,7 @@ body.hms-body--odoo .sage-main.o_action_manager {
   height: 30px;
   border-radius: 50%;
   background: rgba(0, 166, 81, 0.22);
+  box-shadow: inset 0 0 0 1px rgba(127, 224, 171, 0.35);
   color: #9ff0c3;
   font-weight: 700;
   font-size: 12px;
@@ -944,7 +953,9 @@ body.hms-body--odoo .sage-main.o_action_manager {
 }
 
 .sage-login-brand {
-  background: var(--sage-rail);
+  background:
+    radial-gradient(90% 70% at 0% 0%, rgba(0, 166, 81, 0.28), transparent 60%),
+    var(--sage-rail);
   color: #fff;
   padding: 44px 48px;
   display: flex;
@@ -968,21 +979,35 @@ body.hms-body--odoo .sage-main.o_action_manager {
 .sage-login-mark {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-weight: 600;
-  font-size: 15px;
+  gap: 12px;
+  position: relative;
+  z-index: 1;
 }
 
-.sage-login-mark span {
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
-  background: var(--sage-green-bright);
-  color: #06251b;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.sage-login-mark img {
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.sage-login-wordmark {
+  font-size: 15px;
+  font-weight: 300;
+  letter-spacing: 0.26em;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.sage-login-wordmark b {
   font-weight: 800;
+  color: #fff;
+}
+
+.sage-login-eyebrow {
+  margin: 0 0 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7fe0ab;
 }
 
 .sage-login-copy h1 {
@@ -1024,6 +1049,20 @@ body.hms-body--odoo .sage-main.o_action_manager {
 }
 
 .sage-login-form { width: 100%; max-width: 360px; }
+
+.sage-login-form-brand {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 26px;
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 0.24em;
+  color: var(--sage-ink);
+}
+
+.sage-login-form-brand img { border-radius: 9px; }
+.sage-login-form-brand b { font-weight: 800; color: var(--sage-green-dark); }
 .sage-login-form h2 { font-size: 22px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.015em; }
 .sage-login-form .sage-login-sub { color: var(--sage-muted); font-size: 13.5px; margin: 0 0 24px; }
 .sage-login-form .btn { height: 40px; font-size: 14px; }
@@ -1032,6 +1071,7 @@ body.hms-body--odoo .sage-main.o_action_manager {
 @media (max-width: 900px) {
   .sage-login { grid-template-columns: 1fr; }
   .sage-login-brand { display: none; }
+  .sage-login-form-brand { display: flex; }
 }
 
 /* --------------------------------------------------------------------------

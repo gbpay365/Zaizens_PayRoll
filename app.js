@@ -89,12 +89,12 @@ app.use((req, res, next) => {
     const msg = DB_BOOT_CONFIG.error || 'Database not configured for Railway. Set MySQL variables from the MySQL plugin.';
     if (req.method === 'GET' && (req.path === '/' || req.path === '/login')) {
       return res.render('login', {
-        title: 'Login — Zaizens Payroll',
+        title: 'Sign in — ZAIZENS PAY',
         error: msg,
         pageData: {
           error: msg,
           msg: null,
-          brand: { name: 'Zaizens Payroll', logoPath: '/img/zaizens-brand.svg', faviconPath: '/img/zaizens-favicon.svg' },
+          brand: { name: 'ZAIZENS PAY', logoPath: '/img/zaizens-pay-mark.svg', faviconPath: '/img/zaizens-favicon.svg' },
         },
       });
     }
@@ -104,7 +104,7 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  res.locals.brand = { name: 'Zaizens Payroll', logoPath: '/img/zaizens-brand.svg', faviconPath: '/img/zaizens-favicon.svg' };
+  res.locals.brand = { name: 'ZAIZENS PAY', logoPath: '/img/zaizens-pay-mark.svg', faviconPath: '/img/zaizens-favicon.svg' };
   res.locals.user = req.session.user || null;
   res.locals.HMS_PAGE_SIZE = pagination.DEFAULT_PAGE_SIZE;
   res.locals.buildPageUrl = pagination.buildPageUrl;
@@ -197,7 +197,7 @@ app.use((req, res, next) => {
 app.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/payroll');
   res.render('login', {
-    title: 'Login — Zaizens Payroll',
+    title: 'Sign in — ZAIZENS PAY',
     error: req.query.err || null,
     pageData: {
       error: req.query.err || null,
@@ -291,7 +291,7 @@ app.get('/payroll', requireAuth, requirePayrollAccess, async (req, res) => {
     const isPayrollAdmin = role === '1' || role === '99';
     const perms = res.locals.userPerms || [];
     res.render('payroll', {
-      title: pageTitle(res, 'document_titles.payroll_hr', 'Payroll & HR — Zaizens'),
+      title: pageTitle(res, 'document_titles.payroll_hr', 'Payroll & HR — ZAIZENS PAY'),
       headcount,
       metrics,
       isPayrollAdmin,
@@ -336,7 +336,7 @@ async function boot() {
   const server = app.listen(PORT, '0.0.0.0', () => {
     const addr = server.address();
     const boundPort = addr && typeof addr === 'object' ? addr.port : PORT;
-    console.log(`Zaizens Payroll listening on port ${boundPort}`);
+    console.log(`ZAIZENS PAY listening on port ${boundPort}`);
   });
 }
 

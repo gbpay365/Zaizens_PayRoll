@@ -53,7 +53,13 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
       try {
         await conn.beginTransaction();
         for (const table of EMPLOYEE_CHILD_TABLES) {
-          await conn.query(`DELETE FROM ${table} WHERE employee_id = ?`, [row.id]).catch(() => {});
+          try {
+            await conn.query(`DELETE FROM ${table} WHERE employee_id = ?`, [row.id]);
+          } catch (e) {
+            // A missing optional table must not hide a failed delete of a real one;
+            // roll back so the employee is never left without their payroll profile.
+            if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
+          }
         }
         await conn.query('DELETE FROM tbl_employee WHERE id = ?', [row.id]);
         await conn.commit();
@@ -64,6 +70,17 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
       } finally {
         conn.release();
       }
+    }
+    // Profiles left behind by earlier deletions (or by data imports) must not keep
+    // a removed employee visible in Pay profiles.
+    if (deleted.length) {
+      await pool
+        .query(
+          `DELETE pp FROM tbl_hms_pay_profile pp
+             LEFT JOIN tbl_employee e ON e.id = pp.employee_id
+            WHERE e.id IS NULL`
+        )
+        .catch((e) => console.warn('[staff/delete] orphan pay profile cleanup:', e.message));
     }
     return { deleted, skipped };
   }

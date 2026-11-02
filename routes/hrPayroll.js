@@ -13,6 +13,7 @@ const hmsFormatDate = require('../lib/hmsFormatDate');
 const { hmsPayrollCameroonCalculate, defaultBracketsJson } = require('../lib/hmsPayrollCameroon');
 const { loadPayrollDashboard } = require('../lib/hmsPayrollDashboard');
 const pagination = require('../lib/pagination');
+const hmsStaffAccountGuard = require('../lib/hmsStaffAccountGuard');
 const {
   SECTORS: ALLOWANCE_SECTORS,
   loadAllowanceSettings,
@@ -753,7 +754,10 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    await ensureHrPayrollSchema(pool);
    const fid = facilityId(req);
    const searchQ = String(req.query.q || '').trim();
-   let where = 'e.status = 1';
+   // Idle visiting-doctor pool slots are not staff (the employee directory hides
+   // them), so their pay profiles must not linger here either. Admin accounts keep
+   // their profiles: they are hidden from the directory but still paid.
+   let where = `e.status = 1 AND ${hmsStaffAccountGuard.VISITING_DOCTOR_POOL_EXCLUDE_SQL}`;
    const listParams = [fid];
    if (searchQ) {
     const like = '%' + searchQ + '%';

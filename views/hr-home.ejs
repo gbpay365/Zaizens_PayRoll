@@ -1,0 +1,315 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'hrhome', showHrLeaveAdmin: locals.isApprover, canTaxHub: locals.canTax, canPayrollSettings: locals.canPayroll }) %>
+<%
+var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+var _initials = function(first, last) {
+  return ((String(first || '?').charAt(0)) + String(last || '').charAt(0)).toUpperCase();
+};
+var leaveTypeLabel = function (t) { return (LEAVE_TYPES && LEAVE_TYPES[t]) || String(t || '').replace(/_/g, ' '); };
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">HR &middot; <%= todayLabel %></p>
+    <h1>Good morning, <%= firstName %></h1>
+    <p class="sage-sub">Your time off, attendance and payroll in one place — the same records payroll and tax use.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr/request-leave" class="btn btn-sage"><i class="fa fa-paper-plane mr-1"></i> Request time off</a>
+    <% if (isApprover) { %>
+    <a href="/hr/leave-requests" class="btn btn-sage-ghost"><i class="fa fa-inbox mr-1"></i> Approvals<% if (pendingAll > 0) { %> <span class="sage-pill-count"><%= pendingAll %></span><% } %></a>
+    <% } %>
+  </div>
+</div>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">People</div>
+    <div class="sage-stat-value"><%= headcount %></div>
+    <p class="sage-stat-foot">Active employees</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Off today</div>
+    <div class="sage-stat-value"><%= offToday.length %></div>
+    <p class="sage-stat-foot">On approved leave</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Approvals waiting</div>
+    <div class="sage-stat-value"><%= isApprover ? pendingAll : myPending %></div>
+    <p class="sage-stat-foot"><%= isApprover ? 'Pending leave requests' : 'Your pending requests' %></p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Attendance today</div>
+    <div class="sage-stat-value"><%= attendanceMarked %></div>
+    <p class="sage-stat-foot">
+      <% if (attendanceMarked) { %>
+        <%= attendanceByStatus.present || 0 %> present &middot; <%= attendanceByStatus.late || 0 %> late
+      <% } else { %>
+        Not recorded yet
+      <% } %>
+    </p>
+  </div>
+</div>
+
+<div class="sage-grid">
+  <div>
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div>
+          <h2>Who's off today</h2>
+          <p class="sage-card-sub"><%= todayLabel %></p>
+        </div>
+        <% if (isApprover) { %><a href="/hr/leave-requests" class="btn btn-sage-ghost btn-sm">All requests</a><% } %>
+      </div>
+      <div class="sage-card-body">
+        <% if (!offToday.length) { %>
+        <div class="sage-empty" style="padding:22px 12px;"><i class="fa fa-sun-o"></i>Everyone is in today.</div>
+        <% } else { %>
+        <div class="sage-people-list">
+          <% offToday.forEach(function (r) { %>
+          <a class="sage-person" href="/payroll/employees/<%= r.employee_id %>">
+            <span class="sage-person-avatar"><%= _initials(r.first_name, r.last_name) %></span>
+            <span class="sage-person-meta">
+              <strong><%= r.first_name %> <%= r.last_name %></strong>
+              <small><%= r.job_title || r.primary_department || 'Employee' %> &middot; back <%= displayDate(new Date(new Date(r.end_date).getTime() + 86400000)) %></small>
+            </span>
+            <span class="pay-badge pay-badge-pending"><%= leaveTypeLabel(r.leave_type) %></span>
+          </a>
+          <% }); %>
+        </div>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div>
+          <h2>Upcoming time off</h2>
+          <p class="sage-card-sub">Approved leave starting soon</p>
+        </div>
+        <a href="/hr/request-leave" class="btn btn-sage-ghost btn-sm">My requests</a>
+      </div>
+      <div class="sage-card-body">
+        <% if (!upcomingLeave.length) { %>
+        <div class="sage-empty" style="padding:22px 12px;"><i class="fa fa-calendar-o"></i>No approved leave coming up.</div>
+        <% } else { %>
+        <div class="sage-timeline">
+          <% upcomingLeave.forEach(function (r) { %>
+          <div class="sage-timeline-row">
+            <div class="sage-timeline-date">
+              <span><%= new Date(r.start_date).toLocaleDateString('en-GB', { day: '2-digit' }) %></span>
+              <small><%= MONTHS[new Date(r.start_date).getMonth() + 1] ? MONTHS[new Date(r.start_date).getMonth() + 1].slice(0, 3) : '' %></small>
+            </div>
+            <div class="sage-timeline-body">
+              <strong><%= r.first_name %> <%= r.last_name %></strong>
+              <small><%= leaveTypeLabel(r.leave_type) %> &middot; <%= daysBetweenInclusive(r.start_date, r.end_date) %> day(s)</small>
+            </div>
+            <span class="sage-muted" style="font-size:12px;white-space:nowrap;"><%= displayDate(r.start_date) %></span>
+          </div>
+          <% }); %>
+        </div>
+        <% } %>
+      </div>
+    </section>
+
+    <% if (isApprover && approvalQueue.length) { %>
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>Waiting for your approval</h2><p class="sage-card-sub">Oldest request first</p></div>
+        <a href="/hr/leave-requests" class="btn btn-sage-ghost btn-sm">Open queue</a>
+      </div>
+      <div class="sage-card-body">
+        <div class="sage-people-list">
+          <% approvalQueue.forEach(function (r) { %>
+          <div class="sage-person">
+            <span class="sage-person-avatar"><%= _initials(r.first_name, r.last_name) %></span>
+            <span class="sage-person-meta">
+              <strong><%= r.first_name %> <%= r.last_name %></strong>
+              <small><%= leaveTypeLabel(r.leave_type) %> &middot; <%= displayDate(r.start_date) %> → <%= displayDate(r.end_date) %> &middot; <%= Number(r.days_requested) || 0 %> day(s)</small>
+            </span>
+            <form method="POST" action="/hr/leave-requests/action" class="d-inline">
+              <input type="hidden" name="request_id" value="<%= r.id %>">
+              <input type="hidden" name="action" value="approve">
+              <button type="submit" class="btn btn-sage btn-sm">Approve</button>
+            </form>
+            <form method="POST" action="/hr/leave-requests/action" class="d-inline ml-1">
+              <input type="hidden" name="request_id" value="<%= r.id %>">
+              <input type="hidden" name="action" value="reject">
+              <button type="submit" class="btn btn-sage-ghost btn-sm">Reject</button>
+            </form>
+          </div>
+          <% }); %>
+        </div>
+      </div>
+    </section>
+    <% } %>
+  </div>
+
+  <div>
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>My leave</h2><p class="sage-card-sub" id="hrBalanceYear"><%= year %></p></div>
+        <a href="/hr/my-leave-balance" class="btn btn-sage-ghost btn-sm">Details</a>
+      </div>
+      <div class="sage-card-body">
+        <% if (!myBalances.length) { %>
+        <div class="sage-empty" style="padding:20px 10px;"><i class="fa fa-balance-scale"></i>No balance configured for <%= year %>.</div>
+        <% } else { %>
+        <% myBalances.forEach(function (b) { %>
+        <div class="sage-balance-row">
+          <div>
+            <strong><%= b.label %></strong>
+            <small class="sage-muted">days remaining</small>
+          </div>
+          <span class="sage-balance-value"><%= b.balance.toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %></span>
+        </div>
+        <% }); %>
+        <% } %>
+        <div class="mt-3">
+          <a href="/hr/request-leave" class="btn btn-sage-ghost btn-block">Request time off</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>Latest payslip</h2><p class="sage-card-sub">From the payroll module</p></div>
+      </div>
+      <div class="sage-card-body">
+        <% if (!latestPay) { %>
+        <div class="sage-empty" style="padding:20px 10px;"><i class="fa fa-file-text-o"></i>No payroll line yet.</div>
+        <% } else { %>
+        <dl class="sage-list">
+          <div class="sage-list-row"><dt>Period</dt><dd><%= MONTHS[latestPay.month] || latestPay.month %> <%= latestPay.year %></dd></div>
+          <div class="sage-list-row"><dt>Gross</dt><dd><%= _fmtXaf(latestPay.gross_salary) %> XAF</dd></div>
+          <div class="sage-list-row"><dt>Income tax (IRPP)</dt><dd><%= _fmtXaf(latestPay.income_tax) %> XAF</dd></div>
+          <div class="sage-list-row"><dt>Net pay</dt><dd><%= _fmtXaf(latestPay.net_salary) %> XAF</dd></div>
+        </dl>
+        <div class="d-flex mt-3" style="gap:8px;">
+          <a href="/payroll/payslip/<%= latestPay.id %>" target="_blank" rel="noopener" class="btn btn-sage btn-sm">Open payslip</a>
+          <a href="/hr/my-payslips" class="btn btn-sage-ghost btn-sm">All payslips</a>
+        </div>
+        <% } %>
+        <% if (canTax) { %>
+        <p class="sage-hint mt-3 mb-0">Your payslip figures feed the facility's CNPS, DGI and statutory returns. <a href="/tax">Open tax hub</a></p>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>Upcoming holidays</h2><p class="sage-card-sub">Facility calendar</p></div>
+        <% if (isApprover) { %><a href="/hr/holidays" class="btn btn-sage-ghost btn-sm">Manage</a><% } %>
+      </div>
+      <div class="sage-card-body">
+        <% if (!holidays.length) { %>
+        <div class="sage-empty" style="padding:20px 10px;"><i class="fa fa-calendar"></i>No holidays scheduled.</div>
+        <% } else { %>
+        <div class="sage-timeline">
+          <% holidays.forEach(function (h) { %>
+          <div class="sage-timeline-row">
+            <div class="sage-timeline-date">
+              <span><%= new Date(h.holiday_date).toLocaleDateString('en-GB', { day: '2-digit' }) %></span>
+              <small><%= new Date(h.holiday_date).toLocaleDateString('en-GB', { month: 'short' }) %></small>
+            </div>
+            <div class="sage-timeline-body">
+              <strong><%= h.holiday_name %></strong>
+              <small><%= h.is_recurring ? 'Recurring yearly' : 'One-off' %></small>
+            </div>
+          </div>
+          <% }); %>
+        </div>
+        <% } %>
+      </div>
+    </section>
+  </div>
+</div>
+
+<h2 class="sage-section-title">Quick actions</h2>
+<div class="pay-tile-grid">
+  <a href="/hr/request-leave" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-paper-plane"></i></div>
+    <div><h3>Request time off</h3><p>Submit dates for approval</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <a href="/hr/my-payslips" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-file-text-o"></i></div>
+    <div><h3>My payslips</h3><p>View and print payslips</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <a href="/hr/my-attendance" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-clock-o"></i></div>
+    <div><h3>My attendance</h3><p>Check-in history</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <% if (isApprover) { %>
+  <a href="/hr/attendance" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-check-square-o"></i></div>
+    <div><h3>Record attendance</h3><p>Daily register</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <a href="/hr/leave-balances" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-balance-scale"></i></div>
+    <div><h3>Leave balances</h3><p>Entitlements per employee</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <% } %>
+  <% if (canPayroll) { %>
+  <a href="/payroll/monthly" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-calendar-check-o"></i></div>
+    <div><h3>Payroll runs</h3><p>Process and pay the month</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <% } %>
+  <a href="/staff" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-users"></i></div>
+    <div><h3>Employee directory</h3><p>People and roles</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+</div>
+
+<style>
+  .sage-pill-count {
+    display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px;
+    border-radius: 9px; background: #b45309; color: #fff; font-size: 10.5px; font-weight: 700;
+    line-height: 18px; text-align: center;
+  }
+  .sage-section-title {
+    margin: 6px 0 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: #5f6f68;
+  }
+  .sage-people-list { display: block; }
+  .sage-person {
+    display: flex; align-items: center; gap: 11px; padding: 9px 0;
+    border-bottom: 1px solid #e8eeea; text-decoration: none !important; color: #16211c !important;
+  }
+  .sage-person:last-child { border-bottom: 0; }
+  .sage-person-avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: #e7f3ec; color: #006b3d;
+    font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .sage-person-meta { flex: 1; min-width: 0; }
+  .sage-person-meta strong { display: block; font-size: 13px; font-weight: 600; }
+  .sage-person-meta small { display: block; font-size: 11.5px; color: #5f6f68; }
+  .sage-timeline { display: block; }
+  .sage-timeline-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #e8eeea; }
+  .sage-timeline-row:last-child { border-bottom: 0; }
+  .sage-timeline-date {
+    width: 44px; text-align: center; background: #f3f6f4; border: 1px solid #e1e8e4;
+    border-radius: 4px; padding: 4px 0; flex-shrink: 0;
+  }
+  .sage-timeline-date span { display: block; font-size: 15px; font-weight: 600; line-height: 1.1; }
+  .sage-timeline-date small { display: block; font-size: 9.5px; text-transform: uppercase; color: #5f6f68; letter-spacing: 0.05em; }
+  .sage-timeline-body { flex: 1; min-width: 0; }
+  .sage-timeline-body strong { display: block; font-size: 13px; font-weight: 600; }
+  .sage-timeline-body small { display: block; font-size: 11.5px; color: #5f6f68; }
+  .sage-balance-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 9px 0; border-bottom: 1px solid #e8eeea;
+  }
+  .sage-balance-row:last-of-type { border-bottom: 0; }
+  .sage-balance-row strong { display: block; font-size: 13px; font-weight: 600; }
+  .sage-balance-row small { display: block; font-size: 11px; }
+  .sage-balance-value { font-size: 20px; font-weight: 600; color: #006b3d; font-variant-numeric: tabular-nums; }
+</style>
+
+<%- include('partials/payroll-layout-end') %>

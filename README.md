@@ -52,4 +52,22 @@ The same calculation engine powers **Pay profiles →** the row calculator (ente
 
 The application shell is a Sage-style layout: dark green navigation rail, a compact top bar and dense payroll tables. Styles live in `public/css/sage.css`; the shell itself is `views/partials/sage-sidebar.ejs` plus `hms-module-odoo-start.ejs`.
 
+## HR module
+
+`/hr` is the HR home (Sage HR-style): today's absences, upcoming approved leave, the approval queue, personal leave balances, the latest payslip and upcoming holidays, all on the same shared records as payroll and tax.
+
+| Screen | Route | Who |
+|--------|-------|-----|
+| HR overview | `/hr` | everyone |
+| Request time off | `/hr/request-leave` | everyone |
+| My leave balance | `/hr/my-leave-balance` | everyone |
+| My attendance | `/hr/my-attendance` | everyone |
+| My payslips | `/hr/my-payslips` | everyone |
+| Leave approvals | `/hr/leave-requests` | HR / admin |
+| Leave balances | `/hr/leave-balances` | HR / admin |
+| Public holidays | `/hr/holidays` | HR / admin |
+| Attendance register | `/hr/attendance` | HR / payroll write |
+
+Leave balances show entitlement, days taken (approved), days pending and the remaining balance. Employee records in `/payroll/employees/:id` show the same leave/attendance data next to the salary breakdown, and payslips, payroll runs and tax declarations all read the same payroll tables. Non-admin users land on `/hr` after sign-in and are redirected there if they open a payroll-only page.
+
 Account_Core no longer controls payroll in HMS.

@@ -1404,9 +1404,16 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      end_date_fmt: formatLeaveDisplayDate(r.end_date, false)
     })
    );
+   const counts = { pending: 0, approved: 0, rejected: 0, other: 0 };
+   for (const r of formattedRows) {
+    const st = String(r.status || '').toLowerCase();
+    if (counts[st] != null) counts[st] += 1;
+    else counts.other += 1;
+   }
    res.render('hr-leave-requests', {
     title: 'Leave approvals - ZAIZENS',
     rows: formattedRows,
+    counts,
     flash: req.query.msg || null,
     error: req.query.err || null
    });
@@ -1446,6 +1453,24 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    const fid = facilityId(req);
    const year = Math.max(2000, Math.min(2100, parseInt(req.query.year, 10) || new Date().getFullYear()));
    const staff = await activeStaff();
+    const usedByEmp = new Map();
+    const pendingByEmp = new Map();
+    try {
+      const [agg] = await pool.query(
+        `SELECT employee_id, status, SUM(days_requested) AS days
+         FROM tbl_hms_leave_request
+         WHERE facility_id = ? AND YEAR(start_date) = ? AND status IN ('approved','pending')
+         GROUP BY employee_id, status`,
+        [fid, year]
+      );
+      for (const row of agg || []) {
+        const eid = parseInt(row.employee_id, 10) || 0;
+        const days = Number(row.days) || 0;
+        if (!eid) continue;
+        if (String(row.status) === 'approved') usedByEmp.set(eid, days);
+        else pendingByEmp.set(eid, days);
+      }
+    } catch (_) { /* requests table may be empty */ }
    const balances = [];
    for (const em of staff) {
     const eid = em.id;
@@ -1455,12 +1480,27 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
       [fid, eid, 'annual', year]
      )
      .catch(() => [[{ balance: 0 }]]);
-    balances.push({ ...em, balance: parseFloat(b?.balance) || 0 });
+      const entitled = parseFloat(b?.balance) || 0;
+      const used = usedByEmp.get(Number(eid)) || 0;
+      const pending = pendingByEmp.get(Number(eid)) || 0;
+      balances.push({
+        ...em,
+        balance: entitled,
+        used,
+        pending,
+        remaining: Math.round((entitled - used - pending) * 10) / 10,
+      });
    }
    res.render('hr-leave-balances', {
     title: 'Leave balances - ZAIZENS',
     year,
     rows: balances,
+      totals: {
+        entitled: balances.reduce((s, r) => s + r.balance, 0),
+        used: balances.reduce((s, r) => s + r.used, 0),
+        pending: balances.reduce((s, r) => s + r.pending, 0),
+        remaining: balances.reduce((s, r) => s + r.remaining, 0),
+      },
     flash: req.query.msg || null,
     error: req.query.err || null
    });
@@ -1502,9 +1542,17 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      [fid]
     )
     .catch(() => [[]]);
+   const today = new Date().toISOString().slice(0, 10);
+   const upcoming = (rows || [])
+    .filter((h) => String(h.holiday_date).slice(0, 10) >= today)
+    .sort((a, b) => String(a.holiday_date).localeCompare(String(b.holiday_date)));
+   const past = (rows || []).filter((h) => String(h.holiday_date).slice(0, 10) < today);
    res.render('hr-holidays', {
     title: 'Holidays - ZAIZENS',
     rows: rows || [],
+    upcoming,
+    past,
+    today,
     flash: req.query.msg || null,
     error: req.query.err || null
    });
@@ -1565,6 +1613,15 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     )
     .catch(() => [[]]);
    const defaultSubmittedTo = await loadLeaveApproverNames();
+   const year = new Date().getFullYear();
+   const [balanceRows] = await pool
+    .query(
+     `SELECT leave_type, balance FROM tbl_hms_leave_balance
+      WHERE facility_id = ? AND employee_id = ? AND year = ?
+      ORDER BY FIELD(leave_type, 'annual', 'sick', 'unpaid', 'other'), leave_type`,
+     [fid, uid, year]
+    )
+    .catch(() => [[]]);
    const mine = (mineRaw || []).map((r) => {
     const st = String(r.status || '').toLowerCase();
     const approverName = employeeDisplayName(r);
@@ -1582,6 +1639,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     title: 'Request leave - ZAIZENS',
     paySelfServiceOnly: 'leave',
     mine,
+    balances: balanceRows || [],
+    year,
+    today: new Date().toISOString().slice(0, 10),
     flash: req.query.msg || null,
     error: req.query.err || null
    });
@@ -1632,9 +1692,32 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      [fid, uid]
     )
     .catch(() => [[]]);
+   const now = new Date();
+   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+   const summary = { present: 0, late: 0, absent: 0, 'half-day': 0, 'on-leave': 0 };
+   let totalMonth = 0;
+   let hoursMonth = 0;
+   for (const r of rows || []) {
+    const d = String(r.att_date || '').slice(0, 10);
+    if (d < monthStart) continue;
+    totalMonth += 1;
+    const st = String(r.status || 'present').toLowerCase();
+    if (summary[st] == null) summary[st] = 0;
+    summary[st] += 1;
+    if (r.check_in_time && r.check_out_time) {
+     const [ih, im] = String(r.check_in_time).split(':').map(Number);
+     const [oh, om] = String(r.check_out_time).split(':').map(Number);
+     const mins = (oh * 60 + om) - (ih * 60 + im);
+     if (mins > 0) hoursMonth += mins / 60;
+    }
+   }
    res.render('hr-my-attendance', {
     title: 'My attendance - ZAIZENS',
-    rows: rows || []
+    rows: rows || [],
+    summary,
+    totalMonth,
+    hoursMonth: Math.round(hoursMonth * 10) / 10,
+    today: now.toISOString().slice(0, 10),
    });
   } catch (e) {
    res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });
@@ -1657,10 +1740,44 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      [fid, uid, year]
     )
     .catch(() => [[]]);
+   let requestsByType = {};
+   try {
+    const [agg] = await pool.query(
+     `SELECT leave_type, status, SUM(days_requested) AS days
+      FROM tbl_hms_leave_request
+      WHERE facility_id = ? AND employee_id = ? AND YEAR(start_date) = ? AND status IN ('approved','pending')
+      GROUP BY leave_type, status`,
+     [fid, uid, year]
+    );
+    for (const row of agg || []) {
+     const key = String(row.leave_type || 'other');
+     if (!requestsByType[key]) requestsByType[key] = { used: 0, pending: 0 };
+     if (String(row.status) === 'approved') requestsByType[key].used += Number(row.days) || 0;
+     else requestsByType[key].pending += Number(row.days) || 0;
+    }
+   } catch (_) { /* optional */ }
+   const enriched = (rows || []).map((r) => {
+    const agg = requestsByType[String(r.leave_type)] || { used: 0, pending: 0 };
+    const entitled = Number(r.balance) || 0;
+    return {
+     ...r,
+     entitled,
+     used: agg.used,
+     pending: agg.pending,
+     remaining: Math.round((entitled - agg.used - agg.pending) * 10) / 10,
+    };
+   });
    res.render('hr-my-leave-balance', {
     title: 'My leave balance - ZAIZENS',
     year,
-    rows: rows || []
+    rows: enriched,
+    requestsByType,
+    totals: {
+     entitled: enriched.reduce((s, r) => s + r.entitled, 0),
+     used: enriched.reduce((s, r) => s + r.used, 0),
+     pending: enriched.reduce((s, r) => s + r.pending, 0),
+     remaining: enriched.reduce((s, r) => s + r.remaining, 0),
+    },
    });
   } catch (e) {
    res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });
@@ -1699,11 +1816,26 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     11: 'Nov',
     12: 'Dec'
    };
+   const ytd = { gross: 0, tax: 0, net: 0, deductions: 0, count: 0 };
+   const currentYear = new Date().getFullYear();
+   for (const r of rows || []) {
+    if (Number(r.year) !== currentYear) continue;
+    ytd.count += 1;
+    ytd.gross += Number(r.gross_salary) || 0;
+    ytd.tax += Number(r.income_tax) || 0;
+    ytd.net += Number(r.net_salary) || 0;
+    ytd.deductions += (Number(r.cnps_employee) || 0) + (Number(r.cimr_employee) || 0)
+      + (Number(r.crtv_deduction) || 0) + (Number(r.council_tax_deduction) || 0)
+      + (Number(r.development_tax_deduction) || 0) + (Number(r.income_tax) || 0)
+      + (Number(r.cnhc_deduction) || 0);
+   }
    res.render('hr-my-payslips', {
     title: 'My payslips - ZAIZENS',
     paySelfServiceOnly: 'payslips',
     rows: rows || [],
-    months
+    months,
+    ytd,
+    currentYear,
    });
   } catch (e) {
    res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });

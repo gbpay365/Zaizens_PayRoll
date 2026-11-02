@@ -384,6 +384,30 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
         )
         .catch(() => [[]]);
 
+      const hrYear = new Date().getFullYear();
+      const [[leaveBalance]] = await pool
+        .query(
+          `SELECT balance FROM tbl_hms_leave_balance
+           WHERE facility_id = ? AND employee_id = ? AND leave_type = 'annual' AND year = ? LIMIT 1`,
+          [fid, id, hrYear]
+        )
+        .catch(() => [[null]]);
+      const [[leavePending]] = await pool
+        .query(
+          `SELECT COUNT(*) AS c, COALESCE(SUM(days_requested), 0) AS days
+           FROM tbl_hms_leave_request
+           WHERE facility_id = ? AND employee_id = ? AND status = 'pending'`,
+          [fid, id]
+        )
+        .catch(() => [[{ c: 0, days: 0 }]]);
+      const [recentAttendance] = await pool
+        .query(
+          `SELECT att_date, status, check_in_time, check_out_time FROM tbl_hms_attendance
+           WHERE facility_id = ? AND employee_id = ? ORDER BY att_date DESC LIMIT 5`,
+          [fid, id]
+        )
+        .catch(() => [[]]);
+
       let comp = null;
       let compError = null;
       if (profile && Number(profile.basic_salary) > 0) {
@@ -412,6 +436,11 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
         comp,
         compError,
         records: records || [],
+        leaveBalance: leaveBalance ? Number(leaveBalance.balance) || 0 : null,
+        leavePendingCount: Number(leavePending && leavePending.c) || 0,
+        leavePendingDays: Number(leavePending && leavePending.days) || 0,
+        recentAttendance: recentAttendance || [],
+        hrYear,
         months: MONTHS,
         flash: req.query.msg || null,
         error: req.query.err || null,

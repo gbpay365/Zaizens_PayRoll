@@ -1,106 +1,175 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'hratt', showHrLeaveAdmin: true }) %>
- <% if(locals.flash){ %>
- <div class="hms-flash hms-flash--success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
- <% } %>
- <% if(locals.error){ %>
- <div class="hms-flash hms-flash--error border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
- <% } %>
- <!-- Header -->
- <div class="row align-items-center mb-4">
- <div class="col-sm-8">
- <h4 class="page-title font-weight-bold text-dark"><%= _t('hr_attendance.title', { ns: 'legacy', defaultValue: 'Staff Attendance' }) %></h4>
- <p class="text-muted small"><%= _t('hr_attendance.subtitle', { ns: 'legacy', defaultValue: 'Record daily clock-in/out and operational availability (per facility).' }) %></p>
- </div>
- <div class="col-sm-4 text-right">
- <form action="/hr/attendance" method="GET" class="form-inline justify-content-end">
- <input type="date" name="date" class="hms-input w-full mr-2" value="<%= date %>">
- <button type="submit" class="hms-btn-premium"><%= _t('hr_attendance.fetch_date', { ns: 'legacy', defaultValue: 'Fetch Date' }) %></button>
- </form>
- </div>
- </div>
+<%
+var _s = summary || { present: 0, late: 0, absent: 0, 'half-day': 0, 'on-leave': 0, saved: 0 };
+var _staff = staff || [];
+var _dateLabel = new Date(String(date) + 'T12:00:00');
+if (isNaN(_dateLabel.getTime())) _dateLabel = new Date();
+%>
 
- <div class="row mb-3">
- <div class="col-md-5">
- <div class="input-group">
- <div class="input-group-prepend"><span class="input-group-text bg-white border-right-0"><i class="fa fa-search text-muted"></i></span></div>
- <input type="text" id="hmsAttendanceSearch" class="hms-input w-full border-left-0" placeholder="<%= _t('hr_attendance.filter_ph', { ns: 'legacy', defaultValue: 'Filter staff by name...' }) %>" autocomplete="off">
- </div>
- </div>
- </div>
-
- <div class="card border-0 shadow-sm rounded-xl overflow-hidden bg-white">
- <form action="/hr/attendance/save" method="POST">
- <input type="hidden" name="date" value="<%= date %>">
- <div class="table-responsive">
- <table class="table table-hover mb-0 hms-table-v3">
- <thead class="bg-light">
- <tr>
- <th><%= _t('hr_attendance.col_staff', { ns: 'legacy', defaultValue: 'Staff Member' }) %></th>
- <th><%= _t('hr_attendance.col_status', { ns: 'legacy', defaultValue: 'Status' }) %></th>
- <th><%= _t('hr_attendance.col_check_in', { ns: 'legacy', defaultValue: 'Check In' }) %></th>
- <th><%= _t('hr_attendance.col_check_out', { ns: 'legacy', defaultValue: 'Check Out' }) %></th>
- <th class="text-right"><%= _t('hr_attendance.col_shift', { ns: 'legacy', defaultValue: 'Shift Details' }) %></th>
- </tr>
- </thead>
- <tbody>
- <% staff.forEach(emp => { 
- const ex = existing[emp.id] || {};
- const st = ex.status || 'present';
- const cin = ex.check_in_time ? ex.check_in_time.substring(0,5) : '08:00';
- const cout = ex.check_out_time ? ex.check_out_time.substring(0,5) : '17:00';
- const searchBlob = (emp.first_name + ' ' + emp.last_name).toLowerCase();
- %>
- <tr class="hms-att-row" data-hms-search="<%= searchBlob %>">
- <td>
- <div class="font-weight-bold text-dark"><%= emp.first_name %> <%= emp.last_name %></div>
- <div class="extra-small text-muted text-uppercase"><%= _t('hr_attendance.employee_num', { ns: 'legacy', defaultValue: 'Employee #{{id}}', id: emp.id }) %></div>
- </td>
- <td>
- <select name="attendance[<%= emp.id %>][status]" class="hms-input w-full text-sm hms-select-pill">
- <option value="present" <%= st === 'present' ? 'selected' : '' %>><%= _t('hr_attendance.status_present', { ns: 'legacy', defaultValue: 'Present' }) %></option>
- <option value="absent" <%= st === 'absent' ? 'selected' : '' %>><%= _t('hr_attendance.status_absent', { ns: 'legacy', defaultValue: 'Absent' }) %></option>
- <option value="late" <%= st === 'late' ? 'selected' : '' %>><%= _t('hr_attendance.status_late', { ns: 'legacy', defaultValue: 'Late' }) %></option>
- <option value="half-day" <%= st === 'half-day' ? 'selected' : '' %>><%= _t('hr_attendance.status_half_day', { ns: 'legacy', defaultValue: 'Half Day' }) %></option>
- <option value="on-leave" <%= st === 'on-leave' ? 'selected' : '' %>><%= _t('hr_attendance.status_on_leave', { ns: 'legacy', defaultValue: 'On Leave' }) %></option>
- </select>
- </td>
- <td>
- <input type="time" name="attendance[<%= emp.id %>][in]" class="hms-input w-full text-sm hms-input-pill" value="<%= cin %>">
- </td>
- <td>
- <input type="time" name="attendance[<%= emp.id %>][out]" class="hms-input w-full text-sm hms-input-pill" value="<%= cout %>">
- </td>
- <td class="text-right">
- <span class="badge badge-light px-2 py-1 text-muted extra-small"><%= _t('hr_attendance.standard_day', { ns: 'legacy', defaultValue: 'Standard Day (9h)' }) %></span>
- </td>
- </tr>
- <% }) %>
- </tbody>
- </table>
- </div>
- <div class="card-footer bg-white p-4 border-top text-right">
- <button type="submit" class="btn btn-indigo px-5"><%= _t('hr_attendance.save', { ns: 'legacy', defaultValue: 'Save Attendance Records' }) %></button>
- </div>
- </form>
- </div>
- </div>
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">HR &middot; Attendance</p>
+    <h1>Attendance register</h1>
+    <p class="sage-sub"><%= _dateLabel.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) %> &middot; record presence and hours for the payroll period.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <form action="/hr/attendance" method="GET" class="d-flex align-items-center" style="gap:8px;">
+      <input type="date" name="date" class="form-control" style="width:160px;" value="<%= date %>" aria-label="Attendance date">
+      <button type="submit" class="btn btn-sage-ghost">Fetch date</button>
+    </form>
+    <a href="/hr" class="btn btn-sage-ghost"><i class="fa fa-home mr-1"></i> HR overview</a>
+  </div>
 </div>
 
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Present</div>
+    <div class="sage-stat-value"><%= _s.present || 0 %></div>
+    <p class="sage-stat-foot">Including late arrivals</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Late</div>
+    <div class="sage-stat-value"><%= _s.late || 0 %></div>
+    <p class="sage-stat-foot">Flagged on this date</p>
+  </div>
+  <div class="sage-stat sage-stat--warn">
+    <div class="sage-stat-label">Absent</div>
+    <div class="sage-stat-value"><%= _s.absent || 0 %></div>
+    <p class="sage-stat-foot">Not present</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">On leave</div>
+    <div class="sage-stat-value"><%= _s['on-leave'] || 0 %></div>
+    <p class="sage-stat-foot"><%= _s.saved || 0 %> row(s) already saved</p>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div>
+      <h2>Daily register</h2>
+      <p class="sage-card-sub"><%= _staff.length %> active employees</p>
+    </div>
+    <div class="pay-toolbar no-print">
+      <input type="search" id="attendanceSearch" class="pay-search" placeholder="Filter staff…" aria-label="Filter staff" autocomplete="off">
+      <button type="button" id="markAllPresent" class="btn btn-sage-ghost btn-sm">Mark all present</button>
+    </div>
+  </div>
+  <form action="/hr/attendance/save" method="POST">
+    <input type="hidden" name="date" value="<%= date %>">
+    <div class="pay-table-wrap">
+      <table class="pay-table" id="attendanceTable">
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th style="min-width:150px;">Status</th>
+            <th style="min-width:130px;">Check in</th>
+            <th style="min-width:130px;">Check out</th>
+            <th class="pay-num">Hours</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!_staff.length) { %>
+          <tr><td colspan="5" class="sage-empty"><i class="fa fa-users"></i>No active employees.</td></tr>
+          <% } %>
+          <% _staff.forEach(function (emp) {
+            var ex = existing[emp.id] || {};
+            var st = ex.status || 'present';
+            var cin = ex.check_in_time ? String(ex.check_in_time).substring(0, 5) : '08:00';
+            var cout = ex.check_out_time ? String(ex.check_out_time).substring(0, 5) : '17:00';
+            var initials = ((emp.first_name || '?').charAt(0) + (emp.last_name || '').charAt(0)).toUpperCase();
+          %>
+          <tr data-search="<%= [emp.first_name, emp.last_name, emp.id].join(' ').toLowerCase() %>">
+            <td>
+              <div class="d-flex align-items-center" style="gap:10px;">
+                <span class="sage-person-avatar"><%= initials %></span>
+                <span>
+                  <strong style="font-weight:600;"><%= emp.first_name %> <%= emp.last_name %></strong>
+                  <small class="d-block text-muted">Employee #<%= emp.id %></small>
+                </span>
+              </div>
+            </td>
+            <td>
+              <select name="attendance[<%= emp.id %>][status]" class="form-control form-control-sm att-status">
+                <option value="present" <%= st === 'present' ? 'selected' : '' %>>Present</option>
+                <option value="late" <%= st === 'late' ? 'selected' : '' %>>Late</option>
+                <option value="absent" <%= st === 'absent' ? 'selected' : '' %>>Absent</option>
+                <option value="half-day" <%= st === 'half-day' ? 'selected' : '' %>>Half day</option>
+                <option value="on-leave" <%= st === 'on-leave' ? 'selected' : '' %>>On leave</option>
+              </select>
+            </td>
+            <td><input type="time" name="attendance[<%= emp.id %>][in]" class="form-control form-control-sm att-time" value="<%= cin %>" aria-label="Check in for <%= emp.first_name %>"></td>
+            <td><input type="time" name="attendance[<%= emp.id %>][out]" class="form-control form-control-sm att-time" value="<%= cout %>" aria-label="Check out for <%= emp.first_name %>"></td>
+            <td class="pay-num sage-muted att-hours">9h</td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <div class="sage-card-foot">
+      <span class="sage-muted" style="font-size:12px;">Attendance is available to payroll and leave reporting but does not change salary automatically.</span>
+      <button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save attendance</button>
+    </div>
+  </form>
+</section>
+
 <style>
- .hms-select-pill, .hms-input-pill { border-radius: 8px; border: 1px solid #e2e8f0; }
- .extra-small { font-size: 0.65rem; }
+  .sage-person-avatar {
+    width: 30px; height: 30px; border-radius: 50%; background: #e7f3ec; color: #006b3d;
+    font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .att-status { max-width: 160px; }
+  .att-time { max-width: 120px; }
 </style>
+
 <script>
-(function() {
- var input = document.getElementById('hmsAttendanceSearch');
- if (!input) return;
- input.addEventListener('input', function() {
-  var q = this.value.toLowerCase().trim();
-  document.querySelectorAll('.hms-att-row').forEach(function(row) {
-   var blob = row.getAttribute('data-hms-search') || '';
-   row.style.display = (q === '' || blob.indexOf(q) !== -1) ? '' : 'none';
+(function () {
+  var table = document.getElementById('attendanceTable');
+  var input = document.getElementById('attendanceSearch');
+  var markAll = document.getElementById('markAllPresent');
+  if (!table) return;
+
+  function rows() {
+    return Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-search]'));
+  }
+  function recalc(row) {
+    var cin = row.querySelector('input[name$="[in]"]');
+    var cout = row.querySelector('input[name$="[out]"]');
+    var out = row.querySelector('.att-hours');
+    if (!cin || !cout || !out) return;
+    if (!cin.value || !cout.value) { out.textContent = '—'; return; }
+    var a = cin.value.split(':').map(Number);
+    var b = cout.value.split(':').map(Number);
+    var mins = (b[0] * 60 + b[1]) - (a[0] * 60 + a[1]);
+    out.textContent = mins > 0 ? (Math.round(mins / 6) / 10) + 'h' : '—';
+  }
+
+  rows().forEach(function (row) {
+    var cin = row.querySelector('input[name$="[in]"]');
+    var cout = row.querySelector('input[name$="[out]"]');
+    if (cin) cin.addEventListener('change', function () { recalc(row); });
+    if (cout) cout.addEventListener('change', function () { recalc(row); });
+    recalc(row);
   });
- });
+
+  if (input) {
+    input.addEventListener('input', function () {
+      var q = (input.value || '').trim().toLowerCase();
+      rows().forEach(function (row) {
+        var hay = row.getAttribute('data-search') || '';
+        row.style.display = !q || hay.indexOf(q) !== -1 ? '' : 'none';
+      });
+    });
+  }
+
+  if (markAll) {
+    markAll.addEventListener('click', function () {
+      rows().forEach(function (row) {
+        var sel = row.querySelector('.att-status');
+        if (sel) sel.value = 'present';
+      });
+    });
+  }
 })();
 </script>
 

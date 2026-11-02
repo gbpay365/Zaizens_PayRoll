@@ -15,6 +15,7 @@ var _canSettings = locals.payCanSettings || _canWrite;
 var _canTax = locals.payCanTaxHub || _has('accounting.read', 'accounting.write');
 var _leaveAdmin = locals.payShowLeaveAdmin || _isAdmin || _has('hr.leave.approve');
 var _selfMode = _mode === 'payslips' || _mode === 'leave';
+var _canPayrollRead = _isAdmin || _has('payroll.read', 'payroll.write');
 
 function _active(href, exact) {
   if (exact) return _path === href ? ' active' : '';
@@ -35,16 +36,26 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
 
   <nav class="sage-nav">
     <% if (_selfMode) { %>
+      <p class="sage-nav-label">Home</p>
+      <a href="/hr" class="<%= _active('/hr', true) %>"><i class="fa fa-home"></i> HR overview</a>
       <p class="sage-nav-label">Self service</p>
       <a href="/hr/my-payslips" class="<%= _active('/hr/my-payslips') %>"><i class="fa fa-file-text-o"></i> My payslips</a>
       <a href="/hr/request-leave" class="<%= _active('/hr/request-leave') %>"><i class="fa fa-paper-plane"></i> Request leave</a>
       <a href="/hr/my-leave-balance" class="<%= _active('/hr/my-leave-balance') %>"><i class="fa fa-balance-scale"></i> My leave balance</a>
       <a href="/hr/my-attendance" class="<%= _active('/hr/my-attendance') %>"><i class="fa fa-clock-o"></i> My attendance</a>
     <% } else { %>
+      <p class="sage-nav-label">HR</p>
+      <a href="/hr" class="<%= _active('/hr', true) %>"><i class="fa fa-home"></i> HR overview</a>
+      <a href="/staff" class="<%= _active('/staff') %>"><i class="fa fa-users"></i> Employees</a>
+      <% if (_canWrite || _leaveAdmin) { %>
+      <a href="/hr/attendance" class="<%= _active('/hr/attendance') %>"><i class="fa fa-check-square-o"></i> Attendance register</a>
+      <% } %>
+
       <p class="sage-nav-label">Payroll</p>
       <a href="/payroll" class="<%= _active('/payroll', true) %>"><i class="fa fa-th-large"></i> Overview</a>
+      <% if (_canPayrollRead) { %>
       <a href="/payroll/monthly" class="<%= _active('/payroll/monthly') %>"><i class="fa fa-calendar-check-o"></i> Payroll runs</a>
-      <a href="/staff" class="<%= _active('/staff') %>"><i class="fa fa-users"></i> Employees</a>
+      <% } %>
       <% if (_canWrite) { %>
       <a href="/payroll/profiles" class="<%= _active('/payroll/profiles') %>"><i class="fa fa-id-card-o"></i> Pay profiles</a>
       <% } %>
@@ -55,12 +66,13 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
       <a href="/payroll/integrations" class="<%= _active('/payroll/integrations') %>"><i class="fa fa-plug"></i> Integrations</a>
       <% } %>
 
-      <p class="sage-nav-label">People &amp; time</p>
-      <a href="/hr/attendance" class="<%= _active('/hr/attendance') %>"><i class="fa fa-clock-o"></i> Attendance</a>
+      <p class="sage-nav-label">Leave</p>
       <% if (_leaveAdmin) { %>
       <a href="/hr/leave-requests" class="<%= _active('/hr/leave-requests') %>"><i class="fa fa-inbox"></i> Leave requests</a>
       <a href="/hr/leave-balances" class="<%= _active('/hr/leave-balances') %>"><i class="fa fa-balance-scale"></i> Leave balances</a>
       <a href="/hr/holidays" class="<%= _active('/hr/holidays') %>"><i class="fa fa-calendar"></i> Public holidays</a>
+      <% } else { %>
+      <a href="/hr/request-leave" class="<%= _active('/hr/request-leave') %>"><i class="fa fa-paper-plane"></i> Request leave</a>
       <% } %>
 
       <% if (_canTax) { %>
@@ -75,6 +87,7 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
       <a href="/hr/my-payslips" class="<%= _active('/hr/my-payslips') %>"><i class="fa fa-file-text-o"></i> My payslips</a>
       <a href="/hr/request-leave" class="<%= _active('/hr/request-leave') %>"><i class="fa fa-paper-plane"></i> Request leave</a>
       <a href="/hr/my-leave-balance" class="<%= _active('/hr/my-leave-balance') %>"><i class="fa fa-balance-scale"></i> My leave balance</a>
+      <a href="/hr/my-attendance" class="<%= _active('/hr/my-attendance') %>"><i class="fa fa-clock-o"></i> My attendance</a>
     <% } %>
   </nav>
 

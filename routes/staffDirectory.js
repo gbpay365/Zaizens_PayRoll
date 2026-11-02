@@ -75,11 +75,21 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
         for (const r of attRows || []) existing[r.employee_id] = r;
       }
 
+      const summary = { present: 0, late: 0, absent: 0, 'half-day': 0, 'on-leave': 0, saved: 0 };
+      for (const row of rows) {
+        const saved = existing[row.id];
+        if (saved) summary.saved += 1;
+        const st = String((saved && saved.status) || 'present').toLowerCase();
+        if (summary[st] == null) summary[st] = 0;
+        summary[st] += 1;
+      }
+
       res.render('hr-attendance', {
         title: 'Staff Attendance — ZAIZENS',
         date,
         staff: rows,
         existing,
+        summary,
         hrTablesOk: true,
         flash: req.query.msg || null,
         error: req.query.err || null,

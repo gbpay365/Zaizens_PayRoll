@@ -1,73 +1,149 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'leave', paySelfServiceOnly: 'leave' }) %>
+<%
+var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+var _leaveLabel = function (t) {
+  var map = { annual: 'Annual leave', sick: 'Sick leave', unpaid: 'Unpaid leave', other: 'Other leave' };
+  return map[t] || String(t || '').replace(/_/g, ' ');
+};
+var _bal = balances || [];
+%>
 
-<div class="pay-hero">
-  <h1><%= _t('hr_request_leave.title', { ns: 'legacy', defaultValue: 'Request leave' }) %></h1>
-  <p><%= _t('hr_request_leave.subtitle', { ns: 'legacy', defaultValue: 'Submit dates and type for HR approval. Track status in your recent requests.' }) %></p>
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">HR &middot; Time off</p>
+    <h1>Request time off</h1>
+    <p class="sage-sub">Pick your dates and send the request for approval. Approved leave is recorded against your <%= year %> balance.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr/my-leave-balance" class="btn btn-sage-ghost"><i class="fa fa-balance-scale mr-1"></i> My leave balance</a>
+    <a href="/hr" class="btn btn-sage-ghost"><i class="fa fa-home mr-1"></i> HR overview</a>
+  </div>
 </div>
 
-<div class="row">
-  <div class="col-lg-5 mb-4">
-    <div class="pay-panel h-100">
-      <div class="pay-panel-head"><h2><%= _t('hr_request_leave.new_request', { ns: 'legacy', defaultValue: 'New request' }) %></h2></div>
-      <div class="pay-panel-body">
-        <form method="POST" action="/hr/request-leave">
-          <div class="form-group">
-            <label class="small font-weight-bold"><%= _t('hr_request_leave.leave_type', { ns: 'legacy', defaultValue: 'Leave type' }) %></label>
-            <select name="leave_type" class="hms-input w-full">
-              <option value="annual"><%= _t('hr_request_leave.type_annual', { ns: 'legacy', defaultValue: 'Annual' }) %></option>
-              <option value="sick"><%= _t('hr_request_leave.type_sick', { ns: 'legacy', defaultValue: 'Sick' }) %></option>
-              <option value="unpaid"><%= _t('hr_request_leave.type_unpaid', { ns: 'legacy', defaultValue: 'Unpaid' }) %></option>
-              <option value="other"><%= _t('hr_request_leave.type_other', { ns: 'legacy', defaultValue: 'Other' }) %></option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="small font-weight-bold"><%= _t('hr_request_leave.start_date', { ns: 'legacy', defaultValue: 'Start date' }) %></label>
-            <input type="date" name="start_date" class="hms-input w-full" required>
-          </div>
-          <div class="form-group">
-            <label class="small font-weight-bold"><%= _t('hr_request_leave.end_date', { ns: 'legacy', defaultValue: 'End date' }) %></label>
-            <input type="date" name="end_date" class="hms-input w-full" required>
-          </div>
-          <div class="form-group">
-            <label class="small font-weight-bold"><%= _t('hr_request_leave.reason', { ns: 'legacy', defaultValue: 'Reason (optional)' }) %></label>
-            <textarea name="reason" class="hms-input w-full" rows="3" maxlength="2000" placeholder="<%= _t('hr_request_leave.reason_ph', { ns: 'legacy', defaultValue: 'Short note for approver' }) %>"></textarea>
-          </div>
-          <button type="submit" class="hms-btn-primary font-weight-bold"><%= _t('hr_request_leave.submit', { ns: 'legacy', defaultValue: 'Submit request' }) %></button>
-        </form>
-      </div>
+<div class="sage-grid">
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>New request</h2><p class="sage-card-sub">All fields marked * are required</p></div>
     </div>
-  </div>
-  <div class="col-lg-7 mb-4">
-    <div class="pay-panel h-100">
-      <div class="pay-panel-head"><h2><%= _t('hr_request_leave.recent', { ns: 'legacy', defaultValue: 'Your recent requests' }) %></h2></div>
+    <form method="POST" action="/hr/request-leave" class="sage-card-body">
+      <div class="sage-form-grid">
+        <div class="sage-field">
+          <label for="leaveType">Leave type *</label>
+          <select name="leave_type" id="leaveType" class="form-control" required>
+            <option value="annual">Annual leave</option>
+            <option value="sick">Sick leave</option>
+            <option value="unpaid">Unpaid leave</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="sage-field">
+          <label>Duration</label>
+          <div class="sage-duration" id="leaveDuration">Select dates</div>
+        </div>
+        <div class="sage-field">
+          <label for="startDate">Start date *</label>
+          <input type="date" name="start_date" id="startDate" class="form-control" required value="<%= today %>">
+        </div>
+        <div class="sage-field">
+          <label for="endDate">End date *</label>
+          <input type="date" name="end_date" id="endDate" class="form-control" required value="<%= today %>">
+        </div>
+      </div>
+      <div class="sage-field">
+        <label for="reason">Reason <span class="sage-muted">(optional)</span></label>
+        <textarea name="reason" id="reason" class="form-control" rows="3" maxlength="2000" placeholder="A short note for the approver"></textarea>
+      </div>
+      <div class="sage-card-foot px-0 pb-0" style="background:transparent;">
+        <span class="sage-muted" style="font-size:12px;"><i class="fa fa-info-circle mr-1"></i>Your manager receives the request on the leave approvals queue.</span>
+        <button type="submit" class="btn btn-sage"><i class="fa fa-paper-plane mr-1"></i> Submit request</button>
+      </div>
+    </form>
+  </section>
+
+  <div>
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>My balances</h2><p class="sage-card-sub"><%= year %> entitlement</p></div>
+      </div>
+      <div class="sage-card-body">
+        <% if (!_bal.length) { %>
+        <div class="sage-empty" style="padding:20px 10px;"><i class="fa fa-balance-scale"></i>No balance rows for <%= year %> yet.</div>
+        <% } else { %>
+        <% _bal.forEach(function (b) { %>
+        <div class="sage-balance-row">
+          <div>
+            <strong><%= _leaveLabel(b.leave_type) %></strong>
+            <small class="sage-muted">days remaining</small>
+          </div>
+          <span class="sage-balance-value"><%= (Number(b.balance) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %></span>
+        </div>
+        <% }); %>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>Recent requests</h2><p class="sage-card-sub">Latest 30</p></div>
+      </div>
       <div class="pay-table-wrap">
-        <table class="pay-table" data-hms-table-paginate="6">
-          <thead><tr><th><%= _t('hr_request_leave.col_type', { ns: 'legacy', defaultValue: 'Type' }) %></th><th><%= _t('hr_request_leave.col_from', { ns: 'legacy', defaultValue: 'From' }) %></th><th><%= _t('hr_request_leave.col_to', { ns: 'legacy', defaultValue: 'To' }) %></th><th><%= _t('hr_request_leave.col_days', { ns: 'legacy', defaultValue: 'Days' }) %></th><th><%= _t('hr_request_leave.col_submitted_to', { ns: 'legacy', defaultValue: 'Submitted to' }) %></th><th><%= _t('hr_request_leave.col_status', { ns: 'legacy', defaultValue: 'Status' }) %></th></tr></thead>
+        <table class="pay-table">
+          <thead>
+            <tr><th>Type</th><th>Dates</th><th class="pay-num">Days</th><th>Status</th></tr>
+          </thead>
           <tbody>
-          <% if(!mine || !mine.length){ %>
-            <tr><td colspan="6" class="text-center text-muted py-4"><%= _t('hr_request_leave.none', { ns: 'legacy', defaultValue: 'No requests yet.' }) %></td></tr>
-          <% } %>
-          <% (mine||[]).forEach(function(r){
-            var st = String(r.status||'').toLowerCase();
-          %>
+            <% if (!mine || !mine.length) { %>
+            <tr><td colspan="4" class="sage-empty"><i class="fa fa-calendar-o"></i>No requests yet.</td></tr>
+            <% } %>
+            <% (mine || []).forEach(function (r) {
+              var st = String(r.status || '').toLowerCase();
+            %>
             <tr>
-              <td class="text-capitalize"><%= r.leave_type %></td>
-              <td><%= r.start_date_fmt || r.start_date %></td>
-              <td><%= r.end_date_fmt || r.end_date %></td>
-              <td><%= r.days_requested %></td>
-              <td class="small"><%= r.submitted_to || '—' %></td>
-              <td>
-                <% if(st==='pending'){ %><span class="pay-badge pay-badge-pending"><%= _t('hr_request_leave.status_pending', { ns: 'legacy', defaultValue: 'Pending' }) %></span>
-                <% } else if(st==='approved'){ %><span class="pay-badge pay-badge-paid"><%= _t('hr_request_leave.status_approved', { ns: 'legacy', defaultValue: 'Approved' }) %></span>
-                <% } else { %><span class="pay-badge"><%= st %></span><% } %>
-              </td>
+              <td><%= _leaveLabel(r.leave_type) %></td>
+              <td><%= r.start_date_fmt || r.start_date %> → <%= r.end_date_fmt || r.end_date %></td>
+              <td class="pay-num"><%= Number(r.days_requested) || 0 %></td>
+              <td><span class="pay-badge <%= st === 'approved' ? 'pay-badge-paid' : (st === 'pending' ? 'pay-badge-pending' : '') %>"><%= st.charAt(0).toUpperCase() + st.slice(1) %></span></td>
             </tr>
-          <% }); %>
+            <% }); %>
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   </div>
 </div>
+
+<style>
+  .sage-duration {
+    height: 36px; display: flex; align-items: center; padding: 0 12px;
+    border: 1px dashed #d9e2dc; border-radius: 4px; background: #f8faf9;
+    font-size: 13px; font-weight: 600; color: #006b3d;
+  }
+  .sage-balance-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #e8eeea; }
+  .sage-balance-row:last-child { border-bottom: 0; }
+  .sage-balance-row strong { display: block; font-size: 13px; font-weight: 600; }
+  .sage-balance-row small { display: block; font-size: 11px; }
+  .sage-balance-value { font-size: 20px; font-weight: 600; color: #006b3d; font-variant-numeric: tabular-nums; }
+</style>
+
+<script>
+(function () {
+  var start = document.getElementById('startDate');
+  var end = document.getElementById('endDate');
+  var out = document.getElementById('leaveDuration');
+  if (!start || !end || !out) return;
+  function update() {
+    if (!start.value || !end.value) { out.textContent = 'Select dates'; return; }
+    var a = new Date(start.value + 'T12:00:00');
+    var b = new Date(end.value + 'T12:00:00');
+    if (isNaN(a.getTime()) || isNaN(b.getTime())) { out.textContent = 'Select dates'; return; }
+    if (b < a) { out.textContent = 'End date is before start date'; return; }
+    var days = Math.round((b - a) / 86400000) + 1;
+    out.textContent = days + ' day' + (days === 1 ? '' : 's');
+  }
+  start.addEventListener('change', update);
+  end.addEventListener('change', update);
+  update();
+})();
+</script>
 
 <%- include('partials/payroll-layout-end') %>

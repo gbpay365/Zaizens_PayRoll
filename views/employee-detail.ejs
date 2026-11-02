@@ -139,6 +139,52 @@ var latest = rows.length ? rows[0] : null;
 
 <section class="sage-card">
   <div class="sage-card-head">
+    <div><h2>Time off &amp; attendance</h2><p class="sage-card-sub">Shared with HR &middot; <%= locals.hrYear %></p></div>
+    <a href="/hr/leave-balances?year=<%= locals.hrYear %>" class="btn btn-sage-ghost btn-sm">Leave balances</a>
+  </div>
+  <div class="sage-card-body">
+    <div class="sage-hr-grid">
+      <div>
+        <p class="sage-preview-label" style="margin-top:0;">Annual leave <%= locals.hrYear %></p>
+        <div class="sage-balance-row" style="border-bottom:0;">
+          <div>
+            <strong>Remaining balance</strong>
+            <small class="sage-muted">Days left this year</small>
+          </div>
+          <span class="sage-balance-value"><%= locals.leaveBalance != null ? Number(locals.leaveBalance).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) : '—' %></span>
+        </div>
+        <p class="sage-hint mb-0">
+          <% if (locals.leavePendingCount > 0) { %>
+          <span class="pay-badge pay-badge-pending"><%= locals.leavePendingCount %> pending request(s) &middot; <%= Number(locals.leavePendingDays || 0).toLocaleString('fr-FR') %> day(s)</span>
+          <% } else { %>
+          No leave requests waiting for approval.
+          <% } %>
+        </p>
+      </div>
+      <div>
+        <p class="sage-preview-label" style="margin-top:0;">Recent attendance</p>
+        <% if (!locals.recentAttendance || !locals.recentAttendance.length) { %>
+        <p class="sage-muted mb-0" style="font-size:12.5px;">No attendance recorded for this employee.</p>
+        <% } else { %>
+        <dl class="sage-list">
+          <% (locals.recentAttendance || []).forEach(function (a) { %>
+          <div class="sage-list-row">
+            <dt><%= _fmtDate(a.att_date) %></dt>
+            <dd>
+              <span class="pay-badge <%= String(a.status) === 'present' ? 'pay-badge-paid' : (String(a.status) === 'absent' ? 'pay-badge--error' : 'pay-badge-pending') %>"><%= String(a.status || '').charAt(0).toUpperCase() + String(a.status || '').slice(1) %></span>
+              <span class="sage-mono ml-2"><%= a.check_in_time ? String(a.check_in_time).substring(0, 5) : '—' %> – <%= a.check_out_time ? String(a.check_out_time).substring(0, 5) : '—' %></span>
+            </dd>
+          </div>
+          <% }); %>
+        </dl>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sage-card">
+  <div class="sage-card-head">
     <div><h2>Payroll history</h2><p class="sage-card-sub">Most recent 12 periods</p></div>
     <a href="/payroll/monthly?q=<%= encodeURIComponent(emp.first_name + ' ' + emp.last_name) %>" class="btn btn-sage-ghost btn-sm">Open payroll runs</a>
   </div>
@@ -190,6 +236,16 @@ var latest = rows.length ? rows[0] : null;
   .sage-net span { font-size: 12px; font-weight: 600; color: #0a5c36; text-transform: uppercase; letter-spacing: 0.06em; }
   .sage-net strong { font-size: 20px; color: #0a5c36; font-variant-numeric: tabular-nums; }
   .sage-preview-note { margin: 12px 0 0; font-size: 11.5px; color: #5f6f68; line-height: 1.5; }
+  .sage-hr-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 24px;
+  }
+  @media (max-width: 760px) { .sage-hr-grid { grid-template-columns: minmax(0, 1fr); } }
+  .sage-balance-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #e8eeea; }
+  .sage-balance-row strong { display: block; font-size: 13px; font-weight: 600; }
+  .sage-balance-row small { display: block; font-size: 11px; }
+  .sage-balance-value { font-size: 22px; font-weight: 600; color: #006b3d; font-variant-numeric: tabular-nums; }
 </style>
 
 <%- include('partials/payroll-layout-end') %>

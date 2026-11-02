@@ -118,13 +118,13 @@ function requireAdminOrSuper(req, res, next) {
 function requirePayrollAccess(req, res, next) {
   const perms = res.locals.userPerms || [];
   if (perms.includes('*') || perms.includes('payroll.read') || perms.includes('payroll.write')) return next();
-  return res.redirect('/payroll?err=' + encodeURIComponent('Payroll access required.'));
+  return res.redirect('/hr?err=' + encodeURIComponent('Payroll access required.'));
 }
 
 function requireHrSelfService(req, res, next) {
   const perms = res.locals.userPerms || [];
   if (perms.includes('*') || perms.includes('hr.self.read') || perms.includes('payroll.read')) return next();
-  return res.redirect('/payroll?err=' + encodeURIComponent('Access denied.'));
+  return res.redirect('/hr?err=' + encodeURIComponent('Access denied.'));
 }
 
 function requirePerm(...keys) {
@@ -209,7 +209,8 @@ app.post('/login', async (req, res) => {
     };
     req.session.facilityId = defaultFac;
     req.session.userPerms = null;
-    res.redirect('/payroll');
+    const isAdminRole = String(user.role) === '1' || String(user.role) === '99';
+    res.redirect(isAdminRole ? '/payroll' : '/hr');
   } catch (e) {
     res.redirect('/?err=' + encodeURIComponent(e.message));
   }
@@ -261,6 +262,7 @@ require('./routes/taxHub')(app, pool, requireAuth, { requirePerm });
 require('./routes/statutoryReports')(app, pool, requireAuth, { requirePerm });
 require('./routes/integrationSettings')(app, pool, requireAuth, { requireAdminOrSuper });
 require('./routes/employees')(app, pool, requireAuth, { requireAdminOrSuper });
+require('./routes/hrHome')(app, pool, requireAuth);
 
 async function boot() {
   if (pool) {

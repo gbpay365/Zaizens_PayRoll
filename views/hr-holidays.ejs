@@ -1,77 +1,141 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
- <div class="content">
- <% if(locals.flash){ %>
- <div class="hms-flash hms-flash--success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
- <% } %>
- <% if(locals.error){ %>
- <div class="hms-flash hms-flash--error border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
- <% } %>
+<%
+var _upcoming = upcoming || [];
+var _past = past || [];
+var _fmt = function (d) {
+  if (!d) return '—';
+  var dt = new Date(String(d).slice(0, 10) + 'T12:00:00');
+  if (isNaN(dt.getTime())) return String(d);
+  return dt.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+};
+%>
 
- <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
- <div>
- <h4 class="page-title font-weight-bold text-dark mb-1"><%= _t('hr_holidays.title', { ns: 'legacy', defaultValue: 'Public holidays' }) %></h4>
- <p class="text-muted small mb-0"><%= _t('hr_holidays.subtitle', { ns: 'legacy', defaultValue: 'Facility calendar holidays (reference for leave and attendance).' }) %></p>
- </div>
- <a href="/payroll" class="hms-btn hms-btn-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _t('hr_holidays.hr_hub', { ns: 'legacy', defaultValue: 'HR hub' }) %></a>
- </div>
-
- <div class="row">
- <div class="col-lg-5 mb-4">
- <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
- <div class="card-header bg-white font-weight-bold py-3"><%= _t('hr_holidays.add_holiday', { ns: 'legacy', defaultValue: 'Add holiday' }) %></div>
- <div class="card-body">
- <form method="POST" action="/hr/holidays/add">
- <div class="form-group">
- <label class="small font-weight-bold"><%= _t('hr_holidays.name', { ns: 'legacy', defaultValue: 'Name' }) %></label>
- <input type="text" name="holiday_name" class="hms-input w-full" required maxlength="120" placeholder="<%= _t('hr_holidays.name_ph', { ns: 'legacy', defaultValue: 'e.g. Labour Day' }) %>">
- </div>
- <div class="form-group">
- <label class="small font-weight-bold"><%= _t('hr_holidays.date', { ns: 'legacy', defaultValue: 'Date' }) %></label>
- <input type="date" name="holiday_date" class="hms-input w-full" required>
- </div>
- <div class="form-group form-check">
- <input type="checkbox" class="form-check-input" name="is_recurring" value="1" id="rec" checked>
- <label class="form-check-label small" for="rec"><%= _t('hr_holidays.recurring_yearly', { ns: 'legacy', defaultValue: 'Recurring yearly' }) %></label>
- </div>
- <button type="submit" class="hms-btn hms-btn-primary font-weight-bold"><%= _t('hr_holidays.add', { ns: 'legacy', defaultValue: 'Add' }) %></button>
- </form>
- </div>
- </div>
- </div>
- <div class="col-lg-7 mb-4">
- <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
- <div class="card-header bg-white font-weight-bold py-3"><%= _t('hr_holidays.registered', { ns: 'legacy', defaultValue: 'Registered' }) %></div>
- <div class="card-body p-0 table-responsive">
- <table class="table table-sm table-striped mb-0" data-hms-table-paginate="8">
- <thead><tr><th><%= _t('hr_holidays.date', { ns: 'legacy', defaultValue: 'Date' }) %></th><th><%= _t('hr_holidays.name', { ns: 'legacy', defaultValue: 'Name' }) %></th><th><%= _t('hr_holidays.col_recurring', { ns: 'legacy', defaultValue: 'Recurring' }) %></th><th class="text-right"><%= _t('hr_holidays.col_remove', { ns: 'legacy', defaultValue: 'Remove' }) %></th></tr></thead>
- <tbody>
- <% if(!rows || !rows.length){ %>
- <tr><td colspan="4" class="text-center text-muted py-4"><%= _t('hr_holidays.no_holidays', { ns: 'legacy', defaultValue: 'No holidays yet.' }) %></td></tr>
- <% } %>
- <% (rows||[]).forEach(function(h){
- var hid = parseInt(h.id,10)||0;
- %>
- <tr>
- <td><%= h.holiday_date %></td>
- <td><%= h.holiday_name %></td>
- <td><%= h.is_recurring ? _t('hr_holidays.yes', { ns: 'legacy', defaultValue: 'Yes' }) : _t('hr_holidays.no', { ns: 'legacy', defaultValue: 'No' }) %></td>
- <td class="text-right">
- <% if(hid > 0){ %>
- <form method="POST" action="/hr/holidays/delete" class="d-inline" onsubmit="return confirm('<%= _t('hr_holidays.confirm_remove', { ns: 'legacy', defaultValue: 'Remove this holiday?' }).replace(/'/g, "\\'") %>');">
- <input type="hidden" name="id" value="<%= hid %>">
- <button type="submit" class="btn btn-sm btn-outline-danger"><%= _t('hr_holidays.delete', { ns: 'legacy', defaultValue: 'Delete' }) %></button>
- </form>
- <% } %>
- </td>
- </tr>
- <% }); %>
- </tbody>
- </table>
- </div>
- </div>
- </div>
- </div>
- </div>
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">HR &middot; Calendar</p>
+    <h1>Public holidays</h1>
+    <p class="sage-sub">Facility holiday calendar used as a reference for leave and attendance.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr/leave-requests" class="btn btn-sage-ghost"><i class="fa fa-inbox mr-1"></i> Leave requests</a>
+  </div>
 </div>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Upcoming</div>
+    <div class="sage-stat-value"><%= _upcoming.length %></div>
+    <p class="sage-stat-foot">From today onwards</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Next holiday</div>
+    <div class="sage-stat-value" style="font-size:17px;"><%= _upcoming.length ? _upcoming[0].holiday_name : '—' %></div>
+    <p class="sage-stat-foot"><%= _upcoming.length ? _fmt(_upcoming[0].holiday_date) : 'None scheduled' %></p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">On the calendar</div>
+    <div class="sage-stat-value"><%= (rows || []).length %></div>
+    <p class="sage-stat-foot">All recorded holidays</p>
+  </div>
+</div>
+
+<div class="sage-grid">
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Upcoming holidays</h2><p class="sage-card-sub">Next dates in the calendar</p></div>
+    </div>
+    <div class="sage-card-body">
+      <% if (!_upcoming.length) { %>
+      <div class="sage-empty"><i class="fa fa-calendar"></i>No upcoming holidays. Add one on the right.</div>
+      <% } else { %>
+      <div class="sage-timeline">
+        <% _upcoming.forEach(function (h) { %>
+        <div class="sage-timeline-row">
+          <div class="sage-timeline-date">
+            <span><%= new Date(String(h.holiday_date).slice(0, 10) + 'T12:00:00').getDate() %></span>
+            <small><%= new Date(String(h.holiday_date).slice(0, 10) + 'T12:00:00').toLocaleDateString('en-GB', { month: 'short' }) %></small>
+          </div>
+          <div class="sage-timeline-body">
+            <strong><%= h.holiday_name %></strong>
+            <small><%= _fmt(h.holiday_date) %> &middot; <%= h.is_recurring ? 'Recurring yearly' : 'One-off' %></small>
+          </div>
+          <form method="POST" action="/hr/holidays/delete" class="d-inline" data-pay-confirm="Remove this holiday?">
+            <input type="hidden" name="id" value="<%= h.id %>">
+            <button type="submit" class="btn btn-sage-ghost btn-sm" aria-label="Remove <%= h.holiday_name %>"><i class="fa fa-trash"></i></button>
+          </form>
+        </div>
+        <% }); %>
+      </div>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Add a holiday</h2><p class="sage-card-sub">Appears immediately in the calendar</p></div>
+    </div>
+    <form method="POST" action="/hr/holidays/add" class="sage-card-body">
+      <div class="sage-field">
+        <label for="holidayName">Name *</label>
+        <input type="text" id="holidayName" name="holiday_name" class="form-control" required maxlength="120" placeholder="e.g. Labour Day">
+      </div>
+      <div class="sage-field">
+        <label for="holidayDate">Date *</label>
+        <input type="date" id="holidayDate" name="holiday_date" class="form-control" required>
+      </div>
+      <div class="sage-field">
+        <label class="sage-check" style="display:flex;gap:8px;align-items:center;font-weight:400;">
+          <input type="checkbox" name="is_recurring" value="1" id="recurring" checked>
+          <span>Recurring every year</span>
+        </label>
+      </div>
+      <button type="submit" class="btn btn-sage"><i class="fa fa-plus mr-1"></i> Add holiday</button>
+    </form>
+  </section>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div><h2>Past holidays</h2><p class="sage-card-sub">Archive of earlier dates</p></div>
+  </div>
+  <div class="pay-table-wrap">
+    <table class="pay-table">
+      <thead><tr><th>Date</th><th>Name</th><th>Recurring</th><th class="text-right no-print"></th></tr></thead>
+      <tbody>
+        <% if (!_past.length) { %>
+        <tr><td colspan="4" class="sage-empty"><i class="fa fa-calendar-o"></i>No past holidays.</td></tr>
+        <% } %>
+        <% _past.forEach(function (h) { %>
+        <tr>
+          <td><%= _fmt(h.holiday_date) %></td>
+          <td><strong style="font-weight:600;"><%= h.holiday_name %></strong></td>
+          <td><%= h.is_recurring ? 'Yes' : 'No' %></td>
+          <td class="text-right no-print">
+            <form method="POST" action="/hr/holidays/delete" class="d-inline" data-pay-confirm="Remove this holiday?">
+              <input type="hidden" name="id" value="<%= h.id %>">
+              <button type="submit" class="btn btn-sage-ghost btn-sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<style>
+  .sage-timeline-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid #e8eeea; }
+  .sage-timeline-row:last-child { border-bottom: 0; }
+  .sage-timeline-date {
+    width: 44px; text-align: center; background: #f3f6f4; border: 1px solid #e1e8e4;
+    border-radius: 4px; padding: 4px 0; flex-shrink: 0;
+  }
+  .sage-timeline-date span { display: block; font-size: 15px; font-weight: 600; line-height: 1.1; }
+  .sage-timeline-date small { display: block; font-size: 9.5px; text-transform: uppercase; color: #5f6f68; letter-spacing: 0.05em; }
+  .sage-timeline-body { flex: 1; min-width: 0; }
+  .sage-timeline-body strong { display: block; font-size: 13px; font-weight: 600; }
+  .sage-timeline-body small { display: block; font-size: 11.5px; color: #5f6f68; }
+  .sage-check input { accent-color: #00834b; }
+</style>
 
 <%- include('partials/payroll-layout-end') %>

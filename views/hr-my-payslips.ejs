@@ -1,59 +1,93 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'payslips', paySelfServiceOnly: 'payslips' }) %>
 <%
-var _t = typeof t === 'function' ? t : function (k) { return k; };
-var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+var _t = typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; };
+var _fmtXaf = function (n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+var _rows = rows || [];
+var _ytd = ytd || { gross: 0, tax: 0, net: 0, deductions: 0, count: 0 };
 %>
 
-<div class="pay-hero">
-  <h1><%= _t('my_payslips', { ns: 'payroll', defaultValue: 'My payslips' }) %></h1>
-  <p><%= _t('my_payslips_sub', { ns: 'payroll', defaultValue: 'Monthly payroll snapshots stored for your account. Open any row to print or save as PDF.' }) %></p>
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">HR &middot; Payslips</p>
+    <h1>My payslips</h1>
+    <p class="sage-sub">Monthly payroll snapshots for your account. Open any payslip to print or save as PDF.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr" class="btn btn-sage-ghost"><i class="fa fa-home mr-1"></i> HR overview</a>
+    <% if (locals.payCanTaxHub) { %>
+    <a href="/tax" class="btn btn-sage-ghost"><i class="fa fa-institution mr-1"></i> Tax hub</a>
+    <% } %>
+  </div>
 </div>
 
-<div class="pay-panel">
-  <div class="pay-panel-head">
-    <h2><%= _t('payroll_history', { ns: 'payroll', defaultValue: 'Payroll history' }) %></h2>
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Gross <%= currentYear %></div>
+    <div class="sage-stat-value"><%= _fmtXaf(_ytd.gross) %> <small>XAF</small></div>
+    <p class="sage-stat-foot">Year to date</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Income tax</div>
+    <div class="sage-stat-value"><%= _fmtXaf(_ytd.tax) %> <small>XAF</small></div>
+    <p class="sage-stat-foot">IRPP withheld</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Net paid / payable</div>
+    <div class="sage-stat-value"><%= _fmtXaf(_ytd.net) %> <small>XAF</small></div>
+    <p class="sage-stat-foot"><%= _ytd.count %> payslip(s) this year</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Total deductions</div>
+    <div class="sage-stat-value"><%= _fmtXaf(_ytd.deductions) %> <small>XAF</small></div>
+    <p class="sage-stat-foot">CNPS, CFC, CRTV, FNE, IRPP, CAC</p>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div><h2>Payslip history</h2><p class="sage-card-sub">Latest 36 periods</p></div>
   </div>
   <div class="pay-table-wrap">
-    <table class="pay-table" data-hms-table-paginate="8">
+    <table class="pay-table">
       <thead>
         <tr>
-          <th><%= _t('col_period', { ns: 'payroll', defaultValue: 'Period' }) %></th>
-          <th class="text-right"><%= _t('col_gross', { ns: 'payroll', defaultValue: 'Gross (XAF)' }) %></th>
-          <th class="text-right"><%= _t('col_irpp', { ns: 'payroll', defaultValue: 'IRPP' }) %></th>
-          <th class="text-right"><%= _t('col_net', { ns: 'payroll', defaultValue: 'Net' }) %></th>
-          <th><%= _t('col_status', { ns: 'payroll', defaultValue: 'Status' }) %></th>
-          <th class="text-right no-print"><%= _t('col_payslip', { ns: 'payroll', defaultValue: 'Payslip' }) %></th>
+          <th>Period</th>
+          <th class="pay-num">Gross (XAF)</th>
+          <th class="pay-num">IRPP</th>
+          <th class="pay-num">Net (XAF)</th>
+          <th>Status</th>
+          <th class="text-right no-print">Payslip</th>
         </tr>
       </thead>
       <tbody>
-      <% if(!rows || !rows.length){ %>
-        <tr><td colspan="6" class="text-center text-muted py-5"><%= _t('empty', { ns: 'payroll', defaultValue: 'No payroll lines yet.' }) %></td></tr>
-      <% } %>
-      <% (rows||[]).forEach(function(r){
-        var mid = parseInt(r.month,10)||0;
-        var paySt = String(r.payout_status||'pending').toLowerCase().trim();
-        var pid = parseInt(r.id,10)||0;
-      %>
+        <% if (!_rows.length) { %>
+        <tr><td colspan="6" class="sage-empty"><i class="fa fa-file-text-o"></i>No payroll lines yet. Payslips appear once payroll runs for your account.</td></tr>
+        <% } %>
+        <% _rows.forEach(function (r) {
+          var mid = parseInt(r.month, 10) || 0;
+          var pid = parseInt(r.id, 10) || 0;
+          var st = String(r.payout_status || 'pending').toLowerCase();
+        %>
         <tr>
-          <td class="font-weight-bold"><%= months[mid] || mid %> <%= r.year %></td>
+          <td><strong style="font-weight:600;"><%= months[mid] || mid %> <%= r.year %></strong></td>
           <td class="pay-num"><%= _fmtXaf(r.gross_salary) %></td>
           <td class="pay-num"><%= _fmtXaf(r.income_tax) %></td>
           <td class="pay-num"><strong><%= _fmtXaf(r.net_salary) %></strong></td>
-          <td>
-            <% if(paySt==='paid'){ %><span class="pay-badge pay-badge-paid"><%= _t('status_paid', { ns: 'payroll', defaultValue: 'Paid' }) %></span>
-            <% } else if(paySt==='pending'){ %><span class="pay-badge pay-badge-pending"><%= _t('status_pending', { ns: 'payroll', defaultValue: 'Pending' }) %></span>
-            <% } else { %><span class="pay-badge"><%= paySt %></span><% } %>
-          </td>
+          <td><span class="pay-badge <%= st === 'paid' ? 'pay-badge-paid' : 'pay-badge-pending' %>"><%= st === 'paid' ? 'Paid' : 'Pending' %></span></td>
           <td class="text-right no-print">
-            <% if(pid > 0){ %>
-            <a href="/payroll/payslip/<%= pid %>" target="_blank" rel="noopener" class="btn btn-sm hms-btn-secondary"><%= _t('view_print', { ns: 'payroll', defaultValue: 'View / Print' }) %></a>
-            <% } else { %><span class="text-muted small">—</span><% } %>
+            <% if (pid > 0) { %>
+            <a href="/payroll/payslip/<%= pid %>" target="_blank" rel="noopener" class="btn btn-sage-ghost btn-sm">View / Print</a>
+            <% } else { %><span class="sage-muted">—</span><% } %>
           </td>
         </tr>
-      <% }); %>
+        <% }); %>
       </tbody>
     </table>
   </div>
-</div>
+  <div class="sage-card-foot">
+    <span class="sage-muted" style="font-size:12px;"><i class="fa fa-info-circle mr-1"></i>Payslip figures are the same records used for CNPS, DGI and statutory declarations.</span>
+    <a href="/hr/request-leave" class="btn btn-sage-ghost btn-sm">Request time off</a>
+  </div>
+</section>
 
 <%- include('partials/payroll-layout-end') %>

@@ -1,34 +1,77 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'attendance', paySelfServiceOnly: 'payslips' }) %>
- <div class="d-flex flex-column flex-md-row justify-content-between align-items-start gap-3 mb-4">
- <div>
- <h4 class="page-title font-weight-bold text-dark mb-1"><%= _t('hr_my_attendance.title', { ns: 'legacy', defaultValue: 'My attendance' }) %></h4>
- <p class="text-muted small mb-0"><%= _t('hr_my_attendance.subtitle', { ns: 'legacy', defaultValue: 'Recorded check-in rows for your employee profile.' }) %></p>
- </div>
- <a href="/payroll" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="fa fa-arrow-left mr-1"></i><%= _t('hr_my_attendance.hr_hub', { ns: 'legacy', defaultValue: 'HR hub' }) %></a>
- </div>
+<%
+var _rows = rows || [];
+var _s = summary || {};
+var _fmtDate = function (d) {
+  if (!d) return '—';
+  var dt = new Date(String(d).slice(0, 10) + 'T12:00:00');
+  if (isNaN(dt.getTime())) return String(d);
+  return dt.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+};
+var _fmtTime = function (t) { return t ? String(t).substring(0, 5) : '—'; };
+%>
 
- <div class="card border-0 shadow-sm" style="border-radius:14px;">
- <div class="card-header bg-white font-weight-bold py-3"><%= _t('hr_my_attendance.history', { ns: 'legacy', defaultValue: 'History' }) %></div>
- <div class="card-body p-0 table-responsive">
- <table class="table table-sm table-striped mb-0" data-hms-table-paginate="10">
- <thead><tr><th><%= _t('hr_my_attendance.col_date', { ns: 'legacy', defaultValue: 'Date' }) %></th><th><%= _t('hr_my_attendance.col_check_in', { ns: 'legacy', defaultValue: 'Check-in' }) %></th><th><%= _t('hr_my_attendance.col_check_out', { ns: 'legacy', defaultValue: 'Check-out' }) %></th><th><%= _t('hr_my_attendance.col_status', { ns: 'legacy', defaultValue: 'Status' }) %></th></tr></thead>
- <tbody>
- <% if(!rows || !rows.length){ %>
- <tr><td colspan="4" class="text-center text-muted py-4"><%= _t('hr_my_attendance.none', { ns: 'legacy', defaultValue: 'No attendance rows yet.' }) %></td></tr>
- <% } %>
- <% (rows||[]).forEach(function(r){ %>
- <tr>
- <td><%= r.att_date %></td>
- <td><%= r.check_in_time || '—' %></td>
- <td><%= r.check_out_time || '—' %></td>
- <td><%= r.status || '—' %></td>
- </tr>
- <% }); %>
- </tbody>
- </table>
- </div>
- </div>
- </div>
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">HR &middot; Attendance</p>
+    <h1>My attendance</h1>
+    <p class="sage-sub">Check-in history recorded by HR. Monthly totals cover the current calendar month.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr" class="btn btn-sage-ghost"><i class="fa fa-home mr-1"></i> HR overview</a>
+  </div>
 </div>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Recorded this month</div>
+    <div class="sage-stat-value"><%= totalMonth || 0 %></div>
+    <p class="sage-stat-foot">Days on the register</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Present</div>
+    <div class="sage-stat-value"><%= _s.present || 0 %></div>
+    <p class="sage-stat-foot">Including late arrivals</p>
+  </div>
+  <div class="sage-stat sage-stat--warn">
+    <div class="sage-stat-label">Absent / late</div>
+    <div class="sage-stat-value"><%= (_s.absent || 0) %> / <%= _s.late || 0 %></div>
+    <p class="sage-stat-foot">This month</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Hours logged</div>
+    <div class="sage-stat-value"><%= (Number(hoursMonth) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %></div>
+    <p class="sage-stat-foot">From check-in / check-out</p>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div><h2>Attendance history</h2><p class="sage-card-sub">Most recent 120 records</p></div>
+  </div>
+  <div class="pay-table-wrap">
+    <table class="pay-table">
+      <thead>
+        <tr><th>Date</th><th>Check in</th><th>Check out</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <% if (!_rows.length) { %>
+        <tr><td colspan="4" class="sage-empty"><i class="fa fa-clock-o"></i>No attendance recorded yet.</td></tr>
+        <% } %>
+        <% _rows.forEach(function (r) {
+          var st = String(r.status || '').toLowerCase();
+          var badge = st === 'present' ? 'pay-badge-paid' : (st === 'absent' ? 'pay-badge--error' : (st === 'late' || st === 'half-day' ? 'pay-badge-pending' : ''));
+        %>
+        <tr>
+          <td><%= _fmtDate(r.att_date) %></td>
+          <td class="sage-mono"><%= _fmtTime(r.check_in_time) %></td>
+          <td class="sage-mono"><%= _fmtTime(r.check_out_time) %></td>
+          <td><span class="pay-badge <%= badge %>"><%= st ? st.charAt(0).toUpperCase() + st.slice(1) : '—' %></span></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
 
 <%- include('partials/payroll-layout-end') %>

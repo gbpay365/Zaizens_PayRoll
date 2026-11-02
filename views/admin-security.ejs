@@ -1,0 +1,154 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'admin-security' }) %>
+<%
+var p = policy || {};
+var c = counts || {};
+var _activity = activity || [];
+var _fmtWhen = function (v) {
+  if (!v) return '—';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
+var _actionLabel = function (a) {
+  return String(a || '').replace(/[._]/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+};
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Administration &middot; Security</p>
+    <h1>Security policy</h1>
+    <p class="sage-sub">Password rules, sign-in lockout and organisation-wide password resets for payroll and HR access.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/admin/accounts?status=must-change" class="btn btn-sage-ghost"><i class="fa fa-key mr-1"></i> Accounts due a change</a>
+  </div>
+</div>
+
+<%- include('partials/admin-tabs') %>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Active accounts</div>
+    <div class="sage-stat-value"><%= c.active || 0 %></div>
+    <p class="sage-stat-foot"><%= c.inactive || 0 %> inactive</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Password minimum</div>
+    <div class="sage-stat-value"><%= p.password_min_length || 8 %></div>
+    <p class="sage-stat-foot">Characters</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Lockout</div>
+    <div class="sage-stat-value"><%= p.lockout_threshold || 8 %></div>
+    <p class="sage-stat-foot">Attempts per <%= p.lockout_minutes || 15 %> min</p>
+  </div>
+  <div class="sage-stat <%= (c.mustChange || 0) > 0 ? 'sage-stat--warn' : '' %>">
+    <div class="sage-stat-label">Changes due</div>
+    <div class="sage-stat-value"><%= c.mustChange || 0 %></div>
+    <p class="sage-stat-foot">Flagged accounts</p>
+  </div>
+</div>
+
+<div class="sage-grid">
+  <form method="POST" action="/admin/security" class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Password &amp; sign-in policy</h2><p class="sage-card-sub">Applies to every account at next password change</p></div>
+    </div>
+    <div class="sage-card-body">
+      <div class="sage-form-grid">
+        <div class="sage-field">
+          <label for="minLength">Minimum password length</label>
+          <input type="number" class="form-control" id="minLength" name="password_min_length" min="6" max="64" value="<%= p.password_min_length || 8 %>" required>
+          <span class="sage-hint">Between 6 and 64 characters.</span>
+        </div>
+        <div class="sage-field">
+          <label for="lockoutThreshold">Failed attempts before lockout</label>
+          <input type="number" class="form-control" id="lockoutThreshold" name="lockout_threshold" min="3" max="50" value="<%= p.lockout_threshold || 8 %>" required>
+          <span class="sage-hint">Per username and IP address.</span>
+        </div>
+        <div class="sage-field">
+          <label for="lockoutMinutes">Lockout window (minutes)</label>
+          <input type="number" class="form-control" id="lockoutMinutes" name="lockout_minutes" min="1" max="240" value="<%= p.lockout_minutes || 15 %>" required>
+          <span class="sage-hint">Sign-in is blocked for this period after too many failures.</span>
+        </div>
+        <div class="sage-field">
+          <label class="d-block">Complexity</label>
+          <label class="sage-check">
+            <input type="checkbox" name="password_require_digit" value="1" <%= p.password_require_digit ? 'checked' : '' %>>
+            <span>Require at least one number</span>
+          </label>
+          <label class="sage-check">
+            <input type="checkbox" name="password_require_upper" value="1" <%= p.password_require_upper ? 'checked' : '' %>>
+            <span>Require at least one uppercase letter</span>
+          </label>
+        </div>
+      </div>
+      <hr class="sage-divider">
+      <label class="sage-check">
+        <input type="checkbox" name="force_change_on_reset" value="1" <%= p.force_change_on_reset ? 'checked' : '' %>>
+        <span>When an administrator resets a password, require the user to choose a new one at next sign-in</span>
+      </label>
+    </div>
+    <div class="sage-card-foot">
+      <span class="sage-muted" style="font-size:12px;">Policy changes are recorded in the admin activity trail.</span>
+      <button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save policy</button>
+    </div>
+  </form>
+
+  <div>
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>Organisation-wide reset</h2><p class="sage-card-sub">Force every user to choose a new password</p></div>
+      </div>
+      <div class="sage-card-body">
+        <div class="sage-alert sage-alert--warn" style="margin-bottom:12px;">
+          <i class="fa fa-exclamation-triangle"></i>
+          <div>
+            <strong>Use with care.</strong>
+            <span>Every active account except your own will be forced to a new password at next sign-in. Super Admin accounts are excluded.</span>
+          </div>
+        </div>
+        <form method="POST" action="/admin/security/force-change" data-pay-confirm="Force all active users to change their password at next sign-in?">
+          <button type="submit" class="btn btn-sage-ghost btn-block"><i class="fa fa-refresh mr-1"></i> Force password change for all users</button>
+        </form>
+        <p class="sage-hint mt-2 mb-0"><%= c.mustChange || 0 %> account(s) are currently flagged.</p>
+      </div>
+    </section>
+
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>Recent security actions</h2><p class="sage-card-sub">Last 8 admin changes</p></div>
+        <a href="/admin/activity" class="btn btn-sage-ghost btn-sm">All</a>
+      </div>
+      <div class="sage-card-body pt-1">
+        <% if (!_activity.length) { %>
+        <p class="sage-empty mb-0"><i class="fa fa-history"></i>No security actions yet.</p>
+        <% } %>
+        <% _activity.forEach(function (a) { %>
+        <div class="sage-check-row">
+          <span class="sage-check-icon"><i class="fa fa-shield"></i></span>
+          <div>
+            <strong><%= _actionLabel(a.action) %></strong>
+            <small><%= a.actor_name || 'System' %> &middot; <%= _fmtWhen(a.created_at) %></small>
+          </div>
+        </div>
+        <% }); %>
+      </div>
+    </section>
+  </div>
+</div>
+
+<style>
+  .sage-check { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; font-size: 13px; color: #3c4c45; cursor: pointer; padding-top: 5px; }
+  .sage-check input { margin-top: 3px; accent-color: #00834b; }
+  .sage-divider { border: 0; border-top: 1px solid #e8eeea; margin: 4px 0 12px; }
+  .sage-check-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #e8eeea; }
+  .sage-check-row:last-child { border-bottom: 0; }
+  .sage-check-row > div { flex: 1; min-width: 0; }
+  .sage-check-row strong { display: block; font-size: 12.5px; font-weight: 600; }
+  .sage-check-row small { display: block; font-size: 11.5px; color: #5f6f68; }
+  .sage-check-icon { width: 26px; height: 26px; border-radius: 50%; background: #e7f3ec; color: #006b3d; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+</style>
+
+<%- include('partials/payroll-layout-end') %>

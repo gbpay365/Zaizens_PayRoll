@@ -47,6 +47,22 @@ app.use(
   })
 );
 
+/* Lightweight in-memory login throttling (per IP + username). */
+const loginFailures = new Map();
+
+function loginFailureKey(req, username) {
+  const ip = String(req.ip || req.socket?.remoteAddress || '').slice(0, 64);
+  return `${ip}|${String(username || '').toLowerCase()}`;
+}
+
+function pruneLoginFailures(windowMs) {
+  if (loginFailures.size < 500) return;
+  const cutoff = Date.now() - windowMs;
+  for (const [key, rec] of loginFailures) {
+    if (!rec || rec.first < cutoff) loginFailures.delete(key);
+  }
+}
+
 if (!pool) {
   app.get('/__health', (req, res) => {
     res.status(503).json({ ok: false, error: DB_BOOT_CONFIG.error || 'Database not configured' });
@@ -162,6 +178,22 @@ app.use(async (req, res, next) => {
   next();
 });
 
+/* Users flagged by an administrator must change their password first. */
+app.use((req, res, next) => {
+  if (!req.session.user || !req.session.user.mustChange) return next();
+  const allowed =
+    req.path === '/account/password' ||
+    req.path === '/logout' ||
+    req.path === '/login' ||
+    req.path === '/__health' ||
+    req.path.startsWith('/css/') ||
+    req.path.startsWith('/js/') ||
+    req.path.startsWith('/img/') ||
+    req.path.startsWith('/public/');
+  if (allowed) return next();
+  return res.redirect('/account/password?err=' + encodeURIComponent('Set a new password before continuing.'));
+});
+
 app.get('/', (req, res) => {
   if (req.session.user) return res.redirect('/payroll');
   res.render('login', {
@@ -180,11 +212,23 @@ app.post('/login', async (req, res) => {
   const password = String(req.body.password || '');
   try {
     await require('./lib/ensureEmployeeHrSchema')(pool);
+    const policy = await require('./lib/securityPolicy').loadSecurityPolicy(pool);
+    const windowMs = (policy.lockout_minutes || 15) * 60 * 1000;
+    const key = loginFailureKey(req, username);
+    const attempt = loginFailures.get(key);
+    if (attempt && Date.now() - attempt.first < windowMs && attempt.count >= (policy.lockout_threshold || 8)) {
+      const waitMin = Math.max(1, Math.ceil((windowMs - (Date.now() - attempt.first)) / 60000));
+      return res.redirect('/?err=' + encodeURIComponent(`Too many failed attempts. Try again in ${waitMin} minute(s).`));
+    }
     const [rows] = await pool.query(
-      'SELECT id, first_name, last_name, username, password, role FROM tbl_employee WHERE username = ? AND status = 1 LIMIT 1',
+      'SELECT id, first_name, last_name, username, password, role, password_must_change FROM tbl_employee WHERE username = ? AND status = 1 LIMIT 1',
       [username]
     );
     if (!rows.length) {
+      const rec = loginFailures.get(key);
+      if (!rec || Date.now() - rec.first >= windowMs) loginFailures.set(key, { count: 1, first: Date.now() });
+      else rec.count += 1;
+      pruneLoginFailures(windowMs);
       return res.redirect('/?err=' + encodeURIComponent('Invalid username or password.'));
     }
     const user = rows[0];
@@ -196,7 +240,14 @@ app.post('/login', async (req, res) => {
     } else {
       ok = password === hash;
     }
-    if (!ok) return res.redirect('/?err=' + encodeURIComponent('Invalid username or password.'));
+    if (!ok) {
+      const rec = loginFailures.get(key);
+      if (!rec || Date.now() - rec.first >= windowMs) loginFailures.set(key, { count: 1, first: Date.now() });
+      else rec.count += 1;
+      pruneLoginFailures(windowMs);
+      return res.redirect('/?err=' + encodeURIComponent('Invalid username or password.'));
+    }
+    loginFailures.delete(key);
     const [[facRow]] = await pool
       .query('SELECT default_facility_id FROM tbl_employee WHERE id = ? LIMIT 1', [user.id])
       .catch(() => [[null]]);
@@ -206,9 +257,13 @@ app.post('/login', async (req, res) => {
       name: `${user.first_name} ${user.last_name}`.trim(),
       username: user.username,
       role: user.role,
+      mustChange: Number(user.password_must_change) === 1,
     };
     req.session.facilityId = defaultFac;
     req.session.userPerms = null;
+    if (req.session.user.mustChange) {
+      return res.redirect('/account/password?err=' + encodeURIComponent('Your administrator requires a new password.'));
+    }
     const isAdminRole = String(user.role) === '1' || String(user.role) === '99';
     res.redirect(isAdminRole ? '/payroll' : '/hr');
   } catch (e) {
@@ -263,6 +318,7 @@ require('./routes/statutoryReports')(app, pool, requireAuth, { requirePerm });
 require('./routes/integrationSettings')(app, pool, requireAuth, { requireAdminOrSuper });
 require('./routes/employees')(app, pool, requireAuth, { requireAdminOrSuper });
 require('./routes/hrHome')(app, pool, requireAuth);
+require('./routes/admin')(app, pool, requireAuth);
 
 async function boot() {
   if (pool) {
@@ -271,7 +327,7 @@ async function boot() {
       await require('./lib/ensureEmployeeHrSchema')(pool);
       await require('./lib/ensureHrPayrollSchema')(pool);
       await require('./lib/ensureFacilityIntegrationSchema')(pool);
-      await require('./lib/ensureAclSchema')(pool).catch((e) => console.warn('[acl]', e.message));
+      await require('./lib/ensureAdminSchema')(pool).catch((e) => console.warn('[admin schema]', e.message));
       console.log('[Zaizens_PayRoll] schema ready');
     } catch (e) {
       console.warn('[Zaizens_PayRoll] schema:', e.message);

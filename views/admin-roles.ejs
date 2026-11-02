@@ -1,0 +1,115 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'admin-roles' }) %>
+<%
+var _roles = roles || [];
+var _builtInCount = _roles.filter(function (r) { return r.builtIn; }).length;
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Administration &middot; Access control</p>
+    <h1>Roles &amp; permissions</h1>
+    <p class="sage-sub">Roles group the permissions that decide access to payroll, HR, tax and administration. Every account carries one role.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/admin/accounts" class="btn btn-sage-ghost"><i class="fa fa-user-circle-o mr-1"></i> Accounts</a>
+  </div>
+</div>
+
+<%- include('partials/admin-tabs') %>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Roles</div>
+    <div class="sage-stat-value"><%= _roles.length %></div>
+    <p class="sage-stat-foot"><%= _builtInCount %> built-in</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Permissions</div>
+    <div class="sage-stat-value"><%= permissionTotal %></div>
+    <p class="sage-stat-foot">Available to assign</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Assigned users</div>
+    <div class="sage-stat-value"><%= _roles.reduce(function (s, r) { return s + r.users; }, 0) %></div>
+    <p class="sage-stat-foot">Across all roles</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Unused roles</div>
+    <div class="sage-stat-value"><%= _roles.filter(function (r) { return !r.users; }).length %></div>
+    <p class="sage-stat-foot">No accounts assigned</p>
+  </div>
+</div>
+
+<div class="sage-grid">
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>All roles</h2><p class="sage-card-sub">Open a role to edit its permissions</p></div>
+    </div>
+    <div class="pay-table-wrap">
+      <table class="pay-table">
+        <thead>
+          <tr><th>Role</th><th>ID</th><th class="pay-num">Users</th><th class="pay-num">Permissions</th><th class="text-right no-print">Actions</th></tr>
+        </thead>
+        <tbody>
+          <% if (!_roles.length) { %>
+          <tr><td colspan="5" class="sage-empty"><i class="fa fa-shield"></i>No roles defined yet.</td></tr>
+          <% } %>
+          <% _roles.forEach(function (r) { %>
+          <tr>
+            <td>
+              <a href="/admin/roles/<%= r.id %>" class="admin-role-name"><%= r.title %></a>
+              <% if (r.builtIn) { %><span class="pay-badge pay-badge-paid ml-1">Built-in</span><% } %>
+            </td>
+            <td class="sage-mono"><%= r.id %></td>
+            <td class="pay-num"><%= r.users %></td>
+            <td class="pay-num"><%= r.builtIn ? 'Full access' : r.permissions %></td>
+            <td class="text-right no-print text-nowrap">
+              <a href="/admin/roles/<%= r.id %>" class="btn btn-sage-ghost btn-sm">Open</a>
+              <% if (!r.builtIn) { %>
+              <form method="POST" action="/admin/roles/<%= r.id %>/delete" class="d-inline ml-1"
+                    data-pay-confirm="Delete this role? Permissions and role rows are removed. Roles with users cannot be deleted.">
+                <button type="submit" class="btn btn-sage-ghost btn-sm" <%= r.users ? 'disabled title="Reassign users first"' : '' %>>Delete</button>
+              </form>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Create a role</h2><p class="sage-card-sub">Start empty or copy an existing role</p></div>
+    </div>
+    <form method="POST" action="/admin/roles" class="sage-card-body">
+      <div class="sage-field">
+        <label for="roleTitle">Role name *</label>
+        <input type="text" id="roleTitle" name="title" class="form-control" required maxlength="120" placeholder="e.g. Payroll Officer">
+      </div>
+      <div class="sage-field">
+        <label for="roleId">Role ID</label>
+        <input type="number" id="roleId" name="role_id" class="form-control" min="2" max="9999" value="<%= nextRoleId %>" required>
+        <span class="sage-hint">Numeric identifier stored on each account. Must be unique.</span>
+      </div>
+      <div class="sage-field">
+        <label for="templateRole">Copy permissions from</label>
+        <select id="templateRole" name="template_role" class="form-control">
+          <option value="">Start with no permissions</option>
+          <% _roles.forEach(function (r) { %>
+          <option value="<%= r.id %>"><%= r.title %> (<%= r.permissions %>)</option>
+          <% }); %>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-sage"><i class="fa fa-plus mr-1"></i> Create role</button>
+    </form>
+  </section>
+</div>
+
+<style>
+  .admin-role-name { color: #16211c !important; text-decoration: none !important; font-weight: 600; }
+  .admin-role-name:hover { color: #00834b !important; }
+</style>
+
+<%- include('partials/payroll-layout-end') %>

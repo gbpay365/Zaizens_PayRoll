@@ -1,0 +1,186 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'admin' }) %>
+<%
+var s = stats || {};
+var _policy = policy || {};
+var _activity = activity || [];
+var _fmtWhen = function (v) {
+  if (!v) return '—';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
+var _actionLabel = function (a) {
+  return String(a || '').replace(/[._]/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+};
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Administration &middot; Access &amp; security</p>
+    <h1>Admin overview</h1>
+    <p class="sage-sub">Manage who can sign in, what each role can do, and the security rules applied to the payroll and HR modules.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/admin/accounts/new" class="btn btn-sage"><i class="fa fa-user-plus mr-1"></i> New account</a>
+    <a href="/admin/roles" class="btn btn-sage-ghost"><i class="fa fa-shield mr-1"></i> Roles</a>
+  </div>
+</div>
+
+<%- include('partials/admin-tabs') %>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Accounts</div>
+    <div class="sage-stat-value"><%= s.accounts || 0 %></div>
+    <p class="sage-stat-foot"><%= s.active || 0 %> active &middot; <%= s.inactive || 0 %> inactive</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Roles</div>
+    <div class="sage-stat-value"><%= s.roles || 0 %></div>
+    <p class="sage-stat-foot"><%= s.grants || 0 %> permission grants</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Permissions</div>
+    <div class="sage-stat-value"><%= s.permissions || 0 %></div>
+    <p class="sage-stat-foot">Across payroll, HR, tax and admin</p>
+  </div>
+  <div class="sage-stat <%= (s.mustChange || 0) > 0 ? 'sage-stat--warn' : '' %>">
+    <div class="sage-stat-label">Password changes due</div>
+    <div class="sage-stat-value"><%= s.mustChange || 0 %></div>
+    <p class="sage-stat-foot">Must change at next sign-in</p>
+  </div>
+</div>
+
+<div class="sage-grid">
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Security posture</h2><p class="sage-card-sub">Checks that keep payroll access controlled</p></div>
+      <a href="/admin/security" class="btn btn-sage-ghost btn-sm">Security settings</a>
+    </div>
+    <div class="sage-card-body">
+      <div class="sage-checklist">
+        <div class="sage-check-row">
+          <span class="sage-check-icon <%= (_policy.password_min_length || 0) >= 8 ? 'ok' : 'warn' %>"><i class="fa <%= (_policy.password_min_length || 0) >= 8 ? 'fa-check' : 'fa-exclamation' %>"></i></span>
+          <div>
+            <strong>Password policy</strong>
+            <small>Minimum <%= _policy.password_min_length || 8 %> characters<%= _policy.password_require_digit ? ', at least one number' : '' %><%= _policy.password_require_upper ? ', one uppercase letter' : '' %></small>
+          </div>
+          <a href="/admin/security" class="btn btn-sage-ghost btn-sm">Edit</a>
+        </div>
+        <div class="sage-check-row">
+          <span class="sage-check-icon ok"><i class="fa fa-clock-o"></i></span>
+          <div>
+            <strong>Login throttling</strong>
+            <small>Lock after <%= _policy.lockout_threshold || 8 %> failed attempts for <%= _policy.lockout_minutes || 15 %> minutes</small>
+          </div>
+        </div>
+        <div class="sage-check-row">
+          <span class="sage-check-icon ok"><i class="fa fa-user-secret"></i></span>
+          <div>
+            <strong>Role-based access</strong>
+            <small><%= s.grants || 0 %> role permission grants across <%= s.roles || 0 %> roles</small>
+          </div>
+          <a href="/admin/roles" class="btn btn-sage-ghost btn-sm">Review</a>
+        </div>
+        <div class="sage-check-row">
+          <span class="sage-check-icon <%= (s.unassigned || 0) > 0 ? 'warn' : 'ok' %>"><i class="fa <%= (s.unassigned || 0) > 0 ? 'fa-exclamation' : 'fa-check' %>"></i></span>
+          <div>
+            <strong>Accounts without a role</strong>
+            <small><%= s.unassigned || 0 %> account(s) need a role assigned</small>
+          </div>
+          <% if ((s.unassigned || 0) > 0) { %><a href="/admin/accounts?status=active" class="btn btn-sage-ghost btn-sm">Fix</a><% } %>
+        </div>
+        <div class="sage-check-row">
+          <span class="sage-check-icon <%= (s.mustChange || 0) > 0 ? 'warn' : 'ok' %>"><i class="fa fa-key"></i></span>
+          <div>
+            <strong>Password rotation</strong>
+            <small><%= s.mustChange || 0 %> account(s) must choose a new password</small>
+          </div>
+          <% if ((s.mustChange || 0) > 0) { %><a href="/admin/accounts?status=must-change" class="btn btn-sage-ghost btn-sm">View</a><% } %>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div>
+    <section class="sage-card">
+      <div class="sage-card-head">
+        <div><h2>Quick actions</h2><p class="sage-card-sub">Common admin tasks</p></div>
+      </div>
+      <div class="sage-card-body pt-1">
+        <nav class="sage-action-list">
+          <a href="/admin/accounts/new" class="sage-action-row">
+            <span class="sage-action-icon"><i class="fa fa-user-plus"></i></span>
+            <span><strong>Create an account</strong><small>Sign-in, role and temporary password</small></span>
+            <i class="fa fa-angle-right sage-action-arrow"></i>
+          </a>
+          <a href="/admin/roles" class="sage-action-row">
+            <span class="sage-action-icon"><i class="fa fa-shield"></i></span>
+            <span><strong>Roles &amp; permissions</strong><small>Control payroll, HR and tax access</small></span>
+            <i class="fa fa-angle-right sage-action-arrow"></i>
+          </a>
+          <a href="/admin/security" class="sage-action-row">
+            <span class="sage-action-icon"><i class="fa fa-lock"></i></span>
+            <span><strong>Security policy</strong><small>Passwords, lockout and rotation</small></span>
+            <i class="fa fa-angle-right sage-action-arrow"></i>
+          </a>
+          <a href="/admin/activity" class="sage-action-row">
+            <span class="sage-action-icon"><i class="fa fa-history"></i></span>
+            <span><strong>Admin activity</strong><small>Audit trail of account and role changes</small></span>
+            <i class="fa fa-angle-right sage-action-arrow"></i>
+          </a>
+        </nav>
+      </div>
+    </section>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div><h2>Recent admin activity</h2><p class="sage-card-sub">Latest 10 changes</p></div>
+    <a href="/admin/activity" class="btn btn-sage-ghost btn-sm">Full trail</a>
+  </div>
+  <div class="pay-table-wrap">
+    <table class="pay-table">
+      <thead><tr><th>When</th><th>Administrator</th><th>Action</th><th>Target</th><th>Detail</th></tr></thead>
+      <tbody>
+        <% if (!_activity.length) { %>
+        <tr><td colspan="5" class="sage-empty"><i class="fa fa-history"></i>No admin actions recorded yet.</td></tr>
+        <% } %>
+        <% _activity.forEach(function (a) { %>
+        <tr>
+          <td class="sage-muted" style="white-space:nowrap;"><%= _fmtWhen(a.created_at) %></td>
+          <td><%= a.actor_name || '—' %></td>
+          <td><span class="pay-badge"><%= _actionLabel(a.action) %></span></td>
+          <td class="sage-mono"><%= a.target_type ? a.target_type + ' ' + (a.target_id || '') : '—' %></td>
+          <td class="sage-muted"><%= a.detail || '' %></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<style>
+  .sage-checklist { display: block; }
+  .sage-check-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #e8eeea; }
+  .sage-check-row:last-child { border-bottom: 0; }
+  .sage-check-row > div { flex: 1; min-width: 0; }
+  .sage-check-row strong { display: block; font-size: 13px; font-weight: 600; }
+  .sage-check-row small { display: block; font-size: 11.5px; color: #5f6f68; }
+  .sage-check-icon {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 12px;
+    background: #e7f3ec; color: #006b3d;
+  }
+  .sage-check-icon.warn { background: #fdf1dc; color: #8a4c08; }
+  .sage-action-list { display: block; }
+  .sage-action-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid #e8eeea; text-decoration: none !important; color: #16211c !important; }
+  .sage-action-row:last-child { border-bottom: 0; }
+  .sage-action-row strong { display: block; font-size: 13.5px; font-weight: 600; }
+  .sage-action-row small { display: block; font-size: 12px; color: #5f6f68; margin-top: 1px; }
+  .sage-action-icon { width: 32px; height: 32px; flex-shrink: 0; border-radius: 4px; background: #e7f3ec; color: #00834b; display: inline-flex; align-items: center; justify-content: center; }
+  .sage-action-arrow { margin-left: auto; color: #a9b8b1; }
+</style>
+
+<%- include('partials/payroll-layout-end') %>

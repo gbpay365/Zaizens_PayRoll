@@ -1,0 +1,139 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'admin-accounts' }) %>
+<%
+var _rows = accounts || [];
+var _counts = counts || {};
+var _fmtWhen = function (v) {
+  if (!v) return '—';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+var _initials = function (f, l) { return ((String(f || '?').charAt(0)) + String(l || '').charAt(0)).toUpperCase(); };
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Administration &middot; Accounts</p>
+    <h1>Accounts</h1>
+    <p class="sage-sub">Sign-in records, assigned roles and password state. Accounts are the same employee records used by payroll and HR.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/admin/accounts/new" class="btn btn-sage"><i class="fa fa-user-plus mr-1"></i> New account</a>
+    <a href="/admin/roles" class="btn btn-sage-ghost"><i class="fa fa-shield mr-1"></i> Roles</a>
+  </div>
+</div>
+
+<%- include('partials/admin-tabs') %>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">All accounts</div>
+    <div class="sage-stat-value"><%= _counts.total || 0 %></div>
+    <p class="sage-stat-foot"><%= _rows.length %> shown</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Active</div>
+    <div class="sage-stat-value"><%= _counts.active || 0 %></div>
+    <p class="sage-stat-foot">Can sign in</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Inactive</div>
+    <div class="sage-stat-value"><%= _counts.inactive || 0 %></div>
+    <p class="sage-stat-foot">Sign-in blocked</p>
+  </div>
+  <div class="sage-stat <%= (_counts.mustChange || 0) > 0 ? 'sage-stat--warn' : '' %>">
+    <div class="sage-stat-label">Password change due</div>
+    <div class="sage-stat-value"><%= _counts.mustChange || 0 %></div>
+    <p class="sage-stat-foot">Flagged accounts</p>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div><h2>All accounts</h2><p class="sage-card-sub">Filter by name, username, e-mail or matricule</p></div>
+    <form method="GET" action="/admin/accounts" class="pay-toolbar no-print">
+      <input type="search" name="q" class="pay-search" value="<%= q || '' %>" placeholder="Search accounts…" aria-label="Search accounts">
+      <select name="status" class="form-control form-control-sm" style="max-width:150px;" onchange="this.form.submit()">
+        <option value="" <%= !status ? 'selected' : '' %>>All statuses</option>
+        <option value="active" <%= status === 'active' ? 'selected' : '' %>>Active</option>
+        <option value="inactive" <%= status === 'inactive' ? 'selected' : '' %>>Inactive</option>
+        <option value="must-change" <%= status === 'must-change' ? 'selected' : '' %>>Password change due</option>
+      </select>
+      <button type="submit" class="btn btn-sage-ghost btn-sm">Filter</button>
+    </form>
+  </div>
+  <div class="pay-table-wrap">
+    <table class="pay-table" id="accountsTable">
+      <thead>
+        <tr>
+          <th>Account</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Password</th>
+          <th>Last reset</th>
+          <th class="text-right no-print">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!_rows.length) { %>
+        <tr><td colspan="7" class="sage-empty"><i class="fa fa-user-circle-o"></i>No accounts match this filter.</td></tr>
+        <% } %>
+        <% _rows.forEach(function (a) { %>
+        <tr>
+          <td>
+            <div class="d-flex align-items-center" style="gap:10px;">
+              <span class="sage-person-avatar"><%= _initials(a.first_name, a.last_name) %></span>
+              <span>
+                <a href="/admin/accounts/<%= a.id %>" class="admin-account-name"><%= a.first_name %> <%= a.last_name %></a>
+                <small class="d-block text-muted"><%= a.emailid || a.employee_id || 'No e-mail' %></small>
+              </span>
+            </div>
+          </td>
+          <td class="sage-mono">@<%= a.username %></td>
+          <td><%= a.roleLabel || '—' %></td>
+          <td>
+            <% if (Number(a.status) === 1) { %>
+            <span class="pay-badge pay-badge-paid">Active</span>
+            <% } else { %>
+            <span class="pay-badge">Inactive</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (Number(a.password_must_change) === 1) { %>
+            <span class="pay-badge pay-badge-pending">Change due</span>
+            <% } else { %>
+            <span class="sage-muted" style="font-size:12px;">Set</span>
+            <% } %>
+          </td>
+          <td class="sage-muted" style="font-size:12px;"><%= _fmtWhen(a.last_reset_at) %></td>
+          <td class="text-right no-print text-nowrap">
+            <a href="/admin/accounts/<%= a.id %>" class="btn btn-sage-ghost btn-sm">Open</a>
+            <form method="POST" action="/admin/accounts/<%= a.id %>/toggle" class="d-inline ml-1"
+                  data-pay-confirm="<%= Number(a.status) === 1 ? 'Deactivate this account? The user will not be able to sign in.' : 'Activate this account?' %>">
+              <button type="submit" class="btn btn-sm <%= Number(a.status) === 1 ? 'btn-sage-ghost' : 'btn-sage' %>">
+                <%= Number(a.status) === 1 ? 'Deactivate' : 'Activate' %>
+              </button>
+            </form>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <div class="sage-card-foot">
+    <span class="sage-muted" style="font-size:12px;">Accounts are stored in the employee register, so payroll history stays attached when access is removed.</span>
+    <span class="sage-muted" style="font-size:12px;">Showing up to 300 accounts</span>
+  </div>
+</section>
+
+<style>
+  .sage-person-avatar {
+    width: 30px; height: 30px; border-radius: 50%; background: #e7f3ec; color: #006b3d;
+    font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .admin-account-name { color: #16211c !important; text-decoration: none !important; font-weight: 600; }
+  .admin-account-name:hover { color: #00834b !important; }
+</style>
+
+<%- include('partials/payroll-layout-end') %>

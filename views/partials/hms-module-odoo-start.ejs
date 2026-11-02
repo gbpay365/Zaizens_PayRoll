@@ -28,6 +28,12 @@ else if (_path.indexOf('/tax/statutory-reports') === 0) _section = 'Statutory re
 else if (_path.indexOf('/tax/compliance') === 0) _section = 'Compliance';
 else if (_path.indexOf('/tax/payroll-lines') === 0) _section = 'Payroll lines';
 else if (_path.indexOf('/tax') === 0) _section = 'Tax hub';
+else if (_path.indexOf('/admin/accounts') === 0) _section = 'Accounts';
+else if (_path.indexOf('/admin/roles') === 0) _section = 'Roles & permissions';
+else if (_path.indexOf('/admin/security') === 0) _section = 'Security';
+else if (_path.indexOf('/admin/activity') === 0) _section = 'Admin activity';
+else if (_path === '/admin') _section = 'Administration';
+else if (_path.indexOf('/account/password') === 0) _section = 'Change password';
 var _today = new Date();
 var _period = _today.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
 %>
@@ -40,12 +46,13 @@ var _period = _today.toLocaleString('en-GB', { month: 'long', year: 'numeric' })
       <i class="fa fa-bars"></i>
     </button>
     <nav class="sage-breadcrumb" aria-label="Breadcrumb">
-      <a href="/payroll">Payroll</a>
+      <a href="<%= _path.indexOf('/admin') === 0 ? '/admin' : '/payroll' %>"><%= _path.indexOf('/admin') === 0 ? 'Administration' : 'Payroll' %></a>
       <span class="sep">/</span>
       <span class="current"><%= _section %></span>
     </nav>
     <div class="sage-topbar-right">
       <span class="d-none d-md-inline"><i class="fa fa-calendar-o mr-1"></i><%= _period %></span>
+      <a class="sage-topbar-link" href="/account/password" title="Change password"><i class="fa fa-key"></i></a>
       <% if (locals.payCanWrite && !locals.paySelfServiceOnly) { %>
       <a class="sage-topbar-link" href="/payroll/employees/new"><i class="fa fa-user-plus"></i> <span class="d-none d-sm-inline">New employee</span></a>
       <% } %>

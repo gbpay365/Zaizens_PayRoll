@@ -1,0 +1,180 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'admin-roles' }) %>
+<%
+var _groups = groups || [];
+var _flat = [];
+_groups.forEach(function (g) { (g.permissions || []).forEach(function (p) { _flat.push(p); }); });
+var _selectedCount = _flat.filter(function (p) { return p.granted; }).length;
+var _openModules = { payroll: 1, hr: 1, accounting: 1, access_control: 1, admin: 1, employee: 1 };
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Administration &middot; Role <%= role %></p>
+    <h1><%= titleText %></h1>
+    <p class="sage-sub">
+      <%= userCount %> account(s) use this role &middot; <span id="selectedCount"><%= _selectedCount %></span> of <%= permissionTotal %> permissions selected
+      <% if (builtIn) { %> &middot; built-in role<% } %>
+    </p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/admin/roles" class="btn btn-sage-ghost"><i class="fa fa-angle-left mr-1"></i> All roles</a>
+    <% if (!builtIn) { %>
+    <form method="POST" action="/admin/roles/<%= role %>/delete" data-pay-confirm="Delete this role? Roles with users assigned cannot be deleted.">
+      <button type="submit" class="btn btn-sage-ghost" <%= userCount ? 'disabled title="Reassign users first"' : '' %>><i class="fa fa-trash mr-1"></i> Delete role</button>
+    </form>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/admin-tabs') %>
+
+<% if (builtIn) { %>
+<div class="sage-alert sage-alert--info">
+  <i class="fa fa-info-circle"></i>
+  <div>
+    <strong>Built-in role.</strong>
+    <span>Admin and Super Admin always have full access; their permission list is managed by the system and cannot be edited or deleted.</span>
+  </div>
+</div>
+<% } %>
+
+<form method="POST" action="/admin/roles/<%= role %>" id="roleForm">
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Role details</h2><p class="sage-card-sub">Display name shown on accounts</p></div>
+    </div>
+    <div class="sage-card-body">
+      <div class="sage-form-grid">
+        <div class="sage-field">
+          <label for="roleTitleInput">Role name</label>
+          <input class="form-control" id="roleTitleInput" name="title" value="<%= titleText %>" maxlength="120" <%= builtIn ? 'disabled' : '' %>>
+        </div>
+        <div class="sage-field">
+          <label>Role ID</label>
+          <input class="form-control sage-mono" value="<%= role %>" disabled>
+          <span class="sage-hint">Role IDs are permanent once accounts use them.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Permissions</h2><p class="sage-card-sub">Tick the actions this role may perform</p></div>
+      <div class="pay-toolbar no-print">
+        <input type="search" id="permSearch" class="pay-search" placeholder="Filter permissions…" aria-label="Filter permissions">
+        <button type="button" class="btn btn-sage-ghost btn-sm" id="selectAllPerms" <%= builtIn ? 'disabled' : '' %>>Select all</button>
+        <button type="button" class="btn btn-sage-ghost btn-sm" id="clearAllPerms" <%= builtIn ? 'disabled' : '' %>>Clear</button>
+      </div>
+    </div>
+    <div class="sage-card-body">
+      <% if (!_flat.length) { %>
+      <p class="sage-empty mb-0"><i class="fa fa-shield"></i>No permissions are defined in the database yet.</p>
+      <% } %>
+      <div class="perm-groups" id="permGroups">
+        <% _groups.forEach(function (g) { %>
+        <details class="perm-group" <%= _openModules[String(g.code)] ? 'open' : '' %> data-module="<%= g.code %>">
+          <summary>
+            <span class="perm-group-name"><%= g.label %></span>
+            <span class="perm-group-meta"><span class="perm-group-selected"><%= g.granted %></span>/<%= g.permissions.length %></span>
+          </summary>
+          <div class="perm-rows">
+            <% g.permissions.forEach(function (p) { %>
+            <label class="perm-row" data-search="<%= String(p.code + ' ' + (p.label || '')).toLowerCase() %>">
+              <input type="checkbox" name="permission_ids" value="<%= p.id %>" <%= p.granted ? 'checked' : '' %> <%= builtIn ? 'disabled' : '' %>>
+              <span>
+                <strong><%= p.label || p.code %></strong>
+                <small class="sage-mono"><%= p.code %></small>
+              </span>
+            </label>
+            <% }); %>
+          </div>
+        </details>
+        <% }); %>
+      </div>
+    </div>
+    <% if (!builtIn) { %>
+    <div class="sage-card-foot perm-savebar">
+      <span class="sage-muted" style="font-size:12px;">Changes apply the next time affected users load a page.</span>
+      <button type="submit" class="btn btn-sage"><i class="fa fa-check mr-1"></i> Save permissions</button>
+    </div>
+    <% } %>
+  </section>
+</form>
+
+<style>
+  .perm-groups { border: 1px solid #e3eae5; border-radius: 6px; overflow: hidden; }
+  .perm-group { border-bottom: 1px solid #e3eae5; }
+  .perm-group:last-child { border-bottom: 0; }
+  .perm-group > summary {
+    display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 11px 14px;
+    background: #f7faf8; list-style: none; font-weight: 600; font-size: 13px;
+  }
+  .perm-group > summary::-webkit-details-marker { display: none; }
+  .perm-group > summary::before { content: '\f105'; font-family: FontAwesome; color: #8aa196; transition: transform .15s; width: 10px; }
+  .perm-group[open] > summary::before { transform: rotate(90deg); }
+  .perm-group-name { flex: 1; }
+  .perm-group-meta { font-size: 11.5px; color: #6b7d74; font-weight: 500; }
+  .perm-group-selected { color: #00834b; font-weight: 700; }
+  .perm-rows { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2px 18px; padding: 10px 14px 14px; }
+  .perm-row { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 5px 6px; border-radius: 4px; font-weight: 400; cursor: pointer; }
+  .perm-row:hover { background: #f2f8f4; }
+  .perm-row input { margin-top: 3px; accent-color: #00834b; flex-shrink: 0; }
+  .perm-row strong { display: block; font-size: 12.5px; font-weight: 500; color: #22332b; }
+  .perm-row small { display: block; font-size: 10.5px; color: #81948b; }
+  .perm-savebar { position: sticky; bottom: 0; background: #fff; z-index: 5; }
+  .perm-row.is-hidden, .perm-group.is-hidden { display: none; }
+</style>
+
+<script>
+(function () {
+  var form = document.getElementById('roleForm');
+  if (!form) return;
+  var boxes = function () { return Array.prototype.slice.call(form.querySelectorAll('input[name="permission_ids"]')); };
+  var counter = document.getElementById('selectedCount');
+
+  function refreshCounts() {
+    var sel = boxes().filter(function (b) { return b.checked; }).length;
+    if (counter) counter.textContent = sel;
+    Array.prototype.forEach.call(form.querySelectorAll('.perm-group'), function (g) {
+      var chosen = Array.prototype.slice.call(g.querySelectorAll('input[name="permission_ids"]')).filter(function (b) { return b.checked; }).length;
+      var out = g.querySelector('.perm-group-selected');
+      if (out) out.textContent = chosen;
+    });
+  }
+
+  form.addEventListener('change', function (e) {
+    if (e.target && e.target.name === 'permission_ids') refreshCounts();
+  });
+
+  var search = document.getElementById('permSearch');
+  if (search) {
+    search.addEventListener('input', function () {
+      var q = search.value.trim().toLowerCase();
+      Array.prototype.forEach.call(form.querySelectorAll('.perm-group'), function (g) {
+        var visible = 0;
+        Array.prototype.forEach.call(g.querySelectorAll('.perm-row'), function (row) {
+          var hit = !q || (row.getAttribute('data-search') || '').indexOf(q) !== -1;
+          row.classList.toggle('is-hidden', !hit);
+          if (hit) visible++;
+        });
+        g.classList.toggle('is-hidden', visible === 0);
+        if (q && visible) g.open = true;
+      });
+    });
+  }
+
+  var selectAll = document.getElementById('selectAllPerms');
+  if (selectAll) selectAll.addEventListener('click', function () {
+    boxes().forEach(function (b) { if (!b.disabled) b.checked = true; });
+    refreshCounts();
+  });
+  var clearAll = document.getElementById('clearAllPerms');
+  if (clearAll) clearAll.addEventListener('click', function () {
+    boxes().forEach(function (b) { if (!b.disabled) b.checked = false; });
+    refreshCounts();
+  });
+})();
+</script>
+
+<%- include('partials/payroll-layout-end') %>

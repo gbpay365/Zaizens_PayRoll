@@ -1,0 +1,194 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'admin-accounts' }) %>
+<%
+var a = account || {};
+var _policy = policy || {};
+var _fmtWhen = function (v) {
+  if (!v) return '—';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+var _active = Number(a.status) === 1;
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Administration &middot; Account #<%= a.id %></p>
+    <h1><%= a.first_name %> <%= a.last_name %></h1>
+    <p class="sage-sub">@<%= a.username %> &middot; <%= a.roleLabel || 'No role' %><% if (isSelf) { %> &middot; this is your account<% } %></p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <form method="POST" action="/admin/accounts/<%= a.id %>/toggle" data-pay-confirm="<%= _active ? 'Deactivate this account? The user will not be able to sign in.' : 'Activate this account?' %>">
+      <button type="submit" class="btn btn-sage-ghost" <%= isSelf ? 'disabled title="You cannot deactivate your own account"' : '' %>>
+        <i class="fa <%= _active ? 'fa-ban' : 'fa-check-circle' %> mr-1"></i><%= _active ? 'Deactivate' : 'Activate' %>
+      </button>
+    </form>
+    <a href="/admin/accounts" class="btn btn-sage-ghost"><i class="fa fa-angle-left mr-1"></i> Accounts</a>
+  </div>
+</div>
+
+<%- include('partials/admin-tabs') %>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Status</div>
+    <div class="sage-stat-value" style="font-size:19px;"><%= _active ? 'Active' : 'Inactive' %></div>
+    <p class="sage-stat-foot"><%= _active ? 'Can sign in' : 'Sign-in blocked' %></p>
+  </div>
+  <div class="sage-stat <%= Number(a.password_must_change) === 1 ? 'sage-stat--warn' : '' %>">
+    <div class="sage-stat-label">Password</div>
+    <div class="sage-stat-value" style="font-size:19px;"><%= Number(a.password_must_change) === 1 ? 'Change due' : 'Set' %></div>
+    <p class="sage-stat-foot">Last reset <%= _fmtWhen(a.last_reset_at) %></p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Role</div>
+    <div class="sage-stat-value" style="font-size:19px;"><%= a.roleLabel || '—' %></div>
+    <p class="sage-stat-foot"><%= permissionCount %> permission(s)</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Created</div>
+    <div class="sage-stat-value" style="font-size:17px;"><%= _fmtWhen(a.created_at) %></div>
+    <p class="sage-stat-foot"><%= a.employee_id || 'Acc-0000' %></p>
+  </div>
+</div>
+
+<form method="POST" action="/admin/accounts/<%= a.id %>" novalidate>
+  <div class="sage-form-layout">
+    <div>
+      <section class="sage-card">
+        <div class="sage-card-head">
+          <div><h2>Profile</h2><p class="sage-card-sub">Identity, sign-in and role</p></div>
+          <% if (String(a.role) !== '1' && String(a.role) !== '99') { %>
+          <a href="/admin/roles/<%= a.role %>" class="btn btn-sage-ghost btn-sm">Edit role permissions</a>
+          <% } %>
+        </div>
+        <div class="sage-card-body">
+          <div class="sage-form-grid">
+            <div class="sage-field">
+              <label for="firstName">First name</label>
+              <input class="form-control" id="firstName" name="first_name" value="<%= a.first_name %>" required maxlength="120">
+            </div>
+            <div class="sage-field">
+              <label for="lastName">Last name</label>
+              <input class="form-control" id="lastName" name="last_name" value="<%= a.last_name %>" required maxlength="120">
+            </div>
+            <div class="sage-field">
+              <label for="username">Username</label>
+              <input class="form-control" id="username" name="username" value="<%= a.username %>" required maxlength="120" autocomplete="off">
+            </div>
+            <div class="sage-field">
+              <label for="email">E-mail</label>
+              <input type="email" class="form-control" id="email" name="emailid" value="<%= a.emailid || '' %>" maxlength="250">
+            </div>
+            <div class="sage-field">
+              <label for="phone">Phone</label>
+              <input class="form-control" id="phone" name="phone" value="<%= a.phone || '' %>" maxlength="32">
+            </div>
+            <div class="sage-field">
+              <label for="role">Role</label>
+              <select class="form-control" id="role" name="role" <%= isSelf ? 'disabled' : '' %>>
+                <% (roles || []).forEach(function (r) { %>
+                <option value="<%= r.id %>" <%= String(a.role) === String(r.id) ? 'selected' : '' %> <%= (String(r.id) === '99' && !actorIsSuper) ? 'disabled' : '' %>><%= r.title %><%= String(r.id) === '99' ? ' (Super Admin)' : '' %></option>
+                <% }); %>
+              </select>
+              <% if (isSelf) { %><span class="sage-hint">You cannot change your own role.</span><% } %>
+            </div>
+            <div class="sage-field">
+              <label class="d-block">Account status</label>
+              <label class="sage-check">
+                <input type="checkbox" name="status" value="1" <%= _active ? 'checked' : '' %> <%= isSelf ? 'disabled' : '' %>>
+                <span>Account can sign in</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sage-card">
+        <div class="sage-card-head">
+          <div><h2>Reset password</h2><p class="sage-card-sub">Leave blank to keep the current password</p></div>
+        </div>
+        <div class="sage-card-body">
+          <div class="sage-form-grid">
+            <div class="sage-field">
+              <label for="newPassword">New password</label>
+              <div class="d-flex" style="gap:8px;">
+                <input type="text" class="form-control" id="newPassword" name="new_password" autocomplete="new-password" placeholder="Minimum <%= _policy.password_min_length || 8 %> characters">
+                <button type="button" id="generatePassword" class="btn btn-sage-ghost" style="white-space:nowrap;">Generate</button>
+              </div>
+            </div>
+            <div class="sage-field">
+              <label for="confirmPassword">Confirm password</label>
+              <input type="text" class="form-control" id="confirmPassword" name="confirm_password" autocomplete="new-password" placeholder="Repeat the new password">
+            </div>
+            <div class="sage-field">
+              <label class="d-block">Options</label>
+              <label class="sage-check">
+                <input type="checkbox" name="force_change_reset" value="1" <%= _policy.force_change_on_reset ? 'checked' : '' %>>
+                <span>Require a password change at next sign-in</span>
+              </label>
+              <label class="sage-check">
+                <input type="checkbox" name="must_change" value="1" <%= Number(a.password_must_change) === 1 ? 'checked' : '' %>>
+                <span>Flag this account as needing a password change</span>
+              </label>
+            </div>
+          </div>
+          <p class="sage-hint mb-0">Policy: minimum <%= _policy.password_min_length || 8 %> characters<%= _policy.password_require_digit ? ', at least one number' : '' %><%= _policy.password_require_upper ? ', one uppercase letter' : '' %>. No spaces.</p>
+        </div>
+        <div class="sage-card-foot">
+          <span class="sage-muted" style="font-size:12px;">Password changes are recorded in the admin activity trail.</span>
+          <button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save account</button>
+        </div>
+      </section>
+    </div>
+
+    <aside>
+      <section class="sage-card">
+        <div class="sage-card-head"><div><h2>Record</h2><p class="sage-card-sub">Read-only metadata</p></div></div>
+        <div class="sage-card-body">
+          <dl class="sage-list">
+            <div class="sage-list-row"><dt>Account ID</dt><dd class="sage-mono"><%= a.id %></dd></div>
+            <div class="sage-list-row"><dt>Matricule</dt><dd class="sage-mono"><%= a.employee_id || '—' %></dd></div>
+            <div class="sage-list-row"><dt>Department</dt><dd><%= a.primary_department || '—' %></dd></div>
+            <div class="sage-list-row"><dt>Position</dt><dd><%= a.job_title || '—' %></dd></div>
+            <div class="sage-list-row"><dt>Created</dt><dd><%= _fmtWhen(a.created_at) %></dd></div>
+            <div class="sage-list-row"><dt>Last reset</dt><dd><%= _fmtWhen(a.last_reset_at) %></dd></div>
+          </dl>
+          <a href="/payroll/employees/<%= a.id %>" class="btn btn-sage-ghost btn-block">Open payroll record</a>
+          <a href="/admin/activity" class="btn btn-sage-ghost btn-block">View audit trail</a>
+        </div>
+      </section>
+    </aside>
+  </div>
+</form>
+
+<style>
+  .sage-form-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .sage-check { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; font-size: 13px; color: #3c4c45; cursor: pointer; padding-top: 5px; }
+  .sage-check input { margin-top: 3px; accent-color: #00834b; }
+  @media (max-width: 1100px) { .sage-form-layout { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<script>
+(function () {
+  var btn = document.getElementById('generatePassword');
+  var input = document.getElementById('newPassword');
+  var confirm = document.getElementById('confirmPassword');
+  if (!btn || !input) return;
+  btn.addEventListener('click', function () {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    var digits = '23456789';
+    var pwd = '';
+    var arr = new Uint32Array(10);
+    (window.crypto || window.msCrypto).getRandomValues(arr);
+    for (var i = 0; i < 8; i++) pwd += chars[arr[i] % chars.length];
+    for (var j = 8; j < 10; j++) pwd += digits[arr[j] % digits.length];
+    input.value = pwd;
+    if (confirm) confirm.value = pwd;
+    input.focus();
+    input.select();
+  });
+})();
+</script>
+
+<%- include('partials/payroll-layout-end') %>

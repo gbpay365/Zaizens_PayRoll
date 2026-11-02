@@ -89,6 +89,15 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
       <a href="/hr/my-leave-balance" class="<%= _active('/hr/my-leave-balance') %>"><i class="fa fa-balance-scale"></i> My leave balance</a>
       <a href="/hr/my-attendance" class="<%= _active('/hr/my-attendance') %>"><i class="fa fa-clock-o"></i> My attendance</a>
     <% } %>
+
+    <% if (_isAdmin || _has('access_control.manage')) { %>
+      <p class="sage-nav-label">Administration</p>
+      <a href="/admin" class="<%= _active('/admin', true) %>"><i class="fa fa-dashboard"></i> Admin overview</a>
+      <a href="/admin/accounts" class="<%= _active('/admin/accounts') %>"><i class="fa fa-user-circle-o"></i> Accounts</a>
+      <a href="/admin/roles" class="<%= _active('/admin/roles') %>"><i class="fa fa-shield"></i> Roles &amp; permissions</a>
+      <a href="/admin/security" class="<%= _active('/admin/security') %>"><i class="fa fa-lock"></i> Security</a>
+      <a href="/admin/activity" class="<%= _active('/admin/activity') %>"><i class="fa fa-history"></i> Admin activity</a>
+    <% } %>
   </nav>
 
   <div class="sage-sidebar-foot">

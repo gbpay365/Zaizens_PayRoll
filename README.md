@@ -70,4 +70,31 @@ The application shell is a Sage-style layout: dark green navigation rail, a comp
 
 Leave balances show entitlement, days taken (approved), days pending and the remaining balance. Employee records in `/payroll/employees/:id` show the same leave/attendance data next to the salary breakdown, and payslips, payroll runs and tax declarations all read the same payroll tables. Non-admin users land on `/hr` after sign-in and are redirected there if they open a payroll-only page.
 
+## Admin module
+
+`/admin` is the administration home for accounts, roles and security. It is visible in the sidebar to System Admin (role 1), Super Admin (role 99) and any role holding `access_control.manage`; everyone else gets a 403.
+
+| Screen | Route | Purpose |
+|--------|-------|---------|
+| Overview | `/admin` | Headcount, active/inactive accounts, role and permission totals, recent admin activity |
+| Accounts | `/admin/accounts` | Search/filter accounts, see role, status, last reset and whether a password change is due |
+| New account | `/admin/accounts/new` | Create a login, choose a role, set a password and optionally force a change at first sign-in |
+| Edit account | `/admin/accounts/:id` | Rename, change role, activate/deactivate, reset password, toggle the must-change flag |
+| Roles | `/admin/roles` | List roles with user and permission counts |
+| Role editor | `/admin/roles/:role` | Rename a role and tick its permissions, grouped by module, with a filter box |
+| Security | `/admin/security` | Password policy, sign-in lockout and organisation-wide forced password change |
+| Activity | `/admin/activity` | Read-only audit trail of account, role and security changes |
+| My password | `/account/password` | Self-service password change, also used when a change is forced |
+
+Security rules enforced by the module:
+
+- Password policy (minimum length, digits, uppercase) is stored in `tbl_admin_security` and applied when creating or resetting any password.
+- Too many failed sign-ins for the same username and IP block further attempts for the configured lockout window.
+- Accounts with `password_must_change = 1` are forced to `/account/password` at sign-in and on every other request until they set a new password.
+- System Admin and Super Admin always have full access and cannot be edited or deleted. A Super Admin can only be created or modified by another Super Admin.
+- No one can deactivate their own account or change their own role, and a non-super admin cannot remove `access_control.manage` from their own role.
+- Roles that still have users cannot be deleted.
+
+The module creates its own tables on boot (`lib/ensureAdminSchema.js`): `tbl_admin_audit`, `tbl_admin_security`, the base `tbl_acl_permission` / `tbl_acl_role_permission` tables when they are missing, and the `password_must_change` / `last_reset_at` columns on `tbl_employee`. It also seeds the payroll/HR permission catalogue and grants it to roles 1 and 99.
+
 Account_Core no longer controls payroll in HMS.

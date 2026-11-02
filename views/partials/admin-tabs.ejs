@@ -1,0 +1,11 @@
+<%
+var _activeAdmin = locals.payNavActive || '';
+function _admTab(key) { return _activeAdmin === key ? ' active' : ''; }
+%>
+<nav class="sage-tabs" aria-label="Administration sections">
+  <a href="/admin" class="sage-tab<%= _admTab('admin') %>"><i class="fa fa-dashboard"></i> Overview</a>
+  <a href="/admin/accounts" class="sage-tab<%= _admTab('admin-accounts') %>"><i class="fa fa-user-circle-o"></i> Accounts</a>
+  <a href="/admin/roles" class="sage-tab<%= _admTab('admin-roles') %>"><i class="fa fa-shield"></i> Roles &amp; permissions</a>
+  <a href="/admin/security" class="sage-tab<%= _admTab('admin-security') %>"><i class="fa fa-lock"></i> Security</a>
+  <a href="/admin/activity" class="sage-tab<%= _admTab('admin-activity') %>"><i class="fa fa-history"></i> Activity</a>
+</nav>

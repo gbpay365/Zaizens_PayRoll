@@ -1,0 +1,141 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'admin-accounts' }) %>
+<%
+var _v = function (key, fb) {
+  var val = (form || {})[key];
+  return val == null || val === '' ? (fb == null ? '' : fb) : val;
+};
+var _policy = policy || {};
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Administration &middot; Accounts</p>
+    <h1>New account</h1>
+    <p class="sage-sub">Create a sign-in, assign a role and set a first password. The account is added to the employee register.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/admin/accounts" class="btn btn-sage-ghost"><i class="fa fa-angle-left mr-1"></i> All accounts</a>
+  </div>
+</div>
+
+<%- include('partials/admin-tabs') %>
+
+<form method="POST" action="/admin/accounts/new" novalidate>
+  <div class="sage-form-layout">
+    <div>
+      <section class="sage-card">
+        <div class="sage-card-head">
+          <div><h2>Account details</h2><p class="sage-card-sub">Identity and contact</p></div>
+        </div>
+        <div class="sage-card-body">
+          <div class="sage-form-grid">
+            <div class="sage-field">
+              <label for="firstName">First name <span class="text-danger">*</span></label>
+              <input class="form-control" id="firstName" name="first_name" value="<%= _v('first_name') %>" required maxlength="120" autocomplete="off">
+            </div>
+            <div class="sage-field">
+              <label for="lastName">Last name <span class="text-danger">*</span></label>
+              <input class="form-control" id="lastName" name="last_name" value="<%= _v('last_name') %>" required maxlength="120" autocomplete="off">
+            </div>
+            <div class="sage-field">
+              <label for="username">Username <span class="text-danger">*</span></label>
+              <input class="form-control" id="username" name="username" value="<%= _v('username') %>" required maxlength="120" autocomplete="off" placeholder="e.g. jane.doe">
+              <span class="sage-hint">Must be unique. Used to sign in.</span>
+            </div>
+            <div class="sage-field">
+              <label for="email">E-mail</label>
+              <input type="email" class="form-control" id="email" name="emailid" value="<%= _v('emailid') %>" maxlength="250">
+            </div>
+            <div class="sage-field">
+              <label for="phone">Phone</label>
+              <input class="form-control" id="phone" name="phone" value="<%= _v('phone') %>" maxlength="32" autocomplete="off">
+            </div>
+            <div class="sage-field">
+              <label for="role">Role <span class="text-danger">*</span></label>
+              <select class="form-control" id="role" name="role" required>
+                <option value="">Select a role</option>
+                <% (roles || []).forEach(function (r) { %>
+                <option value="<%= r.id %>" <%= String(_v('role')) === String(r.id) ? 'selected' : '' %>><%= r.title %></option>
+                <% }); %>
+              </select>
+              <span class="sage-hint">The role controls payroll, HR, tax and admin access.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sage-card">
+        <div class="sage-card-head">
+          <div><h2>Password</h2><p class="sage-card-sub">Minimum <%= _policy.password_min_length || 8 %> characters<%= _policy.password_require_digit ? ', one number' : '' %><%= _policy.password_require_upper ? ', one uppercase letter' : '' %></p></div>
+        </div>
+        <div class="sage-card-body">
+          <div class="sage-form-grid">
+            <div class="sage-field">
+              <label for="password">Initial password <span class="text-danger">*</span></label>
+              <div class="d-flex" style="gap:8px;">
+                <input type="text" class="form-control" id="password" name="password" required autocomplete="new-password" placeholder="Enter or generate">
+                <button type="button" id="generatePassword" class="btn btn-sage-ghost" style="white-space:nowrap;">Generate</button>
+              </div>
+              <span class="sage-hint">Share this with the user through a secure channel.</span>
+            </div>
+            <div class="sage-field">
+              <label class="d-block">First sign-in</label>
+              <label class="sage-check">
+                <input type="checkbox" name="force_change" value="1" checked>
+                <span>Require a password change at first sign-in</span>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="sage-card-foot">
+          <span class="sage-muted" style="font-size:12px;">This creates an employee record with no salary profile until you assign one.</span>
+          <button type="submit" class="btn btn-sage"><i class="fa fa-check mr-1"></i> Create account</button>
+        </div>
+      </section>
+    </div>
+
+    <aside>
+      <section class="sage-card">
+        <div class="sage-card-head"><div><h2>Access guidelines</h2><p class="sage-card-sub">Applied by the security policy</p></div></div>
+        <div class="sage-card-body">
+          <dl class="sage-list">
+            <div class="sage-list-row"><dt>Password length</dt><dd><%= _policy.password_min_length || 8 %>+</dd></div>
+            <div class="sage-list-row"><dt>Number required</dt><dd><%= _policy.password_require_digit ? 'Yes' : 'No' %></dd></div>
+            <div class="sage-list-row"><dt>Uppercase required</dt><dd><%= _policy.password_require_upper ? 'Yes' : 'No' %></dd></div>
+            <div class="sage-list-row"><dt>Lockout</dt><dd><%= _policy.lockout_threshold || 8 %> attempts / <%= _policy.lockout_minutes || 15 %> min</dd></div>
+          </dl>
+          <p class="sage-hint mb-0">The account can be deactivated later without deleting payroll history.</p>
+        </div>
+      </section>
+    </aside>
+  </div>
+</form>
+
+<style>
+  .sage-form-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .sage-check { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; font-size: 13px; color: #3c4c45; cursor: pointer; padding-top: 6px; }
+  .sage-check input { margin-top: 3px; accent-color: #00834b; }
+  @media (max-width: 1100px) { .sage-form-layout { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<script>
+(function () {
+  var btn = document.getElementById('generatePassword');
+  var input = document.getElementById('password');
+  if (!btn || !input) return;
+  btn.addEventListener('click', function () {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    var digits = '23456789';
+    var pwd = '';
+    var arr = new Uint32Array(10);
+    (window.crypto || window.msCrypto).getRandomValues(arr);
+    for (var i = 0; i < 8; i++) pwd += chars[arr[i] % chars.length];
+    for (var j = 8; j < 10; j++) pwd += digits[arr[j] % digits.length];
+    input.value = pwd;
+    input.focus();
+    input.select();
+  });
+})();
+</script>
+
+<%- include('partials/payroll-layout-end') %>

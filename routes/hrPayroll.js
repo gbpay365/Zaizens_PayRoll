@@ -23,6 +23,7 @@ const {
   rowToSavePayload,
   computeAllowances,
 } = require('../lib/hmsAllowanceCameroon');
+const { allPresets: payrollTaxPresets, presetFor: payrollTaxPresetFor } = require('../lib/payrollTaxPresets');
 const { countRosterShiftsForMonth } = require('../lib/hmsRoster');
 const { syncPayrollPeriodToCoreAccount, syncPayrollPeriodsAfterDelete, formatCoreSyncNote } = require('../lib/coreAccountPayrollSync');
 
@@ -1184,6 +1185,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     activeSector,
     facilitySector,
     allSectors: ALLOWANCE_SECTORS,
+    taxPresets: payrollTaxPresets(),
+    activePreset: payrollTaxPresetFor(current.cnps_regime, activeSector),
     query: req.query,
    });
   } catch (e) {
@@ -1266,7 +1269,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   const taxYear = Math.max(2000, Math.min(2100, parseInt(req.body.tax_year, 10) || new Date().getFullYear()));
   const employer_cnps = String(req.body.employer_cnps_number || '').trim().slice(0, 32);
   const employer_niu = String(req.body.employer_niu || '').trim().slice(0, 32);
-  const cnps_regime = Math.max(1, Math.min(3, parseInt(req.body.cnps_regime, 10) || 1));
+  const cnps_regime = Math.max(1, Math.min(4, parseInt(req.body.cnps_regime, 10) || 1));
   const employer_address = String(req.body.employer_address || '').trim().slice(0, 500);
   const employer_phone = String(req.body.employer_phone || '').trim().slice(0, 64);
   const employer_email = String(req.body.employer_email || '').trim().slice(0, 128);
@@ -1276,7 +1279,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   const council  = parseFloat(req.body.council_tax_rate)    || 0;    // fixed scale
   const dev      = parseFloat(req.body.development_tax_rate) || 1.0; // FNE
   const cnhc     = parseFloat(req.body.cnhc_rate)           || 0;    // CAC auto
-  const defaultSector = String(req.body.default_sector || 'medical').trim().toLowerCase().slice(0, 40);
+  const requestedSector = String(req.body.default_sector || 'medical').trim().toLowerCase().slice(0, 40);
+  const defaultSector = ALLOWANCE_SECTORS[requestedSector] ? requestedSector : 'medical';
   let brackets = JSON.stringify([
    { min: 0,      max: 166666, rate: parseFloat(req.body.tax_rate_1) || 10 },
    { min: 166667, max: 250000, rate: parseFloat(req.body.tax_rate_2) || 15 },

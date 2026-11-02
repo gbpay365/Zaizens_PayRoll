@@ -58,19 +58,36 @@ var _calcLabels = {
         </div>
         <div class="col-md-4 form-group">
           <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.cnps_regime', { ns: 'payroll', defaultValue: 'CNPS regime' }) %></label>
-          <select name="cnps_regime" class="form-control" <%= _canEdit ? '' : 'disabled' %>>
+          <select name="cnps_regime" id="cnpsRegimeSelect" class="form-control" <%= _canEdit ? '' : 'disabled' %>>
             <option value="1" <%= String(cur.cnps_regime || 1) === '1' ? 'selected' : '' %>><%= _t('settings.regime_general', { ns: 'payroll', defaultValue: 'General' }) %></option>
             <option value="2" <%= String(cur.cnps_regime) === '2' ? 'selected' : '' %>><%= _t('settings.regime_agriculture', { ns: 'payroll', defaultValue: 'Agriculture' }) %></option>
             <option value="3" <%= String(cur.cnps_regime) === '3' ? 'selected' : '' %>><%= _t('settings.regime_public', { ns: 'payroll', defaultValue: 'Public' }) %></option>
+            <option value="4" <%= String(cur.cnps_regime) === '4' ? 'selected' : '' %>><%= _t('settings.regime_mining', { ns: 'payroll', defaultValue: 'Mining' }) %></option>
           </select>
         </div>
         <div class="col-md-4 form-group">
           <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.activity_sector', { ns: 'payroll', defaultValue: 'Activity Sector' }) %></label>
-          <select name="default_sector" class="form-control" <%= _canEdit ? '' : 'disabled' %>>
+          <select name="default_sector" id="activitySectorSelect" class="form-control" <%= _canEdit ? '' : 'disabled' %>>
             <% Object.keys(_allSectors).forEach(function(secKey) { %>
             <option value="<%= secKey %>" <%= String(cur.default_sector || _facilitySector) === secKey ? 'selected' : '' %>><%= _allSectors[secKey] %></option>
             <% }); %>
           </select>
+        </div>
+        <div class="col-md-12 form-group" id="taxPresetPanel">
+          <div class="alert alert-light border small mb-0" style="border-radius:10px;">
+            <div class="d-flex flex-wrap align-items-start justify-content-between">
+              <div class="pr-2" style="flex:1 1 320px;">
+                <strong class="d-block mb-1"><i class="fa fa-balance-scale mr-1 text-success"></i><span id="taxPresetTitle"><%= activePreset ? activePreset.regimeLabel + ' · ' + activePreset.sectorLabel : '' %></span></strong>
+                <div class="text-muted" id="taxPresetNote"><%= (activePreset && activePreset.note) || '' %></div>
+                <div class="text-muted mt-1" id="taxPresetSectorNote"><%= (activePreset && activePreset.sectorNote) || '' %></div>
+              </div>
+              <% if (_canEdit) { %>
+              <button type="button" class="btn btn-sm hms-btn-secondary mt-2 mt-md-0" id="applyTaxPreset">
+                <i class="fa fa-refresh mr-1"></i><%= _t('settings.apply_legal_defaults', { ns: 'payroll', defaultValue: 'Reset to legal defaults' }) %>
+              </button>
+              <% } %>
+            </div>
+          </div>
         </div>
         <div class="col-md-12 form-group">
           <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.address', { ns: 'payroll', defaultValue: 'Address' }) %></label>
@@ -280,5 +297,55 @@ var _calcLabels = {
   .pay-settings-tab:hover { background: #e2e8f0; color: #1e293b; }
   .pay-settings-tab.active { background: #059669; color: #fff; }
 </style>
+
+<script>
+(function () {
+  var presets = <%- JSON.stringify(taxPresets || {}) %>;
+  var regSel = document.getElementById('cnpsRegimeSelect');
+  var secSel = document.getElementById('activitySectorSelect');
+  var titleEl = document.getElementById('taxPresetTitle');
+  var noteEl = document.getElementById('taxPresetNote');
+  var sectorNoteEl = document.getElementById('taxPresetSectorNote');
+  var applyBtn = document.getElementById('applyTaxPreset');
+  if (!regSel || !secSel) return;
+
+  function currentPreset() {
+    return presets[regSel.value + '|' + secSel.value] || null;
+  }
+
+  function setValue(name, value) {
+    var input = document.querySelector('input[name="' + name + '"]');
+    if (input && value != null) input.value = value;
+  }
+
+  function render(p) {
+    if (!p) return;
+    if (titleEl) titleEl.textContent = p.regimeLabel + ' \u00b7 ' + p.sectorLabel;
+    if (noteEl) noteEl.textContent = p.note || '';
+    if (sectorNoteEl) sectorNoteEl.textContent = p.sectorNote || '';
+  }
+
+  function applyPreset() {
+    var p = currentPreset();
+    if (!p) return;
+    setValue('cnps_employee_rate', p.rates.cnps_employee_rate);
+    setValue('cimr_employee_rate', p.rates.cimr_employee_rate);
+    setValue('development_tax_rate', p.rates.development_tax_rate);
+    setValue('crtv_rate', p.rates.crtv_rate);
+    setValue('council_tax_rate', p.rates.council_tax_rate);
+    setValue('cnhc_rate', p.rates.cnhc_rate);
+    (p.irppRates || []).forEach(function (rate, i) { setValue('tax_rate_' + (i + 1), rate); });
+    render(p);
+    if (noteEl) {
+      noteEl.textContent = 'Applied ' + p.regimeLabel + ' \u00b7 ' + p.sectorLabel + ' statutory defaults. ' + (p.note || '') + ' Adjust any field before saving.';
+    }
+  }
+
+  regSel.addEventListener('change', applyPreset);
+  secSel.addEventListener('change', applyPreset);
+  if (applyBtn) applyBtn.addEventListener('click', applyPreset);
+  render(currentPreset());
+})();
+</script>
 
 <%- include('partials/payroll-layout-end') %>

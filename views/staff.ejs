@@ -1,56 +1,107 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'staff', showHrLeaveAdmin: true }) %>
-<% if (locals.flash) { %>
-<div class="hms-flash hms-flash--success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
-<% } %>
-<% if (locals.error) { %>
-<div class="hms-flash hms-flash--error border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
-<% } %>
+<%
+var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+var _rows = staff || [];
+var _withProfile = _rows.filter(function (r) { return r.hasProfile; }).length;
+%>
 
-<div class="row align-items-center mb-4">
-  <div class="col-sm-8">
-    <h4 class="page-title font-weight-bold text-dark"><%= _t('nav.staff', { ns: 'payroll', defaultValue: 'Staff directory' }) %></h4>
-    <p class="text-muted small mb-0"><%= _t('staff.subtitle', { ns: 'payroll', defaultValue: 'Active hospital staff linked to payroll (read-only directory).' }) %></p>
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">People &middot; <%= _rows.length %> records</p>
+    <h1><%= _t('nav.staff', { ns: 'payroll', defaultValue: 'Employees' }) %></h1>
+    <p class="sage-sub">Everyone on the payroll register. Open a record to see the salary breakdown and statutory deductions.</p>
   </div>
-  <div class="col-sm-4 text-right">
-    <a href="/payroll/profiles" class="btn btn-outline-primary btn-sm"><i class="fa fa-id-card-o mr-1"></i> <%= _t('dashboard.pay_profiles', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></a>
+  <div class="sage-head-actions no-print">
+    <% if (locals.canManagePayroll) { %>
+    <a href="/payroll/employees/new" class="btn btn-sage"><i class="fa fa-user-plus mr-1"></i> New employee</a>
+    <a href="/payroll/profiles" class="btn btn-sage-ghost"><i class="fa fa-id-card-o mr-1"></i> Pay profiles</a>
+    <% } %>
   </div>
 </div>
 
-<div class="row mb-3">
-  <div class="col-md-5">
-    <div class="input-group">
-      <div class="input-group-prepend"><span class="input-group-text bg-white border-right-0"><i class="fa fa-search text-muted"></i></span></div>
-      <input type="text" id="staffSearch" class="hms-input w-full border-left-0" placeholder="<%= _t('staff.filter_ph', { ns: 'payroll', defaultValue: 'Filter by name, department, role…' }) %>" autocomplete="off">
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Employees</div>
+    <div class="sage-stat-value"><%= _rows.length %></div>
+    <p class="sage-stat-foot">On the register</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">With a pay profile</div>
+    <div class="sage-stat-value"><%= _withProfile %></div>
+    <p class="sage-stat-foot"><%= Math.max(0, _rows.length - _withProfile) %> still to configure</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Active</div>
+    <div class="sage-stat-value"><%= _rows.filter(function (r) { return String(r.status) === '1'; }).length %></div>
+    <p class="sage-stat-foot">Status = active</p>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div>
+      <h2>Payroll register</h2>
+      <p class="sage-card-sub">Gross shown is the profile basic + housing + transport, before allowances.</p>
+    </div>
+    <div class="pay-toolbar no-print">
+      <input type="search" id="staffSearch" class="pay-search"
+             placeholder="<%= _t('staff.filter_ph', { ns: 'payroll', defaultValue: 'Filter by name, matricule, department…' }) %>"
+             aria-label="Filter employees" autocomplete="off">
     </div>
   </div>
-</div>
-
-<div class="card border-0 shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-hover mb-0" id="staffTable">
-      <thead class="thead-light">
+  <div class="pay-table-wrap">
+    <table class="pay-table" id="staffTable">
+      <thead>
         <tr>
-          <th>#</th>
-          <th><%= _t('staff.col_name', { ns: 'payroll', defaultValue: 'Name' }) %></th>
-          <th><%= _t('staff.col_role', { ns: 'payroll', defaultValue: 'Role' }) %></th>
-          <th><%= _t('staff.col_department', { ns: 'payroll', defaultValue: 'Department' }) %></th>
-          <th><%= _t('staff.col_position', { ns: 'payroll', defaultValue: 'Position' }) %></th>
-          <th><%= _t('staff.col_status', { ns: 'payroll', defaultValue: 'Status' }) %></th>
+          <th>Employee</th>
+          <th>Matricule</th>
+          <th>Position</th>
+          <th>Department</th>
+          <th class="pay-num">Gross (XAF)</th>
+          <th>Pay profile</th>
+          <th>Status</th>
+          <th class="text-right no-print"></th>
         </tr>
       </thead>
       <tbody>
-        <% (staff || []).forEach(function(row) { %>
-        <tr data-search="<%= [row.first_name, row.last_name, row.username, row.roleLabel, row.primary_department, row.job_title].filter(Boolean).join(' ').toLowerCase() %>">
-          <td class="text-muted"><%= row.id %></td>
-          <td class="font-weight-bold"><%= row.first_name %> <%= row.last_name %><% if (row.username) { %><br><small class="text-muted">@<%= row.username %></small><% } %></td>
-          <td><%= row.roleLabel || row.role || '—' %></td>
+        <% if (!_rows.length) { %>
+        <tr><td colspan="8" class="sage-empty"><i class="fa fa-users"></i>No employees yet.<% if (locals.canManagePayroll) { %> <a href="/payroll/employees/new">Add the first employee</a>.<% } %></td></tr>
+        <% } %>
+        <% _rows.forEach(function(row) { %>
+        <tr data-search="<%= [row.first_name, row.last_name, row.username, row.employee_id, row.roleLabel, row.primary_department, row.job_title].filter(Boolean).join(' ').toLowerCase() %>">
+          <td>
+            <div class="d-flex align-items-center" style="gap:10px;">
+              <span class="staff-avatar"><%= ((row.first_name || '?').charAt(0) + (row.last_name || '').charAt(0)).toUpperCase() %></span>
+              <span>
+                <a href="/payroll/employees/<%= row.id %>" class="staff-name"><%= row.first_name %> <%= row.last_name %></a>
+                <% if (row.username) { %><small class="d-block text-muted">@<%= row.username %></small><% } %>
+              </span>
+            </div>
+          </td>
+          <td class="sage-mono"><%= row.employee_id || ('EMP-' + String(row.id).padStart(4, '0')) %></td>
+          <td>
+            <div><%= row.job_title || row.roleLabel || '—' %></div>
+            <% if (row.job_title) { %><small class="text-muted"><%= row.roleLabel %></small><% } %>
+          </td>
           <td><%= row.primary_department || '—' %></td>
-          <td><%= row.job_title || '—' %></td>
+          <td class="pay-num"><%= (locals.canManagePayroll && row.hasProfile) ? _fmtXaf(row.gross) : '—' %></td>
+          <td>
+            <% if (row.hasProfile) { %>
+            <span class="pay-badge pay-badge-paid">Configured</span>
+            <% } else { %>
+            <span class="pay-badge pay-badge-pending">To set up</span>
+            <% } %>
+          </td>
           <td>
             <% if (String(row.status) === '1') { %>
-            <span class="badge badge-success"><%= _t('staff.status_active', { ns: 'payroll', defaultValue: 'Active' }) %></span>
+            <span class="pay-badge pay-badge-paid"><%= _t('staff.status_active', { ns: 'payroll', defaultValue: 'Active' }) %></span>
             <% } else { %>
-            <span class="badge badge-secondary"><%= _t('staff.status_inactive', { ns: 'payroll', defaultValue: 'Inactive' }) %></span>
+            <span class="pay-badge"><%= _t('staff.status_inactive', { ns: 'payroll', defaultValue: 'Inactive' }) %></span>
+            <% } %>
+          </td>
+          <td class="text-right no-print">
+            <% if (locals.canManagePayroll || (locals.user && Number(locals.user.id) === Number(row.id))) { %>
+            <a href="/payroll/employees/<%= row.id %>" class="btn btn-sage-ghost btn-sm">Open</a>
             <% } %>
           </td>
         </tr>
@@ -58,12 +109,22 @@
       </tbody>
     </table>
   </div>
-</div>
+</section>
+
+<style>
+  .staff-avatar {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #e7f3ec; color: #006b3d; font-size: 11px; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .staff-name { color: #16211c !important; font-weight: 600; text-decoration: none !important; }
+  .staff-name:hover { color: #00834b !important; }
+</style>
 
 <script>
 (function () {
   var input = document.getElementById('staffSearch');
-  var rows = document.querySelectorAll('#staffTable tbody tr');
+  var rows = document.querySelectorAll('#staffTable tbody tr[data-search]');
   if (!input || !rows.length) return;
   input.addEventListener('input', function () {
     var q = (input.value || '').trim().toLowerCase();

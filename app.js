@@ -25,7 +25,8 @@ try {
 }
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3010', 10);
+const parsedPort = parseInt(process.env.PORT || '', 10);
+const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 3010;
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -259,6 +260,7 @@ require('./routes/staffDirectory')(app, pool, requireAuth);
 require('./routes/taxHub')(app, pool, requireAuth, { requirePerm });
 require('./routes/statutoryReports')(app, pool, requireAuth, { requirePerm });
 require('./routes/integrationSettings')(app, pool, requireAuth, { requireAdminOrSuper });
+require('./routes/employees')(app, pool, requireAuth, { requireAdminOrSuper });
 
 async function boot() {
   if (pool) {
@@ -273,8 +275,10 @@ async function boot() {
       console.warn('[Zaizens_PayRoll] schema:', e.message);
     }
   }
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Zaizens Payroll listening on port ${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    const addr = server.address();
+    const boundPort = addr && typeof addr === 'object' ? addr.port : PORT;
+    console.log(`Zaizens Payroll listening on port ${boundPort}`);
   });
 }
 

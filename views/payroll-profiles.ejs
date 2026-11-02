@@ -19,9 +19,14 @@
 </script>
 
 <div class="pay-hero">
-  <h1><%= _t('profiles.title', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></h1>
+  <div>
+    <p class="sage-eyebrow">Payroll &middot; Compensation</p>
+    <h1><%= _t('profiles.title', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></h1>
+    <p>Basic, housing, transport and statutory allowances per employee. Use the calculator on a row to derive the full breakdown from a gross or net figure.</p>
+  </div>
   <div class="pay-hero-actions no-print">
-    <a href="/payroll/monthly" class="btn btn-light btn-sm font-weight-bold"><i class="fa fa-calculator mr-1"></i> <%= _t('profiles.monthly_payroll', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></a>
+    <a href="/payroll/employees/new" class="btn btn-sage"><i class="fa fa-user-plus mr-1"></i> New employee</a>
+    <a href="/payroll/monthly" class="btn btn-sage-ghost"><i class="fa fa-calculator mr-1"></i> <%= _t('profiles.monthly_payroll', { ns: 'payroll', defaultValue: 'Payroll runs' }) %></a>
   </div>
 </div>
 
@@ -37,7 +42,7 @@
   <div class="pay-panel-head">
     <h2><%= _t('profiles.compensation', { ns: 'payroll', defaultValue: 'Employee compensation' }) %></h2>
     <div class="pay-toolbar no-print">
-      <input type="search" class="pay-search" data-hms-server-search="/payroll/profiles" value="<%= typeof searchQ === 'string' ? searchQ : '' %>" placeholder="<%= _t('profiles.search_placeholder', { ns: 'payroll', defaultValue: 'Search staff…' }) %>" aria-label="<%= _t('profiles.search_aria', { ns: 'payroll', defaultValue: 'Search pay profiles' }) %>" autocomplete="off" form="">
+      <input type="search" class="pay-search" data-hms-server-search="/payroll/profiles" value="<%= typeof searchQ === 'string' ? searchQ : '' %>" placeholder="<%= _t('profiles.search_placeholder', { ns: 'payroll', defaultValue: 'Search staff…' }) %>" aria-label="<%= _t('profiles.search_aria', { ns: 'payroll', defaultValue: 'Search pay profiles' }) %>" autocomplete="off">
       <button type="submit" class="hms-btn-primary"><i class="fa fa-save mr-1"></i> <%= _t('profiles.save_page', { ns: 'payroll', defaultValue: 'Save this page' }) %></button>
     </div>
   </div>
@@ -104,7 +109,7 @@
       %>
         <tr>
           <td class="font-weight-bold pay-staff-name">
-            <%= em.first_name %> <%= em.last_name %>
+            <a href="/payroll/employees/<%= eid %>" class="sage-muted" style="color:#16211c !important;text-decoration:none;"><%= em.first_name %> <%= em.last_name %></a>
             <button type="button" class="btn btn-link btn-sm p-0 ml-1 pay-calc-btn"
                     data-eid="<%= eid %>"
                     data-name="<%= fullName.trim().replace(/"/g, '&quot;') %>"

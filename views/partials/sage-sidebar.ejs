@@ -1,0 +1,90 @@
+<%
+var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+var _path = String(locals.hmsPath || '');
+var _mode = String(locals.paySelfServiceOnly || '').toLowerCase();
+var _up = locals.userPerms || [];
+function _has() {
+  if (_up.includes('*')) return true;
+  for (var i = 0; i < arguments.length; i++) if (_up.includes(arguments[i])) return true;
+  return false;
+}
+var _role = String((locals.user && locals.user.role) || '');
+var _isAdmin = _role === '1' || _role === '99';
+var _canWrite = locals.payCanWrite || _isAdmin || _has('payroll.write');
+var _canSettings = locals.payCanSettings || _canWrite;
+var _canTax = locals.payCanTaxHub || _has('accounting.read', 'accounting.write');
+var _leaveAdmin = locals.payShowLeaveAdmin || _isAdmin || _has('hr.leave.approve');
+var _selfMode = _mode === 'payslips' || _mode === 'leave';
+
+function _active(href, exact) {
+  if (exact) return _path === href ? ' active' : '';
+  if (href === '/staff') return (_path === '/staff' || _path.indexOf('/payroll/employees') === 0) ? ' active' : '';
+  return (_path === href || _path.indexOf(href + '/') === 0) ? ' active' : '';
+}
+var _userName = (locals.user && (locals.user.name || locals.user.username)) || 'User';
+var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p.charAt(0).toUpperCase(); }).join('') || 'U';
+%>
+<aside class="sage-sidebar" id="sageSidebar" aria-label="<%= _t('nav.aria_label', { ns: 'payroll', defaultValue: 'Payroll and HR' }) %>">
+  <div class="sage-brand">
+    <span class="sage-brand-mark">Z</span>
+    <span class="sage-brand-text">
+      <strong>Zaizens Payroll</strong>
+      <small>Cameroon &middot; Sage style</small>
+    </span>
+  </div>
+
+  <nav class="sage-nav">
+    <% if (_selfMode) { %>
+      <p class="sage-nav-label">Self service</p>
+      <a href="/hr/my-payslips" class="<%= _active('/hr/my-payslips') %>"><i class="fa fa-file-text-o"></i> My payslips</a>
+      <a href="/hr/request-leave" class="<%= _active('/hr/request-leave') %>"><i class="fa fa-paper-plane"></i> Request leave</a>
+      <a href="/hr/my-leave-balance" class="<%= _active('/hr/my-leave-balance') %>"><i class="fa fa-balance-scale"></i> My leave balance</a>
+      <a href="/hr/my-attendance" class="<%= _active('/hr/my-attendance') %>"><i class="fa fa-clock-o"></i> My attendance</a>
+    <% } else { %>
+      <p class="sage-nav-label">Payroll</p>
+      <a href="/payroll" class="<%= _active('/payroll', true) %>"><i class="fa fa-th-large"></i> Overview</a>
+      <a href="/payroll/monthly" class="<%= _active('/payroll/monthly') %>"><i class="fa fa-calendar-check-o"></i> Payroll runs</a>
+      <a href="/staff" class="<%= _active('/staff') %>"><i class="fa fa-users"></i> Employees</a>
+      <% if (_canWrite) { %>
+      <a href="/payroll/profiles" class="<%= _active('/payroll/profiles') %>"><i class="fa fa-id-card-o"></i> Pay profiles</a>
+      <% } %>
+      <% if (_canSettings) { %>
+      <a href="/payroll/settings" class="<%= _active('/payroll/settings') %>"><i class="fa fa-sliders"></i> Tax settings</a>
+      <% } %>
+      <% if (_isAdmin) { %>
+      <a href="/payroll/integrations" class="<%= _active('/payroll/integrations') %>"><i class="fa fa-plug"></i> Integrations</a>
+      <% } %>
+
+      <p class="sage-nav-label">People &amp; time</p>
+      <a href="/hr/attendance" class="<%= _active('/hr/attendance') %>"><i class="fa fa-clock-o"></i> Attendance</a>
+      <% if (_leaveAdmin) { %>
+      <a href="/hr/leave-requests" class="<%= _active('/hr/leave-requests') %>"><i class="fa fa-inbox"></i> Leave requests</a>
+      <a href="/hr/leave-balances" class="<%= _active('/hr/leave-balances') %>"><i class="fa fa-balance-scale"></i> Leave balances</a>
+      <a href="/hr/holidays" class="<%= _active('/hr/holidays') %>"><i class="fa fa-calendar"></i> Public holidays</a>
+      <% } %>
+
+      <% if (_canTax) { %>
+      <p class="sage-nav-label">Compliance</p>
+      <a href="/tax" class="<%= _active('/tax', true) %>"><i class="fa fa-institution"></i> Tax hub</a>
+      <a href="/tax/cnps" class="<%= _active('/tax/cnps') %>"><i class="fa fa-shield"></i> CNPS</a>
+      <a href="/tax/dgi" class="<%= _active('/tax/dgi') %>"><i class="fa fa-file-text-o"></i> DGI declarations</a>
+      <a href="/tax/statutory-reports" class="<%= _active('/tax/statutory-reports') %>"><i class="fa fa-book"></i> Statutory reports</a>
+      <% } %>
+
+      <p class="sage-nav-label">Self service</p>
+      <a href="/hr/my-payslips" class="<%= _active('/hr/my-payslips') %>"><i class="fa fa-file-text-o"></i> My payslips</a>
+      <a href="/hr/request-leave" class="<%= _active('/hr/request-leave') %>"><i class="fa fa-paper-plane"></i> Request leave</a>
+      <a href="/hr/my-leave-balance" class="<%= _active('/hr/my-leave-balance') %>"><i class="fa fa-balance-scale"></i> My leave balance</a>
+    <% } %>
+  </nav>
+
+  <div class="sage-sidebar-foot">
+    <span class="sage-user-avatar"><%= _initials %></span>
+    <span class="sage-user-meta">
+      <strong><%= _userName %></strong>
+      <small><%= (locals.user && locals.user.username) ? '@' + locals.user.username : 'Signed in' %></small>
+    </span>
+    <a href="/logout" class="sage-user-signout" title="Sign out" aria-label="Sign out"><i class="fa fa-sign-out"></i></a>
+  </div>
+</aside>
+<div class="sage-sidebar-backdrop" id="sageSidebarBackdrop"></div>

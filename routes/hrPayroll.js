@@ -927,8 +927,14 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      onCallShifts: onCall,
      isSpecialist: isSpec,
     });
-    const gross = b + housing + transport + (allow.total || 0);
-    return { basic: b, housing, transport, allow, gross };
+    const lines = allow.lines || [];
+    const taxFreeTotal = lines
+      .filter((l) => l.code === 'night_duty' || l.code === 'on_call')
+      .reduce((sum, l) => sum + (parseInt(l.amount, 10) || 0), 0);
+    const taxableAllowances = Math.max(0, (allow.total || 0) - taxFreeTotal);
+    const taxableGross = b + housing + transport + taxableAllowances;
+    const gross = taxableGross + taxFreeTotal;
+    return { basic: b, housing, transport, allow, taxableGross, taxFreeTotal, gross };
    }
 
    /** Solve basic so that gross ≈ targetGross. Newton's method. */
@@ -964,7 +970,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    const targetGross = mode === 'gross' ? amount : await solveGrossForNet(amount);
    const basic       = solveBasicForGross(targetGross);
    const final       = breakdownFromBasic(basic);
-   const taxCalc     = await hmsPayrollCameroonCalculate(pool, fid, year, final.gross);
+   const taxCalc     = await hmsPayrollCameroonCalculate(pool, fid, year, final.taxableGross);
 
    return res.json({
     ok:                       true,
@@ -978,7 +984,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     allowance_lines:          final.allow.lines || [],
     allowance_total:          final.allow.total || 0,
     gross:                    final.gross,
-    net:                      taxCalc ? taxCalc.net_salary : null,
+    net:                      taxCalc ? taxCalc.net_salary + final.taxFreeTotal : null,
     deductions:               taxCalc ? {
      cnps:    taxCalc.cnps_employee,
      cfc:     taxCalc.cimr_employee,

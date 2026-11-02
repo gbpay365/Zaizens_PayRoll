@@ -1,4 +1,23 @@
-</div><!-- o_module_content -->
-</main>
-</div><!-- hms-module-odoo-app -->
+    </div><!-- o_module_content -->
+  </main>
+</div><!-- sage-body -->
+</div><!-- sage-app -->
+<script>
+(function () {
+  var toggle = document.getElementById('sageSidebarToggle');
+  var sidebar = document.getElementById('sageSidebar');
+  var backdrop = document.getElementById('sageSidebarBackdrop');
+  if (!toggle || !sidebar) return;
+  function setOpen(open) {
+    sidebar.classList.toggle('is-open', open);
+    if (backdrop) backdrop.classList.toggle('is-open', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  toggle.addEventListener('click', function () {
+    setOpen(!sidebar.classList.contains('is-open'));
+  });
+  if (backdrop) backdrop.addEventListener('click', function () { setOpen(false); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setOpen(false); });
+})();
+</script>
 <script src="/js/hms-module-odoo.js" defer></script>

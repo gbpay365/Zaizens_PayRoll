@@ -5,101 +5,193 @@ var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { ma
 var m = locals.metrics || {};
 var profilesGap = Math.max(0, (m.staffActive || headcount || 0) - (m.profilesConfigured || 0));
 var _staffCount = Number(headcount || m.staffActive || 0);
-var _thisMonth = _t('common.this_month', { ns: 'payroll', defaultValue: 'This month' });
+var _lines = (Number(m.pendingCount) || 0) + (Number(m.paidCount) || 0);
+var _paidPct = _lines > 0 ? Math.round((Number(m.paidCount) || 0) / _lines * 100) : 0;
+var _monthLabel = (m.monthLabel || _t('common.this_month', { ns: 'payroll', defaultValue: 'This month' })) + ' ' + (m.year || new Date().getFullYear());
 %>
 
-<div class="pay-hero">
-  <h1><%= _t('dashboard.title', { ns: 'payroll', defaultValue: 'Payroll & HR' }) %></h1>
-  <div class="pay-hero-actions no-print">
-    <a href="/payroll/monthly" class="btn btn-light btn-sm font-weight-bold"><i class="fa fa-money mr-1"></i> <%= _t('dashboard.monthly_payroll', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></a>
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Payroll &middot; <%= _monthLabel %></p>
+    <h1><%= _t('dashboard.title', { ns: 'payroll', defaultValue: 'Payroll overview' }) %></h1>
+    <p class="sage-sub">Everything for the current pay period: headcount, payroll lines, statutory deductions and the items still to configure.</p>
+  </div>
+  <div class="sage-head-actions no-print">
     <% if(locals.payCanWrite){ %>
-    <a href="/payroll/profiles" class="btn btn-outline-light btn-sm font-weight-bold"><i class="fa fa-id-card-o mr-1"></i> <%= _t('dashboard.pay_profiles', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></a>
+    <a href="/payroll/employees/new" class="btn btn-sage"><i class="fa fa-user-plus mr-1"></i> New employee</a>
     <% } %>
-    <% if(locals.canPayrollSettings){ %>
-    <a href="/payroll/settings" class="btn btn-outline-light btn-sm font-weight-bold"><i class="fa fa-sliders mr-1"></i> <%= _t('dashboard.tax_settings', { ns: 'payroll', defaultValue: 'Tax settings' }) %></a>
-    <% } %>
+    <a href="/payroll/monthly" class="btn btn-sage-ghost"><i class="fa fa-calendar-check-o mr-1"></i> Payroll runs</a>
   </div>
 </div>
 
-<div class="pay-kpi-row">
-  <div class="pay-kpi">
-    <div class="pay-kpi-label"><%= _t('dashboard.active_staff', { ns: 'payroll', defaultValue: 'Active staff' }) %></div>
-    <div class="pay-kpi-value"><%= _staffCount.toLocaleString('fr-FR') %></div>
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Active employees</div>
+    <div class="sage-stat-value"><%= _staffCount.toLocaleString('fr-FR') %></div>
+    <p class="sage-stat-foot"><%= m.profilesConfigured != null ? m.profilesConfigured : 0 %> with a pay profile</p>
   </div>
-  <div class="pay-kpi">
-    <div class="pay-kpi-label"><%= m.monthLabel || _thisMonth %> <%= _t('dashboard.pending_suffix', { ns: 'payroll', defaultValue: '· pending' }) %></div>
-    <div class="pay-kpi-value"><%= m.pendingCount != null ? m.pendingCount : '—' %></div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Payroll lines &middot; <%= m.monthLabel || '' %></div>
+    <div class="sage-stat-value"><%= _lines %></div>
+    <p class="sage-stat-foot"><%= m.pendingCount != null ? m.pendingCount : 0 %> pending &middot; <%= m.paidCount != null ? m.paidCount : 0 %> paid</p>
   </div>
-  <div class="pay-kpi">
-    <div class="pay-kpi-label"><%= m.monthLabel || _thisMonth %> <%= _t('dashboard.paid_suffix', { ns: 'payroll', defaultValue: '· paid' }) %></div>
-    <div class="pay-kpi-value"><%= m.paidCount != null ? m.paidCount : '—' %></div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Net pay this period</div>
+    <div class="sage-stat-value"><%= _fmtXaf(m.periodNet) %> <small>XAF</small></div>
+    <p class="sage-stat-foot">Gross <%= _fmtXaf(m.periodGross) %> XAF</p>
   </div>
-  <div class="pay-kpi">
-    <div class="pay-kpi-label"><%= _t('dashboard.period_net_xaf', { ns: 'payroll', defaultValue: 'Period net (XAF)' }) %></div>
-    <div class="pay-kpi-value"><%= _fmtXaf(m.periodNet) %> <small><%= _t('common.gross_lower', { ns: 'payroll', defaultValue: 'gross' }) %> <%= _fmtXaf(m.periodGross) %></small></div>
+  <% if(profilesGap > 0 && locals.payCanWrite){ %>
+  <div class="sage-stat sage-stat--warn">
+    <div class="sage-stat-label">Profiles to configure</div>
+    <div class="sage-stat-value"><%= profilesGap %></div>
+    <p class="sage-stat-foot"><a href="/payroll/profiles" class="text-decoration-none">Set salaries</a> to include them in a run</p>
   </div>
-  <% if(locals.payCanWrite && profilesGap > 0){ %>
-  <div class="pay-kpi" style="border-color:#fde68a;background:#fffbeb;">
-    <div class="pay-kpi-label"><%= _t('dashboard.profiles_to_configure', { ns: 'payroll', defaultValue: 'Profiles to configure' }) %></div>
-    <div class="pay-kpi-value" style="color:#b45309;"><%= profilesGap %></div>
+  <% } else { %>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Payroll readiness</div>
+    <div class="sage-stat-value">100 <small>%</small></div>
+    <p class="sage-stat-foot">Every active employee is paid up</p>
   </div>
   <% } %>
 </div>
 
-<h2 class="h6 font-weight-bold text-muted text-uppercase mb-3" style="letter-spacing:0.06em;"><%= _t('dashboard.quick_links', { ns: 'payroll', defaultValue: 'Quick links' }) %></h2>
+<div class="sage-grid">
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div>
+        <h2>Current period</h2>
+        <p class="sage-card-sub"><%= _monthLabel %> payout progress</p>
+      </div>
+      <a href="/payroll/monthly" class="btn btn-sage-ghost btn-sm">Open run</a>
+    </div>
+    <div class="sage-card-body">
+      <div class="d-flex align-items-center justify-content-between mb-1">
+        <span class="sage-muted" style="font-size:12.5px;"><%= m.paidCount || 0 %> of <%= _lines %> lines paid</span>
+        <strong style="font-size:13px;"><%= _paidPct %>%</strong>
+      </div>
+      <div class="sage-progress mb-4"><span style="width:<%= _paidPct %>%"></span></div>
+      <dl class="sage-list mb-0">
+        <div class="sage-list-row"><dt>Gross payroll</dt><dd><%= _fmtXaf(m.periodGross) %> XAF</dd></div>
+        <div class="sage-list-row"><dt>Net payable</dt><dd><%= _fmtXaf(m.periodNet) %> XAF</dd></div>
+        <div class="sage-list-row"><dt>Statutory deductions</dt><dd><%= _fmtXaf((Number(m.periodGross) || 0) - (Number(m.periodNet) || 0)) %> XAF</dd></div>
+        <div class="sage-list-row"><dt>Active employees</dt><dd><%= _staffCount.toLocaleString('fr-FR') %></dd></div>
+      </dl>
+    </div>
+    <div class="sage-card-foot">
+      <span class="sage-muted" style="font-size:12px;"><i class="fa fa-info-circle mr-1"></i>CNPS, CFC, CRTV, council tax, FNE, IRPP and CAC are calculated per line.</span>
+      <% if(locals.canTaxHub){ %><a href="/tax" class="btn btn-sage-ghost btn-sm">Tax hub</a><% } %>
+    </div>
+  </section>
+
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div>
+        <h2>Set up &amp; run</h2>
+        <p class="sage-card-sub">The usual monthly sequence</p>
+      </div>
+    </div>
+    <div class="sage-card-body pt-1">
+      <nav class="sage-action-list">
+        <% if(locals.payCanWrite){ %>
+        <a href="/payroll/employees/new" class="sage-action-row">
+          <span class="sage-action-icon"><i class="fa fa-user-plus"></i></span>
+          <span><strong>Add an employee</strong><small>Name, role, hire date and gross salary</small></span>
+          <i class="fa fa-angle-right sage-action-arrow"></i>
+        </a>
+        <a href="/payroll/profiles" class="sage-action-row">
+          <span class="sage-action-icon"><i class="fa fa-id-card-o"></i></span>
+          <span><strong>Review pay profiles</strong><small>Basic, housing, transport and allowances</small></span>
+          <i class="fa fa-angle-right sage-action-arrow"></i>
+        </a>
+        <% } %>
+        <a href="/payroll/monthly" class="sage-action-row">
+          <span class="sage-action-icon"><i class="fa fa-calculator"></i></span>
+          <span><strong>Process the month</strong><small>Generate payroll lines and payslips</small></span>
+          <i class="fa fa-angle-right sage-action-arrow"></i>
+        </a>
+        <% if(locals.canPayrollSettings){ %>
+        <a href="/payroll/settings" class="sage-action-row">
+          <span class="sage-action-icon"><i class="fa fa-sliders"></i></span>
+          <span><strong>Tax settings</strong><small>Employer identity and statutory rates</small></span>
+          <i class="fa fa-angle-right sage-action-arrow"></i>
+        </a>
+        <% } %>
+      </nav>
+    </div>
+  </section>
+</div>
+
+<h2 class="sage-section-title">More</h2>
 <div class="pay-tile-grid">
-  <a href="/payroll/monthly" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#ecfdf5;color:#059669;"><i class="fa fa-money"></i></div>
-    <h3><%= _t('dashboard.monthly_payroll', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></h3>
-</a>
   <% if(locals.payCanWrite){ %>
   <a href="/payroll/profiles" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#f5f3ff;color:#7c3aed;"><i class="fa fa-id-card-o"></i></div>
-    <h3><%= _t('dashboard.salary_profiles', { ns: 'payroll', defaultValue: 'Salary profiles' }) %></h3>
-</a>
-  <a href="/payroll/settings" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#fff7ed;color:#c2410c;"><i class="fa fa-sliders"></i></div>
-    <h3><%= _t('dashboard.tax_settings', { ns: 'payroll', defaultValue: 'Tax settings' }) %></h3>
-</a>
+    <div class="pay-tile-icon"><i class="fa fa-id-card-o"></i></div>
+    <div><h3>Pay profiles</h3><p>Compensation per employee</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <% } %>
+  <a href="/staff" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-users"></i></div>
+    <div><h3>Employee directory</h3><p>Headcount, roles and departments</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <a href="/hr/attendance" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-clock-o"></i></div>
+    <div><h3>Attendance</h3><p>Daily presence and hours</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
+  <% if(locals.showHrLeaveAdmin){ %>
+  <a href="/hr/leave-requests" class="pay-tile">
+    <div class="pay-tile-icon"><i class="fa fa-inbox"></i></div>
+    <div><h3>Leave approvals</h3><p>Pending leave requests</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
   <% } %>
   <% if (locals.paySelfServiceEnabled) { %>
   <a href="/hr/my-payslips" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#eff6ff;color:#2563eb;"><i class="fa fa-file-text-o"></i></div>
-    <h3><%= _t('dashboard.my_payslips', { ns: 'payroll', defaultValue: 'My payslips' }) %></h3>
-</a>
-  <% } %>
-  <a href="/hr/request-leave" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#faf5ff;color:#7c3aed;"><i class="fa fa-paper-plane"></i></div>
-    <h3><%= _t('dashboard.request_leave', { ns: 'payroll', defaultValue: 'Request leave' }) %></h3>
-</a>
-  <a href="/staff" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#eef2ff;color:#4338ca;"><i class="fa fa-users"></i></div>
-    <h3><%= _t('dashboard.staff_directory', { ns: 'payroll', defaultValue: 'Staff directory' }) %></h3>
-</a>
-  <a href="/hr/attendance" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#ecfdf5;color:#15803d;"><i class="fa fa-clock-o"></i></div>
-    <h3><%= _t('dashboard.attendance', { ns: 'payroll', defaultValue: 'Attendance' }) %></h3>
-</a>
-  <% if(locals.showHrLeaveAdmin){ %>
-  <a href="/hr/leave-requests" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#fff1f2;color:#be123c;"><i class="fa fa-inbox"></i></div>
-    <h3><%= _t('dashboard.leave_approvals', { ns: 'payroll', defaultValue: 'Leave approvals' }) %></h3>
-</a>
-  <a href="/hr/leave-balances" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#ecfeff;color:#0e7490;"><i class="fa fa-balance-scale"></i></div>
-    <h3><%= _t('dashboard.leave_balances', { ns: 'payroll', defaultValue: 'Leave balances' }) %></h3>
-</a>
-  <a href="/hr/holidays" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#fef3c7;color:#b45309;"><i class="fa fa-calendar"></i></div>
-    <h3><%= _t('dashboard.public_holidays', { ns: 'payroll', defaultValue: 'Public holidays' }) %></h3>
-</a>
+    <div class="pay-tile-icon"><i class="fa fa-file-text-o"></i></div>
+    <div><h3>My payslips</h3><p>Download your own payslips</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
   <% } %>
   <% if(locals.canTaxHub){ %>
   <a href="/tax" class="pay-tile">
-    <div class="pay-tile-icon" style="background:#eff6ff;color:#1d4ed8;"><i class="fa fa-institution"></i></div>
-    <h3><%= _t('dashboard.tax_compliance', { ns: 'payroll', defaultValue: 'Tax & compliance' }) %></h3>
-</a>
+    <div class="pay-tile-icon"><i class="fa fa-institution"></i></div>
+    <div><h3>Tax &amp; compliance</h3><p>CNPS, DGI and statutory returns</p></div>
+    <i class="fa fa-angle-right sage-tile-arrow"></i>
+  </a>
   <% } %>
 </div>
+
+<style>
+  .sage-section-title {
+    margin: 6px 0 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #5f6f68;
+  }
+  .sage-action-list { display: block; }
+  .sage-action-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px solid #e8eeea;
+    text-decoration: none !important;
+    color: #16211c !important;
+  }
+  .sage-action-row:last-child { border-bottom: 0; }
+  .sage-action-row strong { display: block; font-size: 13.5px; font-weight: 600; }
+  .sage-action-row small { display: block; font-size: 12px; color: #5f6f68; margin-top: 1px; }
+  .sage-action-icon {
+    width: 32px; height: 32px; flex-shrink: 0;
+    border-radius: 4px; background: #e7f3ec; color: #00834b;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .sage-action-arrow { margin-left: auto; color: #a9b8b1; }
+  .sage-action-row:hover .sage-action-arrow { color: #00834b; }
+</style>
 
 <%- include('partials/payroll-layout-end') %>

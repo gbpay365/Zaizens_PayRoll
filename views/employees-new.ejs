@@ -1,0 +1,322 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'staff', showHrLeaveAdmin: true }) %>
+<%
+var _v = function (key, fallback) {
+  var val = (locals.form || {})[key];
+  return val == null || val === '' ? (fallback == null ? '' : fallback) : val;
+};
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Employees &middot; Onboarding</p>
+    <h1>New employee</h1>
+    <p class="sage-sub">Enter the gross monthly salary and the payroll engine fills in basic, housing, transport, allowances and every statutory deduction.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/staff" class="btn btn-sage-ghost"><i class="fa fa-angle-left mr-1"></i> Back to employees</a>
+  </div>
+</div>
+
+<form method="POST" action="/payroll/employees/new" class="sage-form" id="employeeForm" novalidate>
+  <div class="sage-form-layout">
+    <div>
+      <section class="sage-card">
+        <div class="sage-card-head">
+          <div><h2>Employee details</h2><p class="sage-card-sub">Identity and statutory identifiers</p></div>
+        </div>
+        <div class="sage-card-body">
+          <div class="sage-form-section">
+            <div class="sage-form-grid">
+              <div class="sage-field">
+                <label for="firstName">First name <span class="text-danger">*</span></label>
+                <input class="form-control" id="firstName" name="first_name" value="<%= _v('first_name') %>" required maxlength="120" autocomplete="off">
+              </div>
+              <div class="sage-field">
+                <label for="lastName">Last name <span class="text-danger">*</span></label>
+                <input class="form-control" id="lastName" name="last_name" value="<%= _v('last_name') %>" required maxlength="120" autocomplete="off">
+              </div>
+              <div class="sage-field">
+                <label for="employeeId">Matricule</label>
+                <input class="form-control" id="employeeId" name="employee_id" value="<%= _v('employee_id') %>" maxlength="120" placeholder="Generated if left blank">
+              </div>
+              <div class="sage-field">
+                <label for="cnpsNumber">CNPS number</label>
+                <input class="form-control" id="cnpsNumber" name="cnps_number" value="<%= _v('cnps_number') %>" maxlength="32" autocomplete="off">
+              </div>
+              <div class="sage-field">
+                <label for="taxNiu">Tax ID (NIU)</label>
+                <input class="form-control" id="taxNiu" name="tax_niu" value="<%= _v('tax_niu') %>" maxlength="32" autocomplete="off">
+              </div>
+              <div class="sage-field">
+                <label for="nicNumber">National ID</label>
+                <input class="form-control" id="nicNumber" name="nic_number" value="<%= _v('nic_number') %>" maxlength="32" autocomplete="off">
+              </div>
+              <div class="sage-field">
+                <label for="email">Email</label>
+                <input type="email" class="form-control" id="email" name="emailid" value="<%= _v('emailid') %>" maxlength="250">
+              </div>
+              <div class="sage-field">
+                <label for="phone">Phone</label>
+                <input class="form-control" id="phone" name="phone" value="<%= _v('phone') %>" maxlength="32" autocomplete="off">
+              </div>
+              <div class="sage-field">
+                <label for="dob">Date of birth</label>
+                <input class="form-control" id="dob" name="dob" value="<%= _v('dob') %>" placeholder="YYYY-MM-DD" maxlength="50">
+              </div>
+              <div class="sage-field">
+                <label for="gender">Gender</label>
+                <select class="form-control" id="gender" name="gender">
+                  <option value="">Not specified</option>
+                  <option value="F" <%= String(_v('gender')) === 'F' ? 'selected' : '' %>>Female</option>
+                  <option value="M" <%= String(_v('gender')) === 'M' ? 'selected' : '' %>>Male</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sage-card">
+        <div class="sage-card-head">
+          <div><h2>Position &amp; contract</h2><p class="sage-card-sub">Role and hire date drive the statutory allowances</p></div>
+        </div>
+        <div class="sage-card-body">
+          <div class="sage-form-grid">
+            <div class="sage-field">
+              <label for="role">Role <span class="text-danger">*</span></label>
+              <select class="form-control" id="role" name="role" required>
+                <option value="">Select a role</option>
+                <% (roles || []).forEach(function (r) { %>
+                <option value="<%= r.id %>" <%= String(_v('role')) === String(r.id) ? 'selected' : '' %>><%= r.title %></option>
+                <% }); %>
+              </select>
+              <span class="sage-hint">Allowances such as medical risk, responsibility and specialist research follow the role.</span>
+            </div>
+            <div class="sage-field">
+              <label for="jobTitle">Position / job title</label>
+              <input class="form-control" id="jobTitle" name="job_title" value="<%= _v('job_title') %>" maxlength="120" placeholder="e.g. Senior Nurse">
+            </div>
+            <div class="sage-field">
+              <label for="department">Department</label>
+              <input class="form-control" id="department" name="primary_department" value="<%= _v('primary_department') %>" maxlength="120">
+            </div>
+            <div class="sage-field">
+              <label for="joiningDate">Date of joining <span class="text-danger">*</span></label>
+              <input type="date" class="form-control" id="joiningDate" name="joining_date" value="<%= _v('joining_date', today) %>" required>
+              <span class="sage-hint">Used for the seniority bonus (Prime d'Ancienneté).</span>
+            </div>
+            <div class="sage-field">
+              <label for="sector">Collective agreement</label>
+              <select class="form-control" id="sector" name="sector">
+                <% Object.keys(sectors || {}).forEach(function (key) { %>
+                <option value="<%= key %>" <%= (_v('sector', defaultSector) === key) ? 'selected' : '' %>><%= sectors[key] %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="sage-field">
+              <label class="d-block">Specialist grade</label>
+              <label class="sage-check">
+                <input type="checkbox" name="is_specialist" value="1" <%= String(_v('is_specialist')) === '1' ? 'checked' : '' %>>
+                <span>Specialist doctor (adds the 15% specialist research allowance)</span>
+              </label>
+            </div>
+            <div class="sage-field">
+              <label for="bankName">Bank</label>
+              <input class="form-control" id="bankName" name="bank_name" value="<%= _v('bank_name') %>" maxlength="120">
+            </div>
+            <div class="sage-field">
+              <label for="bankAccount">Bank account</label>
+              <input class="form-control" id="bankAccount" name="bank_account_no" value="<%= _v('bank_account_no') %>" maxlength="40" autocomplete="off">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sage-card">
+        <div class="sage-card-head">
+          <div><h2>Salary</h2><p class="sage-card-sub">Gross monthly salary in XAF</p></div>
+        </div>
+        <div class="sage-card-body">
+          <div class="sage-form-grid">
+            <div class="sage-field">
+              <label for="gross">Gross monthly salary (XAF) <span class="text-danger">*</span></label>
+              <input type="number" min="1" step="1000" class="form-control" id="gross" name="gross" value="<%= _v('gross') %>" required inputmode="numeric" placeholder="e.g. 450000">
+              <span class="sage-hint">Basic = gross minus housing (15%), transport (10%) and role allowances.</span>
+            </div>
+            <div class="sage-field">
+              <label for="payMonth">First payroll period</label>
+              <div class="d-flex" style="gap:8px;">
+                <select class="form-control" id="payMonth" name="month">
+                  <% Object.keys(months || {}).forEach(function (key) { %>
+                  <option value="<%= key %>" <%= Number(_v('month', currentMonth)) === Number(key) ? 'selected' : '' %>><%= months[key] %></option>
+                  <% }); %>
+                </select>
+                <input type="number" class="form-control" name="year" min="2000" max="2100" value="<%= _v('year', currentYear) %>" style="max-width:110px;" aria-label="Year">
+              </div>
+              <span class="sage-hint">A pending payroll line is created automatically for this period.</span>
+            </div>
+          </div>
+        </div>
+        <div class="sage-card-foot">
+          <span class="sage-muted" style="font-size:12px;">A login is created automatically with a random password; the employee can reset it later.</span>
+          <button type="submit" class="btn btn-sage"><i class="fa fa-check mr-1"></i> Create employee &amp; payslip</button>
+        </div>
+      </section>
+    </div>
+
+    <aside class="sage-preview">
+      <div class="sage-card">
+        <div class="sage-card-head">
+          <div><h2>Calculation preview</h2><p class="sage-card-sub">Updates as you type</p></div>
+        </div>
+        <div class="sage-card-body" id="previewBody">
+          <div class="sage-empty" id="previewEmpty">
+            <i class="fa fa-calculator"></i>
+            Enter a gross salary to preview the deductions.
+          </div>
+          <div id="previewContent" style="display:none;">
+            <dl class="sage-list">
+              <div class="sage-list-row"><dt>Basic salary</dt><dd id="pvBasic">—</dd></div>
+              <div class="sage-list-row"><dt>Housing (15%)</dt><dd id="pvHousing">—</dd></div>
+              <div class="sage-list-row"><dt>Transport (10%)</dt><dd id="pvTransport">—</dd></div>
+              <div id="pvAllowances"></div>
+              <div class="sage-list-row"><dt><strong>Gross</strong></dt><dd id="pvGross">—</dd></div>
+            </dl>
+            <p class="sage-preview-label">Statutory deductions</p>
+            <dl class="sage-list" id="pvDeductions"></dl>
+            <div class="sage-net">
+              <span>Net pay</span>
+              <strong id="pvNet">—</strong>
+            </div>
+            <p class="sage-preview-note" id="pvNote"></p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</form>
+
+<style>
+  .sage-form-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .sage-preview { position: sticky; top: 72px; }
+  .sage-check { display: flex; align-items: flex-start; gap: 8px; font-weight: 400; font-size: 13px; color: #3c4c45; cursor: pointer; padding-top: 6px; }
+  .sage-check input { margin-top: 3px; accent-color: #00834b; }
+  .sage-preview-label {
+    margin: 16px 0 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em;
+    text-transform: uppercase; color: #5f6f68;
+  }
+  .sage-net {
+    margin-top: 14px; padding: 12px 14px; border-radius: 4px;
+    background: #e7f3ec; display: flex; align-items: center; justify-content: space-between;
+  }
+  .sage-net span { font-size: 12px; font-weight: 600; color: #0a5c36; text-transform: uppercase; letter-spacing: 0.06em; }
+  .sage-net strong { font-size: 20px; color: #0a5c36; font-variant-numeric: tabular-nums; }
+  .sage-preview-note { margin: 12px 0 0; font-size: 11.5px; color: #5f6f68; line-height: 1.5; }
+  @media (max-width: 1100px) {
+    .sage-form-layout { grid-template-columns: minmax(0, 1fr); }
+    .sage-preview { position: static; }
+  }
+</style>
+
+<script>
+(function () {
+  var fmt = function (n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+  var form = document.getElementById('employeeForm');
+  if (!form) return;
+  var grossEl = document.getElementById('gross');
+  var roleEl = document.getElementById('role');
+  var hireEl = document.getElementById('joiningDate');
+  var sectorEl = document.getElementById('sector');
+  var specEl = form.querySelector('input[name="is_specialist"]');
+  var emptyEl = document.getElementById('previewEmpty');
+  var contentEl = document.getElementById('previewContent');
+  var timer = null;
+  var seq = 0;
+
+  function row(label, value) {
+    return '<div class="sage-list-row"><dt>' + label + '</dt><dd>' + fmt(value) + '</dd></div>';
+  }
+
+  function render(data) {
+    document.getElementById('pvBasic').textContent = fmt(data.basic_salary);
+    document.getElementById('pvHousing').textContent = fmt(data.housing_allowance);
+    document.getElementById('pvTransport').textContent = fmt(data.transport_allowance);
+    document.getElementById('pvGross').textContent = fmt(data.gross) + ' XAF';
+
+    var allowBox = document.getElementById('pvAllowances');
+    var lines = data.allowance_lines || [];
+    allowBox.innerHTML = lines.length
+      ? lines.map(function (l) {
+          return '<div class="sage-list-row"><dt>' + (l.label || l.code) + '</dt><dd>' + fmt(l.amount) + '</dd></div>';
+        }).join('')
+      : '';
+
+    var dedBox = document.getElementById('pvDeductions');
+    var dedLines = data.deduction_lines || [];
+    dedBox.innerHTML = dedLines.length
+      ? dedLines.map(function (l) {
+          return '<div class="sage-list-row"><dt>' + l.label + '</dt><dd style="color:#8f2118;">−' + fmt(l.amount) + '</dd></div>';
+        }).join('')
+      : '<div class="sage-list-row"><dt>No statutory settings</dt><dd>—</dd></div>';
+
+    document.getElementById('pvNet').textContent = fmt(data.net) + ' XAF';
+    document.getElementById('pvNote').textContent = data.statutory_ready
+      ? 'Basic, housing (15%) and transport (10%) are derived from the gross. Deductions use the current tax year settings.'
+      : 'Payroll tax settings are missing for this facility, so deductions cannot be calculated yet.';
+    emptyEl.style.display = 'none';
+    contentEl.style.display = '';
+  }
+
+  function refresh() {
+    var gross = parseFloat(grossEl.value) || 0;
+    if (gross <= 0) {
+      emptyEl.style.display = '';
+      contentEl.style.display = 'none';
+      return;
+    }
+    var mySeq = ++seq;
+    var payload = {
+      gross: gross,
+      role: roleEl.value,
+      hire_date: hireEl.value,
+      sector: sectorEl.value,
+      is_specialist: specEl && specEl.checked ? '1' : '0'
+    };
+    fetch('/payroll/employees/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+      .then(function (out) {
+        if (mySeq !== seq) return;
+        if (!out.ok || out.data.error) throw new Error(out.data.error || 'Preview failed');
+        render(out.data);
+      })
+      .catch(function (err) {
+        if (mySeq !== seq) return;
+        document.getElementById('pvNote').textContent = err.message;
+      });
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(refresh, 320);
+  }
+
+  [grossEl, roleEl, hireEl, sectorEl, specEl].forEach(function (el) {
+    if (!el) return;
+    el.addEventListener('change', schedule);
+    el.addEventListener('input', schedule);
+  });
+
+  if (parseFloat(grossEl.value) > 0) refresh();
+})();
+</script>
+
+<%- include('partials/payroll-layout-end') %>

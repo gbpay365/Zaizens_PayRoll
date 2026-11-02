@@ -6,7 +6,11 @@ var m = locals.metrics || {};
 %>
 
 <div class="pay-hero">
-  <h1><%= _t('monthly.title', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></h1>
+  <div>
+    <p class="sage-eyebrow">Payroll &middot; Runs</p>
+    <h1><%= _t('monthly.title', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></h1>
+    <p>Every payroll line for the facility, with gross, IRPP and net. Process a month to generate lines and payslips.</p>
+  </div>
   <% if(isAdmin){ %>
   <div class="pay-hero-actions no-print">
     <button type="button" class="btn btn-light btn-sm font-weight-bold" data-hms-payroll-modal="process"><i class="fa fa-calculator mr-1"></i> <%= _t('monthly.process_month', { ns: 'payroll', defaultValue: 'Process month' }) %></button>
@@ -112,7 +116,7 @@ var m = locals.metrics || {};
             <% } %>
           </td>
           <% } %>
-          <td class="font-weight-bold"><%= r.first_name %> <%= r.last_name %></td>
+          <td class="font-weight-bold"><a href="/payroll/employees/<%= eidRow %>" style="color:#16211c !important;text-decoration:none;"><%= r.first_name %> <%= r.last_name %></a></td>
           <td><%= months[mid] || '' %> <%= r.year %></td>
           <td class="pay-num"><%= _fmtXaf(r.gross_salary) %></td>
           <td class="pay-num"><%= _fmtXaf(r.income_tax) %></td>

@@ -4,17 +4,51 @@ if (typeof _t !== 'function') {
 }
 var _mod = String(locals.hmsOdooModule || odooModule || '').toLowerCase();
 if (!_mod) _mod = 'payroll';
+var _path = String(locals.hmsPath || '');
+var _section = 'Overview';
+if (_path.indexOf('/payroll/monthly') === 0) _section = 'Payroll runs';
+else if (_path.indexOf('/payroll/profiles') === 0) _section = 'Pay profiles';
+else if (_path.indexOf('/payroll/employees/new') === 0) _section = 'New employee';
+else if (_path.indexOf('/payroll/employees') === 0) _section = 'Employee';
+else if (_path.indexOf('/payroll/settings') === 0) _section = 'Tax settings';
+else if (_path.indexOf('/payroll/integrations') === 0) _section = 'Integrations';
+else if (_path.indexOf('/staff') === 0) _section = 'Employees';
+else if (_path.indexOf('/hr/attendance') === 0) _section = 'Attendance';
+else if (_path.indexOf('/hr/leave-requests') === 0) _section = 'Leave requests';
+else if (_path.indexOf('/hr/leave-balances') === 0) _section = 'Leave balances';
+else if (_path.indexOf('/hr/holidays') === 0) _section = 'Public holidays';
+else if (_path.indexOf('/hr/my-payslips') === 0) _section = 'My payslips';
+else if (_path.indexOf('/hr/request-leave') === 0) _section = 'Request leave';
+else if (_path.indexOf('/hr/my-leave-balance') === 0) _section = 'My leave balance';
+else if (_path.indexOf('/hr/my-attendance') === 0) _section = 'My attendance';
+else if (_path.indexOf('/tax/cnps') === 0) _section = 'CNPS';
+else if (_path.indexOf('/tax/dgi') === 0) _section = 'DGI declarations';
+else if (_path.indexOf('/tax/statutory-reports') === 0) _section = 'Statutory reports';
+else if (_path.indexOf('/tax/compliance') === 0) _section = 'Compliance';
+else if (_path.indexOf('/tax/payroll-lines') === 0) _section = 'Payroll lines';
+else if (_path.indexOf('/tax') === 0) _section = 'Tax hub';
+var _today = new Date();
+var _period = _today.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
 %>
-<link rel="stylesheet" href="/css/hms-odoo.css?v=2">
-<link rel="stylesheet" href="/css/hms-module-odoo.css?v=1">
-<div class="hms-module-odoo-app hms-odoo-app" id="hmsModuleOdooApp" data-odoo-module="<%= _mod %>">
-<%- include('hms-odoo-apps') %>
-<% if (_mod === 'payroll') { %>
-<%- include('payroll-odoo-nav') %>
-<% } else { %>
-<%- include('hr-odoo-nav') %>
-<% } %>
-<main class="o_action_manager">
-<% if (typeof flash === 'string' && flash) { %><div class="o_flash o_flash_success"><%= flash %></div><% } %>
-<% if (typeof error === 'string' && error) { %><div class="o_flash o_flash_error"><%= error %></div><% } %>
-<div class="o_module_content">
+<link rel="stylesheet" href="/css/sage.css?v=1">
+<div class="hms-module-odoo-app hms-odoo-app sage-app" id="hmsModuleOdooApp" data-odoo-module="<%= _mod %>">
+<%- include('sage-sidebar') %>
+<div class="sage-body">
+  <header class="sage-topbar">
+    <button type="button" class="sage-topbar-toggle" id="sageSidebarToggle" aria-label="Toggle navigation" aria-controls="sageSidebar" aria-expanded="false">
+      <i class="fa fa-bars"></i>
+    </button>
+    <nav class="sage-breadcrumb" aria-label="Breadcrumb">
+      <a href="/payroll">Payroll</a>
+      <span class="sep">/</span>
+      <span class="current"><%= _section %></span>
+    </nav>
+    <div class="sage-topbar-right">
+      <span class="d-none d-md-inline"><i class="fa fa-calendar-o mr-1"></i><%= _period %></span>
+      <% if (locals.payCanWrite && !locals.paySelfServiceOnly) { %>
+      <a class="sage-topbar-link" href="/payroll/employees/new"><i class="fa fa-user-plus"></i> <span class="d-none d-sm-inline">New employee</span></a>
+      <% } %>
+    </div>
+  </header>
+  <main class="o_action_manager sage-main">
+    <div class="o_module_content">

@@ -19,21 +19,34 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
 
   app.get('/staff', requireAuth, async (req, res) => {
     try {
+      const fid = Math.max(1, parseInt(req.session.facilityId, 10) || 1);
+      const role = String(req.session.user?.role ?? '');
+      const perms = res.locals.userPerms || [];
+      const canManagePayroll =
+        role === '1' || role === '99' || perms.includes('*') || perms.includes('payroll.write');
       const [staff] = await pool.query(
         `SELECT e.id, e.first_name, e.last_name, e.username, e.role, e.primary_department,
-                e.job_title, e.status, e.emailid, e.phone
+                e.job_title, e.status, e.emailid, e.phone, e.employee_id, e.joining_date,
+                COALESCE(pp.basic_salary, 0) + COALESCE(pp.housing_allowance, 0)
+                  + COALESCE(pp.transport_allowance, 0) AS profile_pay,
+                pp.id AS profile_id
          FROM tbl_employee e
+         LEFT JOIN tbl_hms_pay_profile pp ON pp.employee_id = e.id AND pp.facility_id = ?
          WHERE ${hmsStaffAccountGuard.STAFF_HEADCOUNT_SQL}
          ORDER BY e.last_name ASC, e.first_name ASC`
+        , [fid]
       );
       const roleMap = await loadRoleTitleMap(pool).catch(() => ({}));
       const rows = (Array.isArray(staff) ? staff : []).map((row) => ({
         ...row,
         roleLabel: resolveRoleTitle(row.role, roleMap),
+        hasProfile: Boolean(row.profile_id),
+        gross: Number(row.profile_pay || 0),
       }));
       res.render('staff', {
         title: 'Staff — ZAIZENS Payroll',
         staff: rows,
+        canManagePayroll,
         flash: req.query.msg || null,
         error: req.query.err || null,
       });

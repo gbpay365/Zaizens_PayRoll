@@ -1,0 +1,195 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'staff', showHrLeaveAdmin: true }) %>
+<%
+var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+var _fmtDate = function (v) {
+  if (!v) return '—';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+var emp = employee || {};
+var comp = locals.comp || null;
+var rows = records || [];
+var latest = rows.length ? rows[0] : null;
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Employee &middot; <%= emp.employee_id || ('EMP-' + String(emp.id).padStart(4, '0')) %></p>
+    <h1><%= emp.first_name %> <%= emp.last_name %></h1>
+    <p class="sage-sub"><%= roleTitle || '—' %><% if (emp.job_title) { %> &middot; <%= emp.job_title %><% } %><% if (emp.primary_department) { %> &middot; <%= emp.primary_department %><% } %></p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <% if (latest && Number(latest.id) > 0) { %>
+    <a href="/payroll/payslip/<%= latest.id %>" target="_blank" rel="noopener" class="btn btn-sage"><i class="fa fa-file-text-o mr-1"></i> Latest payslip</a>
+    <% } %>
+    <a href="/staff" class="btn btn-sage-ghost"><i class="fa fa-angle-left mr-1"></i> Employees</a>
+  </div>
+</div>
+
+<% if (!comp) { %>
+<div class="alert alert-warning">
+  <strong>No pay profile yet.</strong> Set the salary under
+  <a href="/payroll/profiles?q=<%= encodeURIComponent(emp.first_name + ' ' + emp.last_name) %>">Pay profiles</a>
+  to generate deductions and payslips.
+</div>
+<% } %>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Gross monthly</div>
+    <div class="sage-stat-value"><%= comp ? _fmtXaf(comp.gross) : '—' %> <small>XAF</small></div>
+    <p class="sage-stat-foot">Basic plus housing, transport and allowances</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Net monthly</div>
+    <div class="sage-stat-value"><%= comp && comp.net != null ? _fmtXaf(comp.net) : '—' %> <small>XAF</small></div>
+    <p class="sage-stat-foot">After statutory deductions</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Deductions</div>
+    <div class="sage-stat-value"><%= comp && comp.deductions ? _fmtXaf(comp.deductions.total) : '—' %> <small>XAF</small></div>
+    <p class="sage-stat-foot">CNPS, CFC, CRTV, council, FNE, IRPP, CAC</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Payroll lines</div>
+    <div class="sage-stat-value"><%= rows.length %></div>
+    <p class="sage-stat-foot"><%= latest ? ('Latest ' + (months[latest.month] || latest.month) + ' ' + latest.year) : 'None yet' %></p>
+  </div>
+</div>
+
+<div class="sage-grid">
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Salary breakdown</h2><p class="sage-card-sub">Recomputed from the stored pay profile and current tax year</p></div>
+      <% if (comp) { %><span class="pay-badge pay-badge-paid">Auto-calculated</span><% } %>
+    </div>
+    <% if (comp) { %>
+    <div class="sage-card-body">
+      <dl class="sage-list">
+        <div class="sage-list-row"><dt>Basic salary</dt><dd><%= _fmtXaf(comp.basic_salary) %></dd></div>
+        <div class="sage-list-row"><dt>Housing allowance (15%)</dt><dd><%= _fmtXaf(comp.housing_allowance) %></dd></div>
+        <div class="sage-list-row"><dt>Transport allowance (10%)</dt><dd><%= _fmtXaf(comp.transport_allowance) %></dd></div>
+        <% (comp.allowance_lines || []).forEach(function (l) { %>
+        <div class="sage-list-row"><dt><%= l.label %> <% if (l.qty_label && l.qty_label !== '—') { %><span class="sage-muted">(<%= l.qty_label %>)</span><% } %></dt><dd><%= _fmtXaf(l.amount) %></dd></div>
+        <% }); %>
+        <div class="sage-list-row" style="border-top:1px solid #d9e2dc;margin-top:4px;padding-top:10px;">
+          <dt style="font-weight:600;color:#16211c;">Gross salary</dt>
+          <dd><%= _fmtXaf(comp.gross) %> XAF</dd>
+        </div>
+      </dl>
+
+      <p class="sage-preview-label">Employee statutory deductions</p>
+      <dl class="sage-list" id="deductionList">
+        <% (comp.deduction_lines || []).forEach(function (l) { %>
+        <div class="sage-list-row"><dt><%= l.label %></dt><dd style="color:#8f2118;">−<%= _fmtXaf(l.amount) %></dd></div>
+        <% }); %>
+        <% if (!(comp.deduction_lines || []).length) { %>
+        <div class="sage-list-row"><dt>No deductions calculated</dt><dd>—</dd></div>
+        <% } %>
+        <div class="sage-list-row" style="border-top:1px solid #d9e2dc;padding-top:10px;">
+          <dt style="font-weight:600;color:#16211c;">Total deductions</dt>
+          <dd style="color:#8f2118;"><%= comp.deductions ? _fmtXaf(comp.deductions.total) : '—' %></dd>
+        </div>
+      </dl>
+
+      <div class="sage-net">
+        <span>Net pay</span>
+        <strong><%= comp.net != null ? _fmtXaf(comp.net) : '—' %> XAF</strong>
+      </div>
+      <p class="sage-preview-note">
+        Taxable income after CNPS and the professional allowance: <%= comp.taxable_income != null ? _fmtXaf(comp.taxable_income) : '—' %> XAF.
+        <% if (comp.allowance_tax_free_total > 0) { %>Tax-free roster allowances of <%= _fmtXaf(comp.allowance_tax_free_total) %> XAF are added on top of net.<% } %>
+      </p>
+    </div>
+    <% } else { %>
+    <div class="sage-card-body">
+      <div class="sage-empty"><i class="fa fa-id-card-o"></i><%= compError || 'This employee has no salary profile yet.' %></div>
+    </div>
+    <% } %>
+  </section>
+
+  <section class="sage-card">
+    <div class="sage-card-head">
+      <div><h2>Employee record</h2><p class="sage-card-sub">Identity and payroll identifiers</p></div>
+    </div>
+    <div class="sage-card-body">
+      <dl class="sage-list">
+        <div class="sage-list-row"><dt>Matricule</dt><dd class="sage-mono"><%= emp.employee_id || '—' %></dd></div>
+        <div class="sage-list-row"><dt>Role</dt><dd><%= roleTitle || '—' %></dd></div>
+        <div class="sage-list-row"><dt>Position</dt><dd><%= emp.job_title || '—' %></dd></div>
+        <div class="sage-list-row"><dt>Department</dt><dd><%= emp.primary_department || '—' %></dd></div>
+        <div class="sage-list-row"><dt>Date of joining</dt><dd><%= _fmtDate(emp.joining_date) %></dd></div>
+        <div class="sage-list-row"><dt>Collective agreement</dt><dd><%= (profile && profile.sector) ? profile.sector : '—' %></dd></div>
+        <div class="sage-list-row"><dt>CNPS number</dt><dd class="sage-mono"><%= emp.cnps_number || '—' %></dd></div>
+        <div class="sage-list-row"><dt>Tax ID (NIU)</dt><dd class="sage-mono"><%= emp.tax_niu || '—' %></dd></div>
+        <div class="sage-list-row"><dt>National ID</dt><dd class="sage-mono"><%= emp.nic_number || '—' %></dd></div>
+        <div class="sage-list-row"><dt>Bank</dt><dd><%= emp.bank_name || '—' %></dd></div>
+        <div class="sage-list-row"><dt>Account</dt><dd class="sage-mono"><%= emp.bank_account_no ? ('****' + String(emp.bank_account_no).slice(-4)) : '—' %></dd></div>
+        <div class="sage-list-row"><dt>Login</dt><dd class="sage-mono">@<%= emp.username || '—' %></dd></div>
+        <div class="sage-list-row"><dt>Status</dt><dd><span class="pay-badge <%= String(emp.status) === '1' ? 'pay-badge-paid' : '' %>"><%= String(emp.status) === '1' ? 'Active' : 'Inactive' %></span></dd></div>
+      </dl>
+    </div>
+    <div class="sage-card-foot">
+      <span class="sage-muted" style="font-size:12px;">Salary values are edited in Pay profiles.</span>
+      <a href="/payroll/profiles?q=<%= encodeURIComponent(emp.first_name + ' ' + emp.last_name) %>" class="btn btn-sage-ghost btn-sm">Edit salary</a>
+    </div>
+  </section>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div><h2>Payroll history</h2><p class="sage-card-sub">Most recent 12 periods</p></div>
+    <a href="/payroll/monthly?q=<%= encodeURIComponent(emp.first_name + ' ' + emp.last_name) %>" class="btn btn-sage-ghost btn-sm">Open payroll runs</a>
+  </div>
+  <div class="pay-table-wrap">
+    <table class="pay-table">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th class="pay-num">Gross (XAF)</th>
+          <th class="pay-num">IRPP</th>
+          <th class="pay-num">Net (XAF)</th>
+          <th>Status</th>
+          <th class="text-right no-print"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!rows.length) { %>
+        <tr><td colspan="6" class="sage-empty"><i class="fa fa-calendar-o"></i>No payroll line yet. Process the month from Payroll runs.</td></tr>
+        <% } %>
+        <% rows.forEach(function (r) { %>
+        <tr class="<%= Number(r.id) === Number(locals.highlightRecordId) ? 'is-highlight' : '' %>">
+          <td><%= months[r.month] || r.month %> <%= r.year %></td>
+          <td class="pay-num"><%= _fmtXaf(r.gross_salary) %></td>
+          <td class="pay-num"><%= _fmtXaf(r.income_tax) %></td>
+          <td class="pay-num"><strong><%= _fmtXaf(r.net_salary) %></strong></td>
+          <td>
+            <% var st = String(r.payout_status || 'pending').toLowerCase(); %>
+            <span class="pay-badge <%= st === 'paid' ? 'pay-badge-paid' : 'pay-badge-pending' %>"><%= st === 'paid' ? 'Paid' : 'Pending' %></span>
+          </td>
+          <td class="text-right no-print">
+            <a href="/payroll/payslip/<%= r.id %>" target="_blank" rel="noopener" class="btn btn-sage-ghost btn-sm">Payslip</a>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<style>
+  .sage-preview-label {
+    margin: 16px 0 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.09em;
+    text-transform: uppercase; color: #5f6f68;
+  }
+  .sage-net {
+    margin-top: 14px; padding: 12px 14px; border-radius: 4px;
+    background: #e7f3ec; display: flex; align-items: center; justify-content: space-between;
+  }
+  .sage-net span { font-size: 12px; font-weight: 600; color: #0a5c36; text-transform: uppercase; letter-spacing: 0.06em; }
+  .sage-net strong { font-size: 20px; color: #0a5c36; font-variant-numeric: tabular-nums; }
+  .sage-preview-note { margin: 12px 0 0; font-size: 11.5px; color: #5f6f68; line-height: 1.5; }
+</style>
+
+<%- include('partials/payroll-layout-end') %>

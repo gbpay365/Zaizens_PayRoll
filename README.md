@@ -39,4 +39,17 @@ Tables copied: `tbl_employee`, `tbl_role`, `tbl_facility`, all `tbl_hms_payroll_
 
 All payroll features are enabled locally (profiles, monthly processing, payslips, tax hub, statutory reports, leave/attendance).
 
+## Add an employee and generate the payslip
+
+1. **Employees → New employee** (`/payroll/employees/new`), or the button on the dashboard / pay profiles page.
+2. Fill in the identity, role, hire date and the **gross monthly salary**.
+3. The preview panel shows the derived basic salary, housing (15%) and transport (10%), role allowances and every statutory deduction (CNPS, CFC, CRTV, council tax, FNE, IRPP, CAC), with the resulting net pay.
+4. Saving creates the employee, their pay profile and a pending payroll line for the chosen period, then opens the employee page with the full breakdown and a link to the payslip.
+
+The same calculation engine powers **Pay profiles →** the row calculator (enter a gross or net figure) and the monthly payroll run, so the numbers stay consistent.
+
+## Interface
+
+The application shell is a Sage-style layout: dark green navigation rail, a compact top bar and dense payroll tables. Styles live in `public/css/sage.css`; the shell itself is `views/partials/sage-sidebar.ejs` plus `hms-module-odoo-start.ejs`.
+
 Account_Core no longer controls payroll in HMS.

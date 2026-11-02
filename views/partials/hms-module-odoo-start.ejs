@@ -37,6 +37,9 @@ else if (_path.indexOf('/account/password') === 0) _section = 'Change password';
 var _today = new Date();
 var _period = _today.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
 %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
 <link rel="stylesheet" href="/css/sage.css?v=1">
 <div class="hms-module-odoo-app hms-odoo-app sage-app" id="hmsModuleOdooApp" data-odoo-module="<%= _mod %>">
 <%- include('sage-sidebar') %>
@@ -51,6 +54,7 @@ var _period = _today.toLocaleString('en-GB', { month: 'long', year: 'numeric' })
       <span class="current"><%= _section %></span>
     </nav>
     <div class="sage-topbar-right">
+      <span class="sage-company-chip d-none d-lg-inline-flex"><i class="fa fa-building-o"></i><%= (locals.company && locals.company.legalName) || 'Caminco S.A.' %></span>
       <span class="d-none d-md-inline"><i class="fa fa-calendar-o mr-1"></i><%= _period %></span>
       <a class="sage-topbar-link" href="/account/password" title="Change password"><i class="fa fa-key"></i></a>
       <% if (locals.payCanWrite && !locals.paySelfServiceOnly) { %>

@@ -1,6 +1,6 @@
-# Zaizens Payroll
+# ZAIZENS PAY
 
-Standalone payroll & HR application extracted from HMS. Runs independently from Account_Core and HMS.
+Payroll, HR and compliance application for Caminco S.A. Runs independently of Account_Core and HMS.
 
 ## Setup (XAMPP)
 
@@ -50,11 +50,11 @@ The same calculation engine powers **Pay profiles →** the row calculator (ente
 
 ## Interface
 
-The application shell is a Sage-style layout: dark green navigation rail, a compact top bar and dense payroll tables. Styles live in `public/css/sage.css`; the shell itself is `views/partials/sage-sidebar.ejs` plus `hms-module-odoo-start.ejs`.
+The application shell uses the ZAIZENS identity: a light navigation rail with grouped links and an ink top bar carrying the company chip, over warm paper surfaces with amber accents. Base layout styles live in `public/css/sage.css` and the identity layer in `public/css/zaizens.css`; the shell itself is `views/partials/sage-sidebar.ejs` plus `hms-module-odoo-start.ejs`.
 
 ## HR module
 
-`/hr` is the HR home (Sage HR-style): today's absences, upcoming approved leave, the approval queue, personal leave balances, the latest payslip and upcoming holidays, all on the same shared records as payroll and tax.
+`/hr` is the HR home: today's absences, upcoming approved leave, the approval queue, personal leave balances, the latest payslip and upcoming holidays, all on the same shared records as payroll and tax.
 
 | Screen | Route | Who |
 |--------|-------|-----|

@@ -1,0 +1,503 @@
+/* ==========================================================================
+   ZAIZENS interface — visual identity
+   Warm paper surfaces, an ink top bar and light navigation. Loaded after the
+   base shell stylesheet and intentionally independent of it.
+   ========================================================================== */
+
+:root {
+  --zx-ink: #131a22;
+  --zx-ink-2: #1d2833;
+  --zx-ink-3: #33414f;
+  --zx-muted: #6b7280;
+  --zx-soft: #9aa3ad;
+  --zx-amber: #d99a2b;
+  --zx-amber-strong: #b06a12;
+  --zx-ember: #c2410c;
+  --zx-ember-dark: #9a3412;
+  --zx-sand: #f6f3ec;
+  --zx-paper: #fffdf8;
+  --zx-line: #e7e1d4;
+  --zx-line-soft: #f0ece2;
+  --zx-sidebar: 264px;
+  --zx-radius: 12px;
+}
+
+body.hms-body--odoo {
+  background: var(--zx-sand);
+  color: var(--zx-ink);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
+
+/* ── Navigation rail ─────────────────────────────────────────────────── */
+
+.sage-sidebar {
+  width: var(--zx-sidebar);
+  background: var(--zx-paper);
+  color: var(--zx-ink-3);
+  border-right: 1px solid var(--zx-line);
+  box-shadow: 1px 0 0 rgba(19, 26, 34, 0.02);
+}
+
+.sage-brand {
+  gap: 12px;
+  padding: 20px 18px 18px;
+  border-bottom: 1px solid var(--zx-line);
+  background: linear-gradient(135deg, #fff6e6 0%, #fffdf8 62%);
+}
+
+.sage-brand-mark {
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(176, 106, 18, 0.28), inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.sage-brand-text strong {
+  color: var(--zx-ink);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+}
+
+.sage-brand-text small {
+  color: var(--zx-amber-strong);
+  font-size: 9.5px;
+  letter-spacing: 0.2em;
+}
+
+.sage-nav { padding: 12px 12px 20px; }
+
+.sage-nav-label {
+  margin: 16px 8px 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--zx-line-soft);
+  color: #a2977f;
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+}
+
+.sage-nav > .sage-nav-label:first-child { border-top: 0; padding-top: 0; margin-top: 2px; }
+
+.sage-nav a {
+  gap: 11px;
+  padding: 9px 10px;
+  border-left: 0;
+  border-radius: 10px;
+  color: #4a5563 !important;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.sage-nav a i {
+  width: 18px;
+  opacity: 1;
+  color: #8e97a3;
+  transition: color 0.12s ease;
+}
+
+.sage-nav a:hover {
+  background: #f7f3ea;
+  color: var(--zx-ink) !important;
+}
+.sage-nav a:hover i { color: var(--zx-ink-3); }
+
+.sage-nav a.active {
+  background: var(--zx-ink);
+  border-left: 0;
+  box-shadow: none;
+  color: #fff !important;
+  font-weight: 600;
+}
+.sage-nav a.active i { color: var(--zx-amber); }
+
+.sage-nav::-webkit-scrollbar-thumb { background: #ded8ca; }
+
+.sage-sidebar-foot {
+  padding: 14px 16px;
+  border-top: 1px solid var(--zx-line);
+  background: #fbf8f1;
+}
+
+.sage-user-avatar {
+  background: #fbefd9;
+  color: var(--zx-amber-strong);
+  box-shadow: inset 0 0 0 1px #f2dcb6;
+}
+
+.sage-user-meta strong { color: var(--zx-ink); font-size: 12.5px; }
+.sage-user-meta small { color: var(--zx-soft); }
+.sage-user-signout { color: var(--zx-soft); }
+.sage-user-signout:hover { color: var(--zx-ember); }
+
+/* ── Top bar ─────────────────────────────────────────────────────────── */
+
+.sage-body { margin-left: var(--zx-sidebar); }
+
+.sage-topbar {
+  height: 60px;
+  gap: 16px;
+  padding: 0 28px;
+  background: var(--zx-ink);
+  border-bottom: 0;
+  color: #e8edf3;
+}
+
+.sage-topbar-toggle {
+  border: 1px solid #35485b;
+  background: transparent;
+  color: #e8edf3;
+  border-radius: 9px;
+}
+
+.sage-breadcrumb { font-size: 12.5px; letter-spacing: 0.01em; }
+.sage-breadcrumb a { color: #9fb0c0; }
+.sage-breadcrumb a:hover { color: #fff; }
+.sage-breadcrumb .sep { color: #44596c; }
+.sage-breadcrumb .current { color: #fff; font-weight: 600; }
+
+.sage-topbar-right { color: #9fb0c0; gap: 16px; }
+.sage-topbar-right .sage-topbar-link {
+  color: #cfd9e2;
+  padding: 6px 2px;
+  border-radius: 8px;
+}
+.sage-topbar-right .sage-topbar-link:hover { color: var(--zx-amber); }
+
+.sage-company-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid #33475a;
+  background: #182533;
+  color: #e6ebf1;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sage-company-chip i { color: var(--zx-amber); }
+
+/* ── Content and headers ─────────────────────────────────────────────── */
+
+.sage-content,
+.sage-main { padding: 30px 34px 60px; }
+
+.sage-page-head,
+.sage-content .pay-hero {
+  padding: 0 0 20px;
+  margin: 0 0 24px;
+  border: 0;
+  border-bottom: 1px solid var(--zx-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--zx-ink);
+  align-items: flex-end;
+}
+
+.sage-page-head h1,
+.sage-content .pay-hero h1 {
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.032em;
+  color: var(--zx-ink);
+}
+
+.sage-eyebrow {
+  margin: 0 0 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--zx-amber-strong);
+}
+
+.sage-page-head p.sage-sub,
+.sage-content .pay-hero p {
+  margin-top: 9px;
+  font-size: 13.5px;
+  color: var(--zx-muted);
+  max-width: 68ch;
+}
+
+/* ── Surfaces ────────────────────────────────────────────────────────── */
+
+.sage-card,
+.sage-content .pay-panel {
+  background: #fff;
+  border: 1px solid var(--zx-line);
+  border-radius: var(--zx-radius);
+  box-shadow: 0 1px 2px rgba(19, 26, 34, 0.04), 0 18px 40px -32px rgba(19, 26, 34, 0.4);
+}
+
+.sage-card-head,
+.sage-content .pay-panel-head {
+  padding: 16px 20px;
+  background: #fdfaf4;
+  border-bottom: 1px solid var(--zx-line-soft);
+}
+
+.sage-card-head h2,
+.sage-content .pay-panel-head h2 {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sage-card-head .sage-card-sub { color: var(--zx-muted); }
+.sage-card-body,
+.sage-content .pay-panel-body { padding: 20px; }
+.sage-card-foot { background: #fdfaf4; border-top-color: var(--zx-line-soft); }
+
+/* Stats */
+
+.sage-stat,
+.sage-content .pay-kpi {
+  border: 1px solid var(--zx-line);
+  border-radius: var(--zx-radius);
+  padding: 18px 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #fdfaf4 100%);
+  box-shadow: 0 1px 2px rgba(19, 26, 34, 0.03);
+}
+
+.sage-stat::before,
+.sage-content .pay-kpi::before {
+  width: 26px;
+  height: 3px;
+  top: 0;
+  bottom: auto;
+  left: 20px;
+  background: var(--zx-amber);
+  border-radius: 0 0 3px 3px;
+}
+
+.sage-stat .sage-stat-label,
+.sage-content .pay-kpi-label {
+  color: #8a7f6b;
+  letter-spacing: 0.12em;
+  font-size: 10px;
+  margin-bottom: 10px;
+}
+
+.sage-stat .sage-stat-value,
+.sage-content .pay-kpi-value {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: var(--zx-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sage-stat .sage-stat-foot { color: var(--zx-muted); }
+
+.sage-stat--warn::before { background: var(--zx-ember); }
+.sage-stat--warn .sage-stat-value { color: var(--zx-ember); }
+
+/* Quick action tiles */
+
+.sage-content .pay-tile {
+  border: 1px solid var(--zx-line);
+  border-radius: var(--zx-radius);
+  padding: 13px 15px;
+  background: #fff;
+}
+
+.sage-content .pay-tile:hover {
+  border-color: #e0c79a;
+  background: #fffdf8;
+  box-shadow: 0 10px 24px -20px rgba(19, 26, 34, 0.45);
+}
+
+.sage-content .pay-tile-icon {
+  border-radius: 10px;
+  background: #fbf0dc !important;
+  color: var(--zx-amber-strong) !important;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────── */
+
+.sage-content .pay-table thead th,
+.sage-content table.sage-table thead th {
+  background: #fbf6ec;
+  border-bottom: 1px solid var(--zx-line);
+  color: #857a66;
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  padding: 11px 15px;
+}
+
+.sage-content .pay-table tbody td,
+.sage-content table.sage-table tbody td {
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--zx-line-soft);
+}
+
+.sage-content .pay-table tbody tr:hover td,
+.sage-content table.sage-table tbody tr:hover td { background: #fcf9f2; }
+.sage-content .pay-table tbody tr.is-highlight td { background: #fdf4e3; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+
+.sage-content .btn,
+.btn-sage,
+.btn-sage-ghost,
+.sage-content .hms-btn-primary,
+.sage-content .hms-btn-secondary {
+  border-radius: 9px;
+  font-weight: 600;
+}
+
+.btn-sage,
+.sage-content .hms-btn-primary,
+.sage-content .pay-btn-primary,
+.sage-content .btn-primary {
+  background: var(--zx-ember) !important;
+  border: 1px solid var(--zx-ember) !important;
+  color: #fff !important;
+}
+
+.btn-sage:hover,
+.sage-content .hms-btn-primary:hover,
+.sage-content .pay-btn-primary:hover,
+.sage-content .btn-primary:hover {
+  background: var(--zx-ember-dark) !important;
+  border-color: var(--zx-ember-dark) !important;
+}
+
+.btn-sage-ghost,
+.sage-content .hms-btn-secondary,
+.sage-content .pay-btn-outline,
+.sage-content .btn-outline-primary {
+  background: #fff !important;
+  border: 1px solid var(--zx-line) !important;
+  color: var(--zx-ink) !important;
+}
+
+.btn-sage-ghost:hover,
+.sage-content .hms-btn-secondary:hover,
+.sage-content .pay-btn-outline:hover,
+.sage-content .btn-outline-primary:hover {
+  border-color: var(--zx-ink) !important;
+  color: var(--zx-ink) !important;
+  background: #fbf6ec !important;
+}
+
+.sage-content .btn-link { color: var(--zx-ember); }
+.sage-content .btn-success { background: #0f766e !important; border-color: #0f766e !important; }
+
+/* ── Forms ───────────────────────────────────────────────────────────── */
+
+.sage-content .form-control,
+.sage-form .form-control,
+.sage-content select.form-control,
+.sage-content input.form-control {
+  border: 1px solid #ddd5c4;
+  border-radius: 9px;
+  height: 38px;
+  background-color: #fffefb;
+}
+
+.sage-content .form-control:focus,
+.sage-form .form-control:focus {
+  border-color: var(--zx-amber);
+  box-shadow: 0 0 0 3px rgba(217, 154, 43, 0.18);
+}
+
+.sage-content label,
+.sage-form label { color: #4c5561; }
+
+.sage-content .pay-search {
+  border-radius: 9px;
+  border-color: #ddd5c4;
+  background-color: #fffefb;
+}
+.sage-content .pay-search:focus {
+  border-color: var(--zx-amber);
+  box-shadow: 0 0 0 3px rgba(217, 154, 43, 0.18);
+}
+
+/* ── Tabs and alerts ─────────────────────────────────────────────────── */
+
+.sage-tabs { border-bottom: 1px solid var(--zx-line); gap: 6px; }
+.sage-tab {
+  border-radius: 9px 9px 0 0;
+  color: #6b7280 !important;
+  font-weight: 600;
+}
+.sage-tab i { color: #a99f8c; }
+.sage-tab:hover { color: var(--zx-ink) !important; background: #fbf6ec; }
+.sage-tab.active,
+.sage-tab.active:hover {
+  color: var(--zx-ink) !important;
+  border-bottom-color: var(--zx-amber);
+  background: transparent;
+}
+.sage-tab.active i { color: var(--zx-amber-strong); }
+
+.sage-alert { border-radius: 10px; border-color: var(--zx-line); background: #fdfaf3; }
+.sage-alert > i { color: var(--zx-amber-strong); }
+.sage-alert--info { background: #eef4f8; border-color: #d8e4ee; }
+.sage-alert--warn { background: #fdf3e2; border-color: #f0dcbb; }
+
+/* ── Login ───────────────────────────────────────────────────────────── */
+
+.sage-login { background: var(--zx-sand); }
+
+.sage-login-brand {
+  background:
+    radial-gradient(90% 70% at 0% 0%, rgba(217, 154, 43, 0.3), transparent 58%),
+    linear-gradient(160deg, #182431 0%, #101821 100%);
+  padding: 46px 52px;
+}
+
+.sage-login-brand::after {
+  border-color: rgba(217, 154, 43, 0.16);
+  width: 520px;
+  height: 520px;
+  right: -190px;
+  bottom: -190px;
+}
+
+.sage-login-eyebrow { color: #f0b95a; letter-spacing: 0.22em; }
+.sage-login-copy h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.035em; max-width: 21ch; }
+.sage-login-copy p { color: rgba(255, 255, 255, 0.7); }
+.sage-login-points { color: rgba(255, 255, 255, 0.8); }
+.sage-login-points i { color: #f0b95a; }
+.sage-login-foot { color: rgba(255, 255, 255, 0.42); letter-spacing: 0.04em; }
+
+.sage-login-panel { background: var(--zx-sand); padding: 44px 28px; }
+
+.sage-login-form {
+  max-width: 400px;
+  background: #fff;
+  border: 1px solid var(--zx-line);
+  border-radius: 18px;
+  padding: 34px 32px 30px;
+  box-shadow: 0 24px 60px -38px rgba(19, 26, 34, 0.55), 0 2px 6px rgba(19, 26, 34, 0.04);
+}
+
+.sage-login-form-brand { color: var(--zx-ink); }
+.sage-login-form-brand b { color: var(--zx-amber-strong); }
+.sage-login-form h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+.sage-login-form .sage-login-sub { color: var(--zx-muted); margin-bottom: 22px; }
+.sage-login-form .btn { height: 44px; font-size: 14px; border-radius: 10px; }
+.sage-login-hint { color: var(--zx-muted); }
+
+/* ── Responsive and print ────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .sage-body { margin-left: 0; }
+  .sage-topbar { padding: 0 16px; }
+  .sage-content, .sage-main { padding: 20px 16px 44px; }
+  .sage-topbar-right .sage-company-chip { display: none; }
+}
+
+@media (max-width: 600px) {
+  .sage-page-head h1,
+  .sage-content .pay-hero h1 { font-size: 23px; }
+  .sage-stat .sage-stat-value,
+  .sage-content .pay-kpi-value { font-size: 25px; }
+  .sage-login-form { padding: 26px 22px 24px; border-radius: 14px; }
+}
+
+@media print {
+  .sage-topbar, .sage-sidebar { display: none !important; }
+  .sage-body { margin-left: 0; }
+}

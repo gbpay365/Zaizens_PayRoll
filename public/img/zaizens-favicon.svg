@@ -1,14 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="ZAIZENS PAY">
   <defs>
     <linearGradient id="zf" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#12b76a"/>
-      <stop offset="55%" stop-color="#00834b"/>
-      <stop offset="100%" stop-color="#054b31"/>
+      <stop offset="0%" stop-color="#263442"/>
+      <stop offset="100%" stop-color="#101821"/>
     </linearGradient>
   </defs>
   <rect width="32" height="32" rx="9" fill="url(#zf)"/>
   <path d="M9.4 10h13.2L12.5 22h10.1"
         fill="none" stroke="#ffffff" stroke-width="2.7"
         stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="24.4" cy="8.4" r="2.5" fill="#ffd166"/>
+  <circle cx="24.4" cy="8.4" r="2.5" fill="#f0b95a"/>
 </svg>

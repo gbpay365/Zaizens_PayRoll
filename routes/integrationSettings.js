@@ -72,6 +72,43 @@ module.exports = function integrationSettingsRoutes(app, pool, requireAuth, { re
     }
   });
 
+  app.post('/payroll/integrations/facilities', requireAuth, requireAdminOrSuper, async (req, res) => {
+    const name = String(req.body.name || '').trim().slice(0, 255);
+    const code = String(req.body.code || '').trim().toUpperCase().slice(0, 32);
+    const publicBase = String(req.body.public_base_url || '').trim().replace(/\/+$/, '').slice(0, 512);
+    if (!name) {
+      return res.redirect('/payroll/integrations?err=' + encodeURIComponent('Facility name is required.'));
+    }
+    try {
+      await require('../lib/ensureFacilityIntegrationSchema')(pool);
+      if (code) {
+        const [[dup]] = await pool.query('SELECT id FROM tbl_facility WHERE code = ? LIMIT 1', [code]);
+        if (dup) {
+          return res.redirect('/payroll/integrations?err=' + encodeURIComponent(`Facility code "${code}" is already in use.`));
+        }
+      }
+      const [[maxRow]] = await pool.query('SELECT COALESCE(MAX(id), 0) AS maxId FROM tbl_facility');
+      const id = (Number(maxRow && maxRow.maxId) || 0) + 1;
+      await pool.query(
+        'INSERT INTO tbl_facility (id, code, name, status, public_base_url) VALUES (?,?,?,1,?)',
+        [id, code || `FAC${id}`, name, publicBase || null]
+      );
+      await saveSettings(pool, id, {
+        public_base_url: publicBase,
+        enabled: true,
+        api_enabled: true,
+        hms_sync_enabled: true,
+        core_account_sync_enabled: false,
+      });
+      return res.redirect(
+        `/payroll/integrations?facility_id=${id}&msg=` +
+          encodeURIComponent(`Facility "${name}" created. Configure its integrations below.`)
+      );
+    } catch (e) {
+      return res.redirect('/payroll/integrations?err=' + encodeURIComponent(e.message));
+    }
+  });
+
   app.post('/payroll/integrations', requireAuth, requireAdminOrSuper, async (req, res) => {
     const facilityId = Math.max(1, parseInt(String(req.body.facility_id || '1'), 10) || 1);
     try {
@@ -80,6 +117,7 @@ module.exports = function integrationSettingsRoutes(app, pool, requireAuth, { re
         core_account_url: req.body.core_account_url,
         core_account_api_key: req.body.core_account_api_key,
         enabled: req.body.enabled === '1',
+        api_enabled: req.body.api_enabled === '1',
         core_account_sync_enabled: req.body.core_account_sync_enabled === '1',
         hms_sync_enabled: req.body.hms_sync_enabled === '1',
         hms_url: req.body.hms_url,
@@ -137,6 +175,9 @@ module.exports = function integrationSettingsRoutes(app, pool, requireAuth, { re
       service: 'Zaizens_PayRoll',
       facility_id: facilityId,
       syncEnabled: settings ? settings.core_account_sync_enabled === 1 : cfg.isIntegrationEnabled(),
+      integrationsEnabled: settings ? settings.enabled !== 0 : true,
+      apiEnabled: settings ? settings.api_enabled !== 0 : true,
+      hmsSyncEnabled: settings ? settings.hms_sync_enabled !== 0 : true,
       timestamp: new Date().toISOString(),
     });
   });

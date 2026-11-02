@@ -18,6 +18,69 @@
 <div class="alert alert-danger border-0 shadow-sm mb-3 alert-dismissible"><%= error %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
 <% } %>
 
+<div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+  <div class="card-body p-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-start mb-3">
+      <div>
+        <h2 class="h6 font-weight-bold mb-1">Facilities (tenants)</h2>
+        <p class="text-muted small mb-0">Each facility keeps its own payroll, employees and integration credentials.</p>
+      </div>
+      <span class="badge badge-light border"><%= (facilities || []).length %> facility(ies)</span>
+    </div>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr><th>ID</th><th>Code</th><th>Name</th><th>Status</th><th>Public URL</th><th></th></tr>
+        </thead>
+        <tbody>
+          <% (facilities || []).forEach(function (f) { %>
+          <tr<%= selectedId == f.id ? ' class="table-active"' : '' %>>
+            <td><%= f.id %></td>
+            <td><%= f.code || '—' %></td>
+            <td class="font-weight-bold"><%= f.name || '—' %></td>
+            <td>
+              <% if (Number(f.status) === 1) { %>
+              <span class="badge badge-success">Active</span>
+              <% } else { %>
+              <span class="badge badge-secondary">Inactive</span>
+              <% } %>
+            </td>
+            <td class="small text-muted text-break"><%= f.public_base_url || '—' %></td>
+            <td class="text-right">
+              <% if (selectedId != f.id) { %>
+              <a href="/payroll/integrations?facility_id=<%= f.id %>" class="btn btn-outline-secondary btn-sm">Configure</a>
+              <% } else { %>
+              <span class="text-success small font-weight-bold">Selected</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <form method="POST" action="/payroll/integrations/facilities" class="border-top pt-3">
+      <h3 class="h6 font-weight-bold mb-2">Create a facility</h3>
+      <div class="form-row">
+        <div class="form-group col-md-5">
+          <label class="small font-weight-bold text-muted text-uppercase" for="newFacilityName">Facility name</label>
+          <input type="text" class="form-control" id="newFacilityName" name="name" maxlength="255" required placeholder="e.g. Caminco Mining — Site B">
+        </div>
+        <div class="form-group col-md-3">
+          <label class="small font-weight-bold text-muted text-uppercase" for="newFacilityCode">Code (optional)</label>
+          <input type="text" class="form-control" id="newFacilityCode" name="code" maxlength="32" placeholder="e.g. SITEB">
+        </div>
+        <div class="form-group col-md-4">
+          <label class="small font-weight-bold text-muted text-uppercase" for="newFacilityUrl">Public URL (optional)</label>
+          <input type="url" class="form-control" id="newFacilityUrl" name="public_base_url" maxlength="512" placeholder="https://payroll.example.com">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm font-weight-bold"><i class="fa fa-plus mr-1"></i>Create facility</button>
+      <small class="text-muted ml-2">New facilities start with integrations and the API enabled.</small>
+    </form>
+  </div>
+</div>
+
 <form method="POST" action="/payroll/integrations" class="mb-4">
   <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
     <div class="card-body p-4">
@@ -26,6 +89,10 @@
       <div class="custom-control custom-switch mb-2">
         <input type="checkbox" class="custom-control-input" id="integrationsEnabled" name="enabled" value="1" <%= settings.enabled ? 'checked' : '' %>>
         <label class="custom-control-label font-weight-bold" for="integrationsEnabled">Enable integrations for this facility</label>
+      </div>
+      <div class="custom-control custom-switch mb-2">
+        <input type="checkbox" class="custom-control-input" id="apiEnabled" name="api_enabled" value="1" <%= settings.api_enabled ? 'checked' : '' %>>
+        <label class="custom-control-label" for="apiEnabled">Allow API access for this facility <span class="text-muted small">(inbound employee endpoints)</span></label>
       </div>
       <div class="custom-control custom-switch">
         <input type="checkbox" class="custom-control-input" id="hmsSyncEnabled" name="hms_sync_enabled" value="1" <%= settings.hms_sync_enabled ? 'checked' : '' %>>

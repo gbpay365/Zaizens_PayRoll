@@ -86,7 +86,7 @@ Leave balances show entitlement, days taken (approved), days pending and the rem
 | Role editor | `/admin/roles/:role` | Rename a role and tick its permissions, grouped by module, with a filter box |
 | Security | `/admin/security` | Password policy, sign-in lockout and organisation-wide forced password change |
 | Activity | `/admin/activity` | Read-only audit trail of account, role and security changes |
-| Integrations | `/payroll/integrations` | Facility URLs and API keys, plus master switches to enable or disable integrations and HMS employee sync |
+| Integrations | `/payroll/integrations` | Create facilities (tenants), store their URLs and API keys, and switch integrations, API access and HMS employee sync on or off per facility |
 | My password | `/account/password` | Self-service password change, also used when a change is forced |
 
 Security rules enforced by the module:

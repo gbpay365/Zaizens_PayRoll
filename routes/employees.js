@@ -10,6 +10,7 @@ const bcrypt = require('bcryptjs');
 const ensureHrPayrollSchema = require('../lib/ensureHrPayrollSchema');
 const ensureEmployeeHrSchema = require('../lib/ensureEmployeeHrSchema');
 const { loadRoleTitleMap, resolveRoleTitle, resolveHireDate } = require('../lib/hmsEmployeeHr');
+const { rolesForSector } = require('../lib/rolePresets');
 const { SECTORS, loadAllowanceSettings } = require('../lib/hmsAllowanceCameroon');
 const {
   computeFromGross,
@@ -82,6 +83,44 @@ async function loadRoles(pool) {
   }
 }
 
+/**
+ * Seed the sector's usual roles once, so HR does not have to create each one.
+ * Idempotent: titles already present in tbl_role are left untouched.
+ */
+async function ensurePresetRoles(pool, sector) {
+  const wanted = rolesForSector(sector);
+  if (!wanted.length) return;
+  try {
+    const [rows] = await pool.query(
+      'SELECT CAST(role AS UNSIGNED) AS id, title FROM tbl_role'
+    );
+    const seen = new Set((rows || []).map((r) => String(r.title || '').trim().toLowerCase()));
+    let nextId = Math.max(111, ...(rows || []).map((r) => Number(r.id) || 0)) + 1;
+    for (const title of wanted) {
+      const key = title.toLowerCase();
+      if (seen.has(key)) continue;
+      await pool.query('INSERT INTO tbl_role (role, title) VALUES (?, ?)', [String(nextId), title]);
+      seen.add(key);
+      nextId += 1;
+    }
+  } catch (e) {
+    console.warn('[employees/roles] preset seeding skipped:', e.message);
+  }
+}
+
+/** Sector roles first (Admin / Super Admin lead), then every other role. */
+function orderRolesForSector(roles, sector) {
+  const presets = rolesForSector(sector);
+  if (!presets.length) return roles;
+  const rank = new Map(presets.map((title, i) => [title.toLowerCase(), i]));
+  return roles.slice().sort((a, b) => {
+    const ra = rank.has(a.title.toLowerCase()) ? rank.get(a.title.toLowerCase()) : 1000;
+    const rb = rank.has(b.title.toLowerCase()) ? rank.get(b.title.toLowerCase()) : 1000;
+    if (ra !== rb) return ra - rb;
+    return a.id - b.id;
+  });
+}
+
 async function facilitySector(pool, fid) {
   try {
     const [[row]] = await pool.query(
@@ -135,7 +174,9 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
     try {
       await ensureHrPayrollSchema(pool);
       const fid = facilityId(req);
-      const [roles, sector] = await Promise.all([loadRoles(pool), facilitySector(pool, fid)]);
+      const sector = await facilitySector(pool, fid);
+      await ensurePresetRoles(pool, sector);
+      const roles = orderRolesForSector(await loadRoles(pool), sector);
       return renderNew(res, { roles, defaultSector: sector });
     } catch (e) {
       return res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });
@@ -185,7 +226,9 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
       const year = Math.min(2100, Math.max(2000, parseInt(body.year, 10) || new Date().getFullYear()));
 
       const fail = async (msg) => {
-        const [roles, sectorDefault] = await Promise.all([loadRoles(pool), facilitySector(pool, fid)]);
+        const sectorDefault = await facilitySector(pool, fid);
+        await ensurePresetRoles(pool, sectorDefault);
+        const roles = orderRolesForSector(await loadRoles(pool), sectorDefault);
         return renderNew(res, {
           status: 400,
           roles,
@@ -332,7 +375,9 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
       return res.redirect(`/payroll/employees/${employeeId}?${q.toString()}`);
     } catch (e) {
       console.error('[employees/new]', e.message);
-      const [roles, sectorDefault] = await Promise.all([loadRoles(pool), facilitySector(pool, fid)]);
+      const sectorDefault = await facilitySector(pool, fid);
+      await ensurePresetRoles(pool, sectorDefault);
+      const roles = orderRolesForSector(await loadRoles(pool), sectorDefault);
       return renderNew(res, {
         status: 500,
         roles,
@@ -340,6 +385,32 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
         form: body,
         error: e.message,
       });
+    }
+  });
+
+  /** Create a role that is not in the list yet, from the onboarding form. */
+  app.post('/payroll/roles', requireAuth, guard, async (req, res) => {
+    const title = clean((req.body || {}).title || (req.body || {}).name, 120);
+    if (title.length < 2) {
+      return res.status(400).json({ ok: false, error: 'Enter a role name of at least 2 characters.' });
+    }
+    try {
+      const [[existing]] = await pool.query(
+        'SELECT CAST(role AS UNSIGNED) AS id, title FROM tbl_role WHERE LOWER(title) = LOWER(?) ORDER BY id LIMIT 1',
+        [title]
+      );
+      if (existing && Number(existing.id) > 0) {
+        return res.json({ ok: true, role: { id: Number(existing.id), title: clean(existing.title, 120) || title } });
+      }
+      const [[maxRow]] = await pool.query(
+        'SELECT COALESCE(MAX(CAST(role AS UNSIGNED)), 0) AS maxId FROM tbl_role'
+      );
+      const nextId = Math.max(111, Number(maxRow && maxRow.maxId) + 1);
+      await pool.query('INSERT INTO tbl_role (role, title) VALUES (?, ?)', [String(nextId), title]);
+      return res.json({ ok: true, role: { id: nextId, title } });
+    } catch (e) {
+      console.error('[payroll/roles]', e.message);
+      return res.status(500).json({ ok: false, error: 'The role could not be saved. Try again.' });
     }
   });
 

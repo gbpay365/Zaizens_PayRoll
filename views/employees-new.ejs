@@ -91,6 +91,17 @@ var _v = function (key, fallback) {
                 <% }); %>
               </select>
               <span class="sage-hint">Allowances such as medical risk, responsibility and specialist research follow the role.</span>
+              <div class="mt-1">
+                <button type="button" class="btn btn-link btn-sm p-0" id="newRoleToggle">+ Create new role</button>
+                <div id="newRoleForm" class="mt-2" hidden>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <input type="text" class="form-control" id="newRoleName" maxlength="120" placeholder="e.g. Ventilation Engineer" style="flex:1 1 220px;" autocomplete="off">
+                    <button type="button" class="btn btn-sage btn-sm" id="newRoleSave">Add role</button>
+                    <button type="button" class="btn btn-sage-ghost btn-sm" id="newRoleCancel">Cancel</button>
+                  </div>
+                  <div class="text-danger small mt-1" id="newRoleError" hidden></div>
+                </div>
+              </div>
             </div>
             <div class="sage-field">
               <label for="jobTitle">Position / job title</label>
@@ -307,6 +318,72 @@ var _v = function (key, fallback) {
   function schedule() {
     clearTimeout(timer);
     timer = setTimeout(refresh, 320);
+  }
+
+  // ── Create a role that is missing from the list ───────────
+  var roleToggle = document.getElementById('newRoleToggle');
+  var roleForm = document.getElementById('newRoleForm');
+  var roleName = document.getElementById('newRoleName');
+  var roleSave = document.getElementById('newRoleSave');
+  var roleCancel = document.getElementById('newRoleCancel');
+  var roleError = document.getElementById('newRoleError');
+
+  function showRoleError(msg) {
+    if (!roleError) return;
+    roleError.textContent = msg || '';
+    roleError.hidden = !msg;
+  }
+
+  function closeRoleForm() {
+    if (!roleForm) return;
+    roleForm.hidden = true;
+    roleName.value = '';
+    showRoleError('');
+    if (roleSave) { roleSave.disabled = false; roleSave.textContent = 'Add role'; }
+  }
+
+  if (roleToggle && roleForm && roleName && roleSave) {
+    roleToggle.addEventListener('click', function () {
+      roleForm.hidden = !roleForm.hidden;
+      if (!roleForm.hidden) roleName.focus();
+    });
+    if (roleCancel) roleCancel.addEventListener('click', closeRoleForm);
+    roleName.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); roleSave.click(); }
+      if (ev.key === 'Escape') closeRoleForm();
+    });
+    roleSave.addEventListener('click', function () {
+      var title = roleName.value.trim();
+      if (title.length < 2) { showRoleError('Enter a role name of at least 2 characters.'); return; }
+      showRoleError('');
+      roleSave.disabled = true;
+      roleSave.textContent = 'Saving…';
+      fetch('/payroll/roles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ title: title })
+      })
+        .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+        .then(function (out) {
+          if (!out.ok || !out.data.role) throw new Error(out.data.error || 'The role could not be saved.');
+          var role = out.data.role;
+          var option = roleEl.querySelector('option[value="' + String(role.id) + '"]');
+          if (!option) {
+            option = document.createElement('option');
+            option.value = String(role.id);
+            option.textContent = role.title;
+            roleEl.appendChild(option);
+          }
+          roleEl.value = String(role.id);
+          closeRoleForm();
+          schedule();
+        })
+        .catch(function (err) {
+          showRoleError(err.message);
+          roleSave.disabled = false;
+          roleSave.textContent = 'Add role';
+        });
+    });
   }
 
   [grossEl, roleEl, hireEl, sectorEl, specEl].forEach(function (el) {

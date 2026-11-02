@@ -8,7 +8,7 @@ if (isNaN(_dateLabel.getTime())) _dateLabel = new Date();
 
 <div class="sage-page-head">
   <div>
-    <p class="sage-eyebrow">HR &middot; Attendance</p>
+    <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Attendance</p>
     <h1>Attendance register</h1>
     <p class="sage-sub"><%= _dateLabel.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) %> &middot; record presence and hours for the payroll period.</p>
   </div>

@@ -15,6 +15,17 @@
   }
   .toolbar button.primary { background: <%= meta.accent %>; color: #fff; border-color: <%= meta.accent %>; }
   .page { max-width: 980px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 28px; }
+  .letterhead {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
+    border-top: 4px solid #0d2137; padding-bottom: 16px; margin-bottom: 4px;
+  }
+  .letterhead-brand { display: flex; align-items: center; gap: 12px; }
+  .letterhead-logo { width: 44px; height: 44px; border-radius: 9px; display: block; }
+  .letterhead-name { font-size: 19px; font-weight: 800; letter-spacing: .02em; color: #0d2137; }
+  .letterhead-tag { font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #8a7440; margin-top: 3px; }
+  .letterhead-doc { text-align: right; }
+  .letterhead-title { font-size: 14px; font-weight: 800; color: #0d2137; }
+  .letterhead-meta { font-size: 11.5px; color: #64748b; margin-top: 3px; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 16px; }
   th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }
   th { background: #f1f5f9; font-weight: 700; }
@@ -48,7 +59,7 @@
     docNumber: periodLabel,
     docDate: printDate,
     accent: meta.accent,
-    tagline: orgName
+    tagline: (locals.company && locals.company.tagline) || orgName
   }) %>
 
   <div class="meta-row">
@@ -61,7 +72,11 @@
   <div class="summary-grid">
     <div class="summary-card"><div class="label"><%= _tl('tax_statutory.gross', 'Gross payroll') %></div><div class="value"><%= fmtMoney(summary.gross) %> FCFA</div></div>
     <div class="summary-card"><div class="label"><%= _tl('tax_statutory.cnps_employee', 'CNPS (employee)') %></div><div class="value"><%= fmtMoney(summary.cnps_employee) %> FCFA</div></div>
+    <% if (employerCnpsAvailable) { %>
     <div class="summary-card"><div class="label"><%= _tl('tax_statutory.cnps_employer', 'CNPS (employer)') %></div><div class="value"><%= fmtMoney(summary.cnps_employer) %> FCFA</div></div>
+    <% } else { %>
+    <div class="summary-card"><div class="label"><%= _tl('tax_statutory.cnps_employer', 'CNPS (employer)') %></div><div class="value">—</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">Not recorded in payroll rows</div></div>
+    <% } %>
     <div class="summary-card"><div class="label"><%= _tl('tax_statutory.irpp', 'IRPP') %></div><div class="value"><%= fmtMoney(summary.irpp) %> FCFA</div></div>
     <div class="summary-card"><div class="label"><%= _tl('tax_statutory.net', 'Net payroll') %></div><div class="value"><%= fmtMoney(summary.net) %> FCFA</div></div>
   </div>

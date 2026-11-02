@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Caminco S.A.">
+  <defs>
+    <linearGradient id="cm" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16344f"/>
+      <stop offset="100%" stop-color="#0d2137"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="10" fill="url(#cm)"/>
+  <circle cx="24" cy="24" r="17" fill="none" stroke="#c9a84c" stroke-width="1.4" opacity="0.55"/>
+  <path d="M31.6 17.4a10 10 0 1 0 0 13.2" fill="none" stroke="#c9a84c" stroke-width="3.6" stroke-linecap="round"/>
+  <circle cx="33.4" cy="14.8" r="2.4" fill="#f0d080"/>
+</svg>

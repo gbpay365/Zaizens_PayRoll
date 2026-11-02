@@ -209,7 +209,7 @@ module.exports = function registerHrHomeRoutes(app, pool, requireAuth) {
 
       const now = new Date();
       res.render('hr-home', {
-        title: 'HR — Zaizens Payroll',
+        title: 'HR — Caminco S.A.',
         payNavActive: 'hrhome',
         today,
         todayLabel: now.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),

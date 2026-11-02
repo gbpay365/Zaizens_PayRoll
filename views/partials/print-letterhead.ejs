@@ -1,0 +1,20 @@
+<%
+var _co = locals.company || {};
+var _name = _co.legalName || 'Caminco S.A.';
+var _tag = locals.tagline || _co.tagline || '';
+var _logo = _co.logoPath || '/img/caminco-mark.svg';
+%>
+<div class="letterhead" style="border-top-color: <%= accent %>;">
+  <div class="letterhead-brand">
+    <img class="letterhead-logo" src="<%= _logo %>" alt="">
+    <div>
+      <div class="letterhead-name"><%= _name %></div>
+      <% if (_tag) { %><div class="letterhead-tag"><%= _tag %></div><% } %>
+    </div>
+  </div>
+  <div class="letterhead-doc">
+    <div class="letterhead-title"><%= docTitle %></div>
+    <% if (docNumber) { %><div class="letterhead-meta"><%= docNumber %></div><% } %>
+    <% if (docDate) { %><div class="letterhead-meta">Printed: <%= docDate %></div><% } %>
+  </div>
+</div>

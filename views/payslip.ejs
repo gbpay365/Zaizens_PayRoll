@@ -63,6 +63,20 @@ if (typeof _tl !== 'function') {
       background: linear-gradient(90deg, transparent, #c9a84c, transparent);
       margin-top: 12px;
     }
+    .ps-header .org-logo {
+      width: 42px;
+      height: 42px;
+      display: block;
+      margin: 0 auto 8px;
+      border-radius: 9px;
+    }
+    .ps-header .org-tagline {
+      font-size: 9.5px;
+      margin-top: 3px;
+      color: rgba(255,255,255,.62);
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+    }
     .ps-header .org-name {
       font-size: 21px;
       font-weight: 700;
@@ -352,7 +366,7 @@ if (typeof _tl !== 'function') {
 
   const net = gross - ded;
   const netWords = numberToWords(net) + ' Francs CFA';
-  const orgName  = brand.slipHeader || brand.orgName || brand.facilityName || 'Hospital';
+  const orgName  = brand.slipHeader || brand.orgName || brand.facilityName || (locals.company && locals.company.legalName) || 'Caminco S.A.';
   const empAddr        = (empSettings.employer_address || '').trim();
   const empPhone       = (empSettings.employer_phone  || '').trim();
   const empCNPS        = (empSettings.employer_cnps_number || '').trim(); /* footer: employer CNPS code */
@@ -372,7 +386,9 @@ if (typeof _tl !== 'function') {
 
   <!-- ── HEADER ── -->
   <div class="ps-header">
+    <img class="org-logo" src="<%= (locals.company && locals.company.logoPath) || '/img/caminco-mark.svg' %>" alt="">
     <div class="org-name"><%- orgName %></div>
+    <div class="org-tagline"><%= (locals.company && locals.company.tagline) || 'Cameroon Mining Company' %></div>
     <div class="org-dept"><%= _tl('payslip.hr_dept', 'Human Resources Department – Payroll Unit') %></div>
     <% if (empAddr || empPhone) { %>
     <div class="org-addr">

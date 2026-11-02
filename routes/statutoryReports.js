@@ -3,6 +3,7 @@
 const ensureHrPayrollSchema = require('../lib/ensureHrPayrollSchema');
 const {
   REPORT_KINDS,
+  hasEmployerCnpsColumn,
   fmtMoney,
   loadEmployerSettings,
   loadMonthlySummary,
@@ -105,7 +106,8 @@ module.exports = function registerStatutoryReports(app, pool, requireAuth, { req
         months: MONTHS,
         periodLabel,
         printDate: new Date().toLocaleDateString('fr-FR'),
-        orgName: employer.facilityName || res.locals.brand?.orgName || 'Hospital',
+        orgName: res.locals.company?.legalName || res.locals.brand?.orgName || 'Caminco S.A.',
+        employerCnpsAvailable: await hasEmployerCnpsColumn(pool),
       });
     } catch (e) {
       res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });

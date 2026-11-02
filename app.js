@@ -12,6 +12,7 @@ const { flashT } = require('./lib/flashI18n');
 const { pageTitle } = require('./lib/pageTitle');
 const hmsI18n = require('./lib/payrollI18n');
 const pagination = require('./lib/pagination');
+const company = require('./lib/companyBrand');
 
 loadEnv();
 
@@ -94,7 +95,15 @@ app.use((req, res, next) => {
         pageData: {
           error: msg,
           msg: null,
-          brand: { name: 'ZAIZENS PAY', logoPath: '/img/zaizens-pay-mark.svg', faviconPath: '/img/zaizens-favicon.svg' },
+          brand: {
+            name: 'ZAIZENS PAY',
+            logoPath: '/img/zaizens-pay-mark.svg',
+            faviconPath: '/img/zaizens-favicon.svg',
+            orgName: company.legalName,
+            slipHeader: company.legalName,
+            facilityName: company.legalName,
+          },
+          company,
         },
       });
     }
@@ -104,7 +113,15 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  res.locals.brand = { name: 'ZAIZENS PAY', logoPath: '/img/zaizens-pay-mark.svg', faviconPath: '/img/zaizens-favicon.svg' };
+  res.locals.brand = {
+    name: 'ZAIZENS PAY',
+    logoPath: '/img/zaizens-pay-mark.svg',
+    faviconPath: '/img/zaizens-favicon.svg',
+    orgName: company.legalName,
+    slipHeader: company.legalName,
+    facilityName: company.legalName,
+  };
+  res.locals.company = company;
   res.locals.user = req.session.user || null;
   res.locals.HMS_PAGE_SIZE = pagination.DEFAULT_PAGE_SIZE;
   res.locals.buildPageUrl = pagination.buildPageUrl;

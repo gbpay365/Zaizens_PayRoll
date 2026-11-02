@@ -3,8 +3,71 @@
 const ensureHrPayrollSchema = require('../lib/ensureHrPayrollSchema');
 const hmsStaffAccountGuard = require('../lib/hmsStaffAccountGuard');
 const { loadRoleTitleMap, resolveRoleTitle } = require('../lib/hmsEmployeeHr');
+const { logAdminAction } = require('../lib/adminAudit');
+
+const EMPLOYEE_CHILD_TABLES = [
+  'tbl_hms_payroll_record',
+  'tbl_hms_pay_profile',
+  'tbl_hms_leave_request',
+  'tbl_hms_leave_balance',
+  'tbl_hms_attendance',
+  'tbl_hr_attendance',
+];
 
 module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
+  function canDeleteEmployees(req, res) {
+    const role = String(req.session.user?.role ?? '');
+    if (role === '1' || role === '99') return true;
+    const perms = res.locals.userPerms || [];
+    return perms.includes('*') || perms.includes('employee.delete');
+  }
+
+  function parseIdList(raw) {
+    const list = Array.isArray(raw) ? raw : [raw];
+    return [...new Set(list.map((v) => parseInt(String(v), 10)).filter((n) => n > 0))];
+  }
+
+  /**
+   * Remove employees and their login accounts (tbl_employee) together with the
+   * payroll, leave and attendance rows that belong to them.
+   */
+  async function removeEmployees(pool, ids, actorId) {
+    if (!ids.length) return { deleted: [], skipped: [] };
+    const placeholders = ids.map(() => '?').join(',');
+    const [rows] = await pool.query(
+      `SELECT id, first_name, last_name, username, role FROM tbl_employee WHERE id IN (${placeholders})`,
+      ids
+    );
+    const deleted = [];
+    const skipped = [];
+    for (const row of rows || []) {
+      if (Number(row.id) === Number(actorId)) {
+        skipped.push({ id: row.id, reason: 'You cannot delete your own account.' });
+        continue;
+      }
+      if (String(row.role) === '99') {
+        skipped.push({ id: row.id, reason: 'Super Admin accounts cannot be deleted.' });
+        continue;
+      }
+      const conn = await pool.getConnection();
+      try {
+        await conn.beginTransaction();
+        for (const table of EMPLOYEE_CHILD_TABLES) {
+          await conn.query(`DELETE FROM ${table} WHERE employee_id = ?`, [row.id]).catch(() => {});
+        }
+        await conn.query('DELETE FROM tbl_employee WHERE id = ?', [row.id]);
+        await conn.commit();
+        deleted.push(row);
+      } catch (e) {
+        await conn.rollback().catch(() => {});
+        skipped.push({ id: row.id, reason: e.message || 'Delete failed.' });
+      } finally {
+        conn.release();
+      }
+    }
+    return { deleted, skipped };
+  }
+
   function requireAdminOrPayrollWrite(req, res, next) {
     const role = String(req.session.user?.role ?? '');
     if (role === '1' || role === '99') return next();
@@ -47,12 +110,63 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
         title: 'Staff — ZAIZENS Payroll',
         staff: rows,
         canManagePayroll,
+        canDeleteEmployees: canDeleteEmployees(req, res),
         flash: req.query.msg || null,
         error: req.query.err || null,
       });
     } catch (err) {
       console.error('[staff]', err.message);
       res.status(500).render('error', { title: 'Error', message: err.message || 'Staff load failed.', status: 500 });
+    }
+  });
+
+  app.post('/staff/bulk-delete', requireAuth, async (req, res) => {
+    if (!canDeleteEmployees(req, res)) {
+      return res.redirect('/staff?err=' + encodeURIComponent('You do not have permission to delete employees.'));
+    }
+    const ids = parseIdList(req.body.ids);
+    if (!ids.length) return res.redirect('/staff?err=' + encodeURIComponent('Select at least one employee to delete.'));
+    try {
+      const actorId = Number(req.session.user?.id) || 0;
+      const { deleted, skipped } = await removeEmployees(pool, ids, actorId);
+      for (const row of deleted) {
+        await logAdminAction(pool, req, 'employee.delete', {
+          targetType: 'employee',
+          targetId: row.id,
+          detail: `Deleted employee ${row.first_name} ${row.last_name} (@${row.username || '—'}) and their login account`,
+        });
+      }
+      const msg = `${deleted.length} employee(s) and their accounts deleted.` +
+        (skipped.length ? ` ${skipped.length} skipped: ${skipped.map((s) => s.reason).join(' ')}` : '');
+      return res.redirect('/staff?msg=' + encodeURIComponent(msg));
+    } catch (e) {
+      console.error('[staff/bulk-delete]', e.message);
+      return res.redirect('/staff?err=' + encodeURIComponent(e.message));
+    }
+  });
+
+  app.post('/staff/:id/delete', requireAuth, async (req, res) => {
+    if (!canDeleteEmployees(req, res)) {
+      return res.redirect('/staff?err=' + encodeURIComponent('You do not have permission to delete employees.'));
+    }
+    const id = parseInt(req.params.id, 10) || 0;
+    if (id < 1) return res.redirect('/staff?err=' + encodeURIComponent('Employee not found.'));
+    try {
+      const actorId = Number(req.session.user?.id) || 0;
+      const { deleted, skipped } = await removeEmployees(pool, [id], actorId);
+      if (!deleted.length) {
+        return res.redirect('/staff?err=' + encodeURIComponent(skipped[0]?.reason || 'Employee not found.'));
+      }
+      const row = deleted[0];
+      await logAdminAction(pool, req, 'employee.delete', {
+        targetType: 'employee',
+        targetId: row.id,
+        detail: `Deleted employee ${row.first_name} ${row.last_name} (@${row.username || '—'}) and their login account`,
+      });
+      return res.redirect('/staff?msg=' + encodeURIComponent('Employee and their login account deleted.'));
+    } catch (e) {
+      console.error('[staff/:id/delete]', e.message);
+      return res.redirect('/staff?err=' + encodeURIComponent(e.message));
     }
   });
 

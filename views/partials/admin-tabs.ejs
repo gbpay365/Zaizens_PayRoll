@@ -8,4 +8,5 @@ function _admTab(key) { return _activeAdmin === key ? ' active' : ''; }
   <a href="/admin/roles" class="sage-tab<%= _admTab('admin-roles') %>"><i class="fa fa-shield"></i> Roles &amp; permissions</a>
   <a href="/admin/security" class="sage-tab<%= _admTab('admin-security') %>"><i class="fa fa-lock"></i> Security</a>
   <a href="/admin/activity" class="sage-tab<%= _admTab('admin-activity') %>"><i class="fa fa-history"></i> Activity</a>
+  <a href="/payroll/integrations" class="sage-tab<%= _admTab('integrations') %>"><i class="fa fa-plug"></i> Integrations</a>
 </nav>

@@ -6,7 +6,10 @@
     <h4 class="page-title font-weight-bold text-dark mb-1">Integration &amp; API settings</h4>
     <p class="text-muted small mb-0">Configure cross-platform URLs and API keys per facility. Use public HTTPS URLs when apps run on different servers.</p>
   </div>
+  <span class="badge <%= settings.enabled ? 'badge-success' : 'badge-secondary' %> align-self-start"><%= settings.enabled ? 'Integrations enabled' : 'Integrations disabled' %></span>
 </div>
+
+<%- include('partials/admin-tabs') %>
 
 <% if(locals.flash){ %>
 <div class="alert alert-success border-0 shadow-sm mb-3 alert-dismissible"><%= flash %><button type="button" class="close" data-dismiss="alert"><span>&times;</span></button></div>
@@ -16,6 +19,24 @@
 <% } %>
 
 <form method="POST" action="/payroll/integrations" class="mb-4">
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-body p-4">
+      <h2 class="h6 font-weight-bold mb-1">Integration switches</h2>
+      <p class="text-muted small mb-3">Turn the whole integration layer off without deleting any configuration. Disabled integrations reject incoming API calls and skip outbound payroll sync.</p>
+      <div class="custom-control custom-switch mb-2">
+        <input type="checkbox" class="custom-control-input" id="integrationsEnabled" name="enabled" value="1" <%= settings.enabled ? 'checked' : '' %>>
+        <label class="custom-control-label font-weight-bold" for="integrationsEnabled">Enable integrations for this facility</label>
+      </div>
+      <div class="custom-control custom-switch">
+        <input type="checkbox" class="custom-control-input" id="hmsSyncEnabled" name="hms_sync_enabled" value="1" <%= settings.hms_sync_enabled ? 'checked' : '' %>>
+        <label class="custom-control-label" for="hmsSyncEnabled">Accept employee updates pushed from HMS</label>
+      </div>
+      <div class="mt-3">
+        <button type="submit" class="btn btn-primary btn-sm font-weight-bold"><i class="fa fa-save mr-1"></i>Save switches</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
     <div class="card-body p-4">
       <h2 class="h6 font-weight-bold mb-3">Facility (tenant)</h2>

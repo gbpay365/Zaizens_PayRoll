@@ -49,10 +49,22 @@ var _withProfile = _rows.filter(function (r) { return r.hasProfile; }).length;
              aria-label="Filter employees" autocomplete="off">
     </div>
   </div>
+  <% if (locals.canDeleteEmployees) { %>
+  <form method="POST" action="/staff/bulk-delete" id="staffBulkForm">
+    <div class="staff-bulk-bar">
+      <label class="staff-check-all"><input type="checkbox" id="staffSelectAll"> <span>Select all</span></label>
+      <span class="staff-sel-count" id="staffSelCount">0 selected</span>
+      <button type="submit" class="btn btn-danger btn-sm" id="staffBulkDelete" disabled
+              onclick="return confirm('Delete the selected employees and their login accounts? This cannot be undone.');">
+        <i class="fa fa-trash mr-1"></i>Delete selected
+      </button>
+    </div>
+  <% } %>
   <div class="pay-table-wrap">
     <table class="pay-table" id="staffTable">
       <thead>
         <tr>
+          <% if (locals.canDeleteEmployees) { %><th class="staff-check"></th><% } %>
           <th>Employee</th>
           <th>Matricule</th>
           <th>Position</th>
@@ -65,10 +77,13 @@ var _withProfile = _rows.filter(function (r) { return r.hasProfile; }).length;
       </thead>
       <tbody>
         <% if (!_rows.length) { %>
-        <tr><td colspan="8" class="sage-empty"><i class="fa fa-users"></i>No employees yet.<% if (locals.canManagePayroll) { %> <a href="/payroll/employees/new">Add the first employee</a>.<% } %></td></tr>
+        <tr><td colspan="<%= locals.canDeleteEmployees ? 9 : 8 %>" class="sage-empty"><i class="fa fa-users"></i>No employees yet.<% if (locals.canManagePayroll) { %> <a href="/payroll/employees/new">Add the first employee</a>.<% } %></td></tr>
         <% } %>
         <% _rows.forEach(function(row) { %>
         <tr data-search="<%= [row.first_name, row.last_name, row.username, row.employee_id, row.roleLabel, row.primary_department, row.job_title].filter(Boolean).join(' ').toLowerCase() %>">
+          <% if (locals.canDeleteEmployees) { %>
+          <td class="staff-check"><input type="checkbox" class="staff-row-check" name="ids" value="<%= row.id %>" aria-label="Select <%= row.first_name %> <%= row.last_name %>"></td>
+          <% } %>
           <td>
             <div class="d-flex align-items-center" style="gap:10px;">
               <span class="staff-avatar"><%= ((row.first_name || '?').charAt(0) + (row.last_name || '').charAt(0)).toUpperCase() %></span>
@@ -103,12 +118,17 @@ var _withProfile = _rows.filter(function (r) { return r.hasProfile; }).length;
             <% if (locals.canManagePayroll || (locals.user && Number(locals.user.id) === Number(row.id))) { %>
             <a href="/payroll/employees/<%= row.id %>" class="btn btn-sage-ghost btn-sm">Open</a>
             <% } %>
+            <% if (locals.canDeleteEmployees && String(row.role) !== '99' && !(locals.user && Number(locals.user.id) === Number(row.id))) { %>
+            <button type="submit" formaction="/staff/<%= row.id %>/delete" class="btn btn-sage-ghost btn-sm staff-row-delete"
+                    title="Delete this employee" onclick="return confirm('Delete <%= (row.first_name + ' ' + row.last_name).replace(/'/g, "") %> and their login account? This cannot be undone.');">Delete</button>
+            <% } %>
           </td>
         </tr>
         <% }); %>
       </tbody>
     </table>
   </div>
+  <% if (locals.canDeleteEmployees) { %></form><% } %>
 </section>
 
 <style>
@@ -118,21 +138,65 @@ var _withProfile = _rows.filter(function (r) { return r.hasProfile; }).length;
     display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
   }
   .staff-name { color: #16211c !important; font-weight: 600; text-decoration: none !important; }
-  .staff-name:hover { color: #00834b !important; }
+  .staff-name:hover { color: #b06a12 !important; }
+  .staff-bulk-bar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 14px;
+    padding: 10px 18px; border-bottom: 1px solid var(--zx-line, #e7e1d4);
+    background: #fdfaf4; font-size: 13px;
+  }
+  .staff-bulk-bar .staff-check-all { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: #4c5561; margin: 0; }
+  .staff-bulk-bar .staff-sel-count { color: #8a7f6b; font-size: 12px; }
+  .staff-bulk-bar .btn { margin-left: auto; }
+  .staff-bulk-bar .btn:disabled { opacity: 0.45; }
+  .staff-check { width: 34px; text-align: center; }
+  .staff-check input { width: 15px; height: 15px; accent-color: #c2410c; cursor: pointer; }
+  .staff-row-delete { color: #b42318 !important; border-color: #f0c6c2 !important; }
+  .staff-row-delete:hover { background: #fbeceb !important; border-color: #b42318 !important; }
 </style>
 
 <script>
 (function () {
   var input = document.getElementById('staffSearch');
   var rows = document.querySelectorAll('#staffTable tbody tr[data-search]');
-  if (!input || !rows.length) return;
-  input.addEventListener('input', function () {
-    var q = (input.value || '').trim().toLowerCase();
-    rows.forEach(function (tr) {
-      var hay = tr.getAttribute('data-search') || '';
-      tr.style.display = !q || hay.indexOf(q) !== -1 ? '' : 'none';
+  if (input && rows.length) {
+    input.addEventListener('input', function () {
+      var q = (input.value || '').trim().toLowerCase();
+      rows.forEach(function (tr) {
+        var hay = tr.getAttribute('data-search') || '';
+        tr.style.display = !q || hay.indexOf(q) !== -1 ? '' : 'none';
+      });
     });
-  });
+  }
+
+  var form = document.getElementById('staffBulkForm');
+  if (!form) return;
+  var selectAll = document.getElementById('staffSelectAll');
+  var countEl = document.getElementById('staffSelCount');
+  var deleteBtn = document.getElementById('staffBulkDelete');
+  var boxes = Array.prototype.slice.call(form.querySelectorAll('.staff-row-check'));
+
+  function refresh() {
+    var selected = boxes.filter(function (b) { return b.checked; }).length;
+    var visible = boxes.filter(function (b) { return b.closest('tr') && b.closest('tr').style.display !== 'none'; });
+    if (selectAll) {
+      selectAll.checked = visible.length > 0 && visible.every(function (b) { return b.checked; });
+      selectAll.indeterminate = selected > 0 && !selectAll.checked;
+    }
+    if (countEl) countEl.textContent = selected + ' selected';
+    if (deleteBtn) deleteBtn.disabled = selected === 0;
+  }
+
+  boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      boxes.forEach(function (b) {
+        var tr = b.closest('tr');
+        if (tr && tr.style.display !== 'none') b.checked = selectAll.checked;
+      });
+      refresh();
+    });
+  }
+  refresh();
 })();
 </script>
 

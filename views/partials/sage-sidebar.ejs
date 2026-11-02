@@ -62,9 +62,6 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
       <% if (_canSettings) { %>
       <a href="/payroll/settings" class="<%= _active('/payroll/settings') %>"><i class="fa fa-sliders"></i> Tax settings</a>
       <% } %>
-      <% if (_isAdmin) { %>
-      <a href="/payroll/integrations" class="<%= _active('/payroll/integrations') %>"><i class="fa fa-plug"></i> Integrations</a>
-      <% } %>
 
       <p class="sage-nav-label">Leave</p>
       <% if (_leaveAdmin) { %>
@@ -97,6 +94,7 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
       <a href="/admin/roles" class="<%= _active('/admin/roles') %>"><i class="fa fa-shield"></i> Roles &amp; permissions</a>
       <a href="/admin/security" class="<%= _active('/admin/security') %>"><i class="fa fa-lock"></i> Security</a>
       <a href="/admin/activity" class="<%= _active('/admin/activity') %>"><i class="fa fa-history"></i> Admin activity</a>
+      <a href="/payroll/integrations" class="<%= _active('/payroll/integrations') %>"><i class="fa fa-plug"></i> Integrations</a>
     <% } %>
   </nav>
 

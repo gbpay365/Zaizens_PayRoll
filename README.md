@@ -68,6 +68,8 @@ The application shell uses the ZAIZENS identity: a light navigation rail with gr
 | Public holidays | `/hr/holidays` | HR / admin |
 | Attendance register | `/hr/attendance` | HR / payroll write |
 
+Employees can be deleted one at a time or in bulk from the Employees register; deleting an employee also removes their login account, pay profile, payroll lines, leave records and attendance. Super Admin accounts and your own account are protected, and every deletion is written to the admin audit trail.
+
 Leave balances show entitlement, days taken (approved), days pending and the remaining balance. Employee records in `/payroll/employees/:id` show the same leave/attendance data next to the salary breakdown, and payslips, payroll runs and tax declarations all read the same payroll tables. Non-admin users land on `/hr` after sign-in and are redirected there if they open a payroll-only page.
 
 ## Admin module
@@ -84,6 +86,7 @@ Leave balances show entitlement, days taken (approved), days pending and the rem
 | Role editor | `/admin/roles/:role` | Rename a role and tick its permissions, grouped by module, with a filter box |
 | Security | `/admin/security` | Password policy, sign-in lockout and organisation-wide forced password change |
 | Activity | `/admin/activity` | Read-only audit trail of account, role and security changes |
+| Integrations | `/payroll/integrations` | Facility URLs and API keys, plus master switches to enable or disable integrations and HMS employee sync |
 | My password | `/account/password` | Self-service password change, also used when a change is forced |
 
 Security rules enforced by the module:

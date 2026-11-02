@@ -10,7 +10,7 @@ var _v = function (key, fallback) {
   <div>
     <p class="sage-eyebrow">Employees &middot; Onboarding</p>
     <h1>New employee</h1>
-    <p class="sage-sub">Enter the gross monthly salary and the payroll engine fills in basic, housing, transport, allowances and every statutory deduction.</p>
+    <p class="sage-sub">Enter the net monthly salary and the payroll engine back-calculates basic, housing, transport, gross and every statutory deduction.</p>
   </div>
   <div class="sage-head-actions no-print">
     <a href="/staff" class="btn btn-sage-ghost"><i class="fa fa-angle-left mr-1"></i> Back to employees</a>
@@ -145,14 +145,14 @@ var _v = function (key, fallback) {
 
       <section class="sage-card">
         <div class="sage-card-head">
-          <div><h2>Salary</h2><p class="sage-card-sub">Gross monthly salary in XAF</p></div>
+          <div><h2>Salary</h2><p class="sage-card-sub">Net monthly salary in XAF</p></div>
         </div>
         <div class="sage-card-body">
           <div class="sage-form-grid">
             <div class="sage-field">
-              <label for="gross">Gross monthly salary (XAF) <span class="text-danger">*</span></label>
-              <input type="number" min="1" step="1000" class="form-control" id="gross" name="gross" value="<%= _v('gross') %>" required inputmode="numeric" placeholder="e.g. 450000">
-              <span class="sage-hint">Basic = gross minus housing (15%), transport (10%) and role allowances.</span>
+              <label for="net">Net monthly salary (XAF) <span class="text-danger">*</span></label>
+              <input type="number" min="1" step="1000" class="form-control" id="net" name="net" value="<%= _v('net') %>" required inputmode="numeric" placeholder="e.g. 342000">
+              <span class="sage-hint">Take-home pay after tax. Basic and gross are back-calculated from housing (15%), transport (10%), role allowances and statutory deductions.</span>
             </div>
             <div class="sage-field">
               <label for="payMonth">First payroll period</label>
@@ -183,7 +183,7 @@ var _v = function (key, fallback) {
         <div class="sage-card-body" id="previewBody">
           <div class="sage-empty" id="previewEmpty">
             <i class="fa fa-calculator"></i>
-            Enter a gross salary to preview the deductions.
+            Enter a net salary to preview the gross and deductions.
           </div>
           <div id="previewContent" style="display:none;">
             <dl class="sage-list">
@@ -239,7 +239,7 @@ var _v = function (key, fallback) {
   var fmt = function (n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
   var form = document.getElementById('employeeForm');
   if (!form) return;
-  var grossEl = document.getElementById('gross');
+  var netEl = document.getElementById('net');
   var roleEl = document.getElementById('role');
   var hireEl = document.getElementById('joiningDate');
   var sectorEl = document.getElementById('sector');
@@ -277,22 +277,22 @@ var _v = function (key, fallback) {
 
     document.getElementById('pvNet').textContent = fmt(data.net) + ' XAF';
     document.getElementById('pvNote').textContent = data.statutory_ready
-      ? 'Basic, housing (15%) and transport (10%) are derived from the gross. Deductions use the current tax year settings.'
+      ? 'Gross, basic, housing (15%) and transport (10%) are back-calculated from the net. Deductions use the current tax year settings.'
       : 'Payroll tax settings are missing for this facility, so deductions cannot be calculated yet.';
     emptyEl.style.display = 'none';
     contentEl.style.display = '';
   }
 
   function refresh() {
-    var gross = parseFloat(grossEl.value) || 0;
-    if (gross <= 0) {
+    var net = parseFloat(netEl.value) || 0;
+    if (net <= 0) {
       emptyEl.style.display = '';
       contentEl.style.display = 'none';
       return;
     }
     var mySeq = ++seq;
     var payload = {
-      gross: gross,
+      net: net,
       role: roleEl.value,
       hire_date: hireEl.value,
       sector: sectorEl.value,
@@ -386,13 +386,13 @@ var _v = function (key, fallback) {
     });
   }
 
-  [grossEl, roleEl, hireEl, sectorEl, specEl].forEach(function (el) {
+  [netEl, roleEl, hireEl, sectorEl, specEl].forEach(function (el) {
     if (!el) return;
     el.addEventListener('change', schedule);
     el.addEventListener('input', schedule);
   });
 
-  if (parseFloat(grossEl.value) > 0) refresh();
+  if (parseFloat(netEl.value) > 0) refresh();
 })();
 </script>
 

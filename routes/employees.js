@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Employee onboarding: create an employee, set a gross salary and let the
+ * Employee onboarding: create an employee, set a net salary and let the
  * Cameroon statutory engine generate the pay profile + first payroll line.
  */
 
@@ -14,6 +14,7 @@ const { rolesForSector } = require('../lib/rolePresets');
 const { SECTORS, loadAllowanceSettings } = require('../lib/hmsAllowanceCameroon');
 const {
   computeFromGross,
+  computeFromNet,
   computeFromProfile,
 } = require('../lib/payrollCompensation');
 
@@ -183,19 +184,19 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
     }
   });
 
-  /** Live preview: gross → basic, allowances, statutory deductions, net. */
+  /** Live preview: net → gross, basic, allowances and statutory deductions. */
   app.post('/payroll/employees/preview', requireAuth, guard, async (req, res) => {
     try {
       await ensureHrPayrollSchema(pool);
       const fid = facilityId(req);
-      const gross = Math.max(0, parseFloat(req.body.gross) || 0);
-      if (gross <= 0) return res.status(400).json({ error: 'Enter a gross salary greater than zero.' });
+      const net = Math.max(0, parseFloat(req.body.net) || 0);
+      if (net <= 0) return res.status(400).json({ error: 'Enter a net salary greater than zero.' });
 
       const sector = SECTORS[clean(req.body.sector, 40).toLowerCase()] ? clean(req.body.sector, 40).toLowerCase() : 'medical';
       const settings = await loadAllowanceSettings(pool, fid, sector);
       const role = clean(req.body.role, 20) || '0';
       const roleMap = await loadRoleTitleMap(pool);
-      const comp = await computeFromGross(pool, fid, new Date().getFullYear(), gross, {
+      const comp = await computeFromNet(pool, fid, new Date().getFullYear(), net, {
         role,
         roleTitle: resolveRoleTitle(role, roleMap),
         hireDate: toIsoDate(req.body.hire_date),
@@ -218,7 +219,7 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
 
       const first = clean(body.first_name, 120);
       const last = clean(body.last_name, 120);
-      const gross = Math.max(0, parseFloat(body.gross) || 0);
+      const net = Math.max(0, parseFloat(body.net) || 0);
       const role = clean(body.role, 20);
       const sector = SECTORS[clean(body.sector, 40).toLowerCase()] ? clean(body.sector, 40).toLowerCase() : 'medical';
       const hireDate = toIsoDate(body.joining_date) || new Date().toISOString().slice(0, 10);
@@ -240,7 +241,7 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
 
       if (!first || !last) return fail('First name and last name are required.');
       if (!role) return fail('Select the employee role — it drives the statutory allowances.');
-      if (gross <= 0) return fail('Enter a gross monthly salary greater than zero.');
+      if (net <= 0) return fail('Enter a net monthly salary greater than zero.');
 
       // ── Unique username ───────────────────────────────────────
       const base = slugUsername(first, last);
@@ -293,10 +294,10 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
         await pool.query('UPDATE tbl_employee SET employee_id = ? WHERE id = ?', [matricule, employeeId]);
       }
 
-      // ── Pay profile + statutory deductions from gross ────────
+      // ── Pay profile + statutory deductions, back-calculated from net ────────
       const settings = await loadAllowanceSettings(pool, fid, sector);
       const roleMap = await loadRoleTitleMap(pool);
-      const comp = await computeFromGross(pool, fid, year, gross, {
+      const comp = await computeFromNet(pool, fid, year, net, {
         role,
         roleTitle: resolveRoleTitle(role, roleMap),
         hireDate,
@@ -369,7 +370,7 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
       }
 
       const q = new URLSearchParams();
-      q.set('msg', `Employee ${first} ${last} created with gross XAF ${comp.gross.toLocaleString('fr-FR')}.`);
+      q.set('msg', `Employee ${first} ${last} created with net XAF ${net.toLocaleString('fr-FR')} (gross XAF ${comp.gross.toLocaleString('fr-FR')}).`);
       if (recordId) q.set('record', String(recordId));
       if (warning) q.set('err', warning);
       return res.redirect(`/payroll/employees/${employeeId}?${q.toString()}`);

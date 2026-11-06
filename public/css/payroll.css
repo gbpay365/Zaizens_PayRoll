@@ -343,6 +343,26 @@
   font-weight: 600;
 }
 
+.pay-module .pay-run-costs {
+  margin-bottom: 20px;
+}
+
+.pay-module .pay-run-costs .pay-panel-head small {
+  font-size: 0.74rem;
+}
+
+.pay-module .pay-run-table tfoot td {
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-top: 2px solid var(--pay-border);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pay-module .pay-run-total {
+  color: #0f172a;
+}
+
 .pay-module .pay-badge {
   display: inline-block;
   font-size: 0.7rem;

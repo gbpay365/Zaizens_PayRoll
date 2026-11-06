@@ -183,6 +183,69 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      .filter((id) => id > 0);
    }
 
+   // Employer burden per monthly run. Rates are read from the facility settings
+   // and applied to each line exactly as on the payslip (CNPS is capped).
+   let runTotals = [];
+   let runTotalsSummary = null;
+   try {
+    const [[rateRow]] = await pool.query(
+     `SELECT employer_cnps_rate, employer_cfc_rate, employer_fne_rate
+        FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1`,
+     [fid]
+    );
+    const rateOr = (value, fallback) => {
+     const n = parseFloat(value);
+     return Number.isFinite(n) ? n : fallback;
+    };
+    const rates = {
+     cnps: rateOr(rateRow && rateRow.employer_cnps_rate, DEFAULT_EMPLOYER_RATES.cnps),
+     cfc: rateOr(rateRow && rateRow.employer_cfc_rate, DEFAULT_EMPLOYER_RATES.cfc),
+     fne: rateOr(rateRow && rateRow.employer_fne_rate, DEFAULT_EMPLOYER_RATES.fne),
+    };
+    const [groupRows] = await pool.query(
+     `SELECT p.year, p.month, COUNT(*) AS line_count,
+             COALESCE(SUM(p.gross_salary), 0) AS gross,
+             COALESCE(SUM(ROUND(LEAST(COALESCE(p.gross_salary, 0), ?) * ? / 100)), 0) AS employer_cnps,
+             COALESCE(SUM(ROUND(COALESCE(p.gross_salary, 0) * ? / 100)), 0) AS employer_cfc,
+             COALESCE(SUM(ROUND(COALESCE(p.gross_salary, 0) * ? / 100)), 0) AS employer_fne
+        ${fromJoin}
+       GROUP BY p.year, p.month
+       ORDER BY p.year DESC, p.month DESC`,
+     [EMPLOYER_CNPS_CAP, rates.cnps, rates.cfc, rates.fne, ...listParams]
+    );
+    runTotals = (groupRows || []).map((r) => {
+     const gross = Number(r.gross) || 0;
+     const employerCnps = Number(r.employer_cnps) || 0;
+     const employerCfc = Number(r.employer_cfc) || 0;
+     const employerFne = Number(r.employer_fne) || 0;
+     return {
+      year: parseInt(r.year, 10) || 0,
+      month: parseInt(r.month, 10) || 0,
+      count: parseInt(r.line_count, 10) || 0,
+      gross,
+      employerCnps,
+      employerCfc,
+      employerFne,
+      cost: gross + employerCnps + employerCfc + employerFne,
+     };
+    });
+    if (runTotals.length) {
+     runTotalsSummary = runTotals.reduce(
+      (acc, r) => ({
+       count: acc.count + r.count,
+       gross: acc.gross + r.gross,
+       employerCnps: acc.employerCnps + r.employerCnps,
+       employerCfc: acc.employerCfc + r.employerCfc,
+       employerFne: acc.employerFne + r.employerFne,
+       cost: acc.cost + r.cost,
+      }),
+      { count: 0, gross: 0, employerCnps: 0, employerCfc: 0, employerFne: 0, cost: 0 }
+     );
+    }
+   } catch (err) {
+    console.warn('PAYROLL MONTHLY employer totals:', err.message);
+   }
+
    res.render('payroll-monthly', {
     title: 'Payroll (monthly) - ZAIZENS',
     months,
@@ -195,6 +258,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     canPayrollSettings,
     sessionUid: uid,
     allDeletableIds,
+    runTotals,
+    runTotalsSummary,
     flash: req.query.msg || null,
     error: req.query.err || null
    });

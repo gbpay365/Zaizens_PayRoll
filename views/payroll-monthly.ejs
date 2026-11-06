@@ -3,6 +3,8 @@
 var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
 var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
 var m = locals.metrics || {};
+var _runTotals = Array.isArray(locals.runTotals) ? locals.runTotals : [];
+var _runSummary = locals.runTotalsSummary || null;
 %>
 
 <div class="pay-hero">
@@ -39,6 +41,56 @@ var m = locals.metrics || {};
     <div class="pay-kpi-value"><%= _fmtXaf(m.periodNet) %></div>
   </div>
 </div>
+
+<% if(_runTotals.length){ %>
+<div class="pay-panel pay-run-costs">
+  <div class="pay-panel-head">
+    <h2><%= _t('monthly.employer_cost_by_run', { ns: 'payroll', defaultValue: 'Employer cost by run' }) %></h2>
+    <small class="text-muted"><%= _t('monthly.employer_cost_hint', { ns: 'payroll', defaultValue: 'Gross salary plus configured employer CNPS, CFC and FNE.' }) %></small>
+  </div>
+  <div class="pay-table-wrap">
+    <table class="pay-table pay-run-table">
+      <thead>
+        <tr>
+          <th><%= _t('common.period', { ns: 'payroll', defaultValue: 'Period' }) %></th>
+          <th class="text-right"><%= _t('monthly.run_lines', { ns: 'payroll', defaultValue: 'Lines' }) %></th>
+          <th class="text-right"><%= _t('col_gross', { ns: 'payroll', defaultValue: 'Gross (XAF)' }) %></th>
+          <th class="text-right"><%= _t('monthly.employer_cnps', { ns: 'payroll', defaultValue: 'Employer CNPS' }) %></th>
+          <th class="text-right"><%= _t('monthly.employer_cfc', { ns: 'payroll', defaultValue: 'Employer CFC' }) %></th>
+          <th class="text-right"><%= _t('monthly.employer_fne', { ns: 'payroll', defaultValue: 'Employer FNE' }) %></th>
+          <th class="text-right"><%= _t('monthly.total_employer_cost', { ns: 'payroll', defaultValue: 'Total employer cost' }) %></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% _runTotals.forEach(function(run){ %>
+        <tr>
+          <td class="font-weight-bold"><%= months[run.month] || run.month %> <%= run.year %></td>
+          <td class="pay-num"><%= run.count %></td>
+          <td class="pay-num"><%= _fmtXaf(run.gross) %></td>
+          <td class="pay-num"><%= _fmtXaf(run.employerCnps) %></td>
+          <td class="pay-num"><%= _fmtXaf(run.employerCfc) %></td>
+          <td class="pay-num"><%= _fmtXaf(run.employerFne) %></td>
+          <td class="pay-num pay-run-total"><strong><%= _fmtXaf(run.cost) %></strong></td>
+        </tr>
+        <% }); %>
+      </tbody>
+      <% if(_runSummary){ %>
+      <tfoot>
+        <tr>
+          <td class="font-weight-bold"><%= _t('monthly.all_runs', { ns: 'payroll', defaultValue: 'All runs' }) %></td>
+          <td class="pay-num"><%= _runSummary.count %></td>
+          <td class="pay-num"><%= _fmtXaf(_runSummary.gross) %></td>
+          <td class="pay-num"><%= _fmtXaf(_runSummary.employerCnps) %></td>
+          <td class="pay-num"><%= _fmtXaf(_runSummary.employerCfc) %></td>
+          <td class="pay-num"><%= _fmtXaf(_runSummary.employerFne) %></td>
+          <td class="pay-num"><strong><%= _fmtXaf(_runSummary.cost) %></strong></td>
+        </tr>
+      </tfoot>
+      <% } %>
+    </table>
+  </div>
+</div>
+<% } %>
 
 <div class="pay-panel">
   <div class="pay-panel-head">

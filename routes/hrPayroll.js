@@ -865,8 +865,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
       roleTitle: p.role_title || '',
       hireDate: pay.hire_date || null,
       settings: settingsBySector.get(sector) || [],
-      nightShifts: 0,
-      onCallShifts: 0,
+      nightShifts: Number(pay.night_shifts_per_month) || 0,
+      onCallShifts: Number(pay.on_call_per_month) || 0,
       isSpecialist: Boolean(pay.is_specialist),
      }).lines || [];
     } catch (e) {
@@ -875,12 +875,62 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     pay.engine_allowance_lines = lines
      .filter((l) => ENGINE_ONLY_CODES.includes(l.code))
      .map((l) => ({ code: l.code, label: l.label, amount: Math.round(Number(l.amount) || 0) }));
+
+    // Mirror the monthly run: engine values replace the legacy flat Risk /
+    // Responsibility fields for the same code, and shift allowances stay tax-free.
+    const engineCodes = new Set(lines.map((l) => l.code));
+    const effectiveMra = engineCodes.has('medical_risk') ? 0 : Number(pay.medical_risk_allowance) || 0;
+    const effectiveRa = engineCodes.has('medical_responsibility') ? 0 : Number(pay.responsibility_allowance) || 0;
+    const isTaxFree = (l) => TAX_FREE_ALLOWANCE_CODES.has(l.code);
+    const taxFreeTotal = lines.filter(isTaxFree).reduce((s, l) => s + (Math.round(Number(l.amount)) || 0), 0);
+    const taxableEngine = lines.filter((l) => !isTaxFree(l)).reduce((s, l) => s + (Math.round(Number(l.amount)) || 0), 0);
+    const taxableGross =
+     (Number(pay.basic_salary) || 0) +
+     (Number(pay.housing_allowance) || 0) +
+     (Number(pay.transport_allowance) || 0) +
+     (Number(pay.other_allowances) || 0) +
+     taxableEngine +
+     effectiveMra +
+     effectiveRa;
+    pay.monthly_gross = taxableGross + taxFreeTotal;
+    pay._taxable_gross = taxableGross;
+    pay._tax_free_total = taxFreeTotal;
+   }
+
+   // Expected net for the summary row. The tax engine needs the taxable gross
+   // only, so run these in parallel to keep the page fast on a full page of staff.
+   const taxYear = new Date().getFullYear();
+   await Promise.all(
+    profiles.map(async (p) => {
+     const pay = p.pay || {};
+     if (!(pay._taxable_gross > 0)) {
+      pay.monthly_net = 0;
+      return;
+     }
+     try {
+      const tax = await hmsPayrollCameroonCalculate(pool, fid, taxYear, pay._taxable_gross);
+      pay.monthly_net = tax ? Math.round((Number(tax.net_salary) || 0) + (pay._tax_free_total || 0)) : null;
+     } catch (e) {
+      console.warn('[payroll/profiles] expected net:', e.message);
+      pay.monthly_net = null;
+     }
+    })
+   );
+   const totals = { count: profiles.length, gross: 0, net: 0, netComplete: true };
+   for (const p of profiles) {
+    const pay = p.pay || {};
+    totals.gross += Number(pay.monthly_gross) || 0;
+    if (pay.monthly_net == null) totals.netComplete = false;
+    else totals.net += Number(pay.monthly_net) || 0;
+    delete pay._taxable_gross;
+    delete pay._tax_free_total;
    }
 
    res.render('payroll-profiles', {
     title: 'Pay profiles - ZAIZENS',
     profiles,
     pager,
+    totals,
     searchQ,
     roleLabels,
     allSectors: ALLOWANCE_SECTORS,

@@ -10,6 +10,7 @@
   .pay-profiles-wide .pay-table th,
   .pay-profiles-wide .pay-table td { white-space: nowrap; }
   .pay-profiles-wide .pay-staff-name { white-space: nowrap; }
+  .pay-totals-row td { background: #f8fafc; border-top: 2px solid #cbd5e1; padding: 12px 14px; }
 </style>
 <script>
   (function () {
@@ -205,6 +206,32 @@
         <tr><td colspan="13" class="text-center text-muted py-5"><%= _t('profiles.no_staff_match', { ns: 'payroll', defaultValue: 'No staff match your search.' }) %></td></tr>
       <% } %>
       </tbody>
+      <tfoot>
+        <tr class="pay-totals-row">
+          <td colspan="13">
+            <div class="d-flex flex-wrap align-items-center justify-content-between" style="gap:12px 24px;">
+              <div>
+                <strong><%= _t('profiles.page_totals', { ns: 'payroll', defaultValue: 'Page totals' }) %></strong>
+                <span class="text-muted small">
+                  &middot; <%= _t('profiles.staff_on_page', { ns: 'payroll', defaultValue: '{{count}} staff on this page' }).replace('{{count}}', totals.count) %>
+                </span>
+              </div>
+              <div class="d-flex flex-wrap" style="gap:24px;">
+                <div>
+                  <div class="text-muted small text-uppercase"><%= _t('profiles.monthly_gross_cost', { ns: 'payroll', defaultValue: 'Monthly gross cost' }) %></div>
+                  <div class="font-weight-bold" style="font-size:1.05rem;"><%= Number(totals.gross || 0).toLocaleString('fr-FR') %> XAF</div>
+                </div>
+                <div>
+                  <div class="text-muted small text-uppercase"><%= _t('profiles.expected_net', { ns: 'payroll', defaultValue: 'Expected net' }) %></div>
+                  <div class="font-weight-bold" style="font-size:1.05rem;color:#065f46;">
+                    <%= totals.netComplete ? Number(totals.net || 0).toLocaleString('fr-FR') + ' XAF' : '—' %>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </tfoot>
     </table>
   </div>
   <%- include('partials/pagination', { pager: locals.pager, pagerBase: '/payroll/profiles', pagerQuery: (typeof searchQ === 'string' && searchQ) ? { q: searchQ } : {} }) %>

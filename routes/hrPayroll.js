@@ -11,6 +11,7 @@ const {
 } = require('../lib/hmsEmployeeHr');
 const hmsFormatDate = require('../lib/hmsFormatDate');
 const { hmsPayrollCameroonCalculate, defaultBracketsJson } = require('../lib/hmsPayrollCameroon');
+const { computeFromGross, computeFromNet } = require('../lib/payrollCompensation');
 const { loadPayrollDashboard } = require('../lib/hmsPayrollDashboard');
 const pagination = require('../lib/pagination');
 const hmsStaffAccountGuard = require('../lib/hmsStaffAccountGuard');
@@ -877,12 +878,10 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   *   Gross = Basic + Housing + Transport + EngineAllowances
   *   Net   = Gross − statutory deductions (CNPS, CFC, CRTV, council, FNE, IRPP, CAC)
   *
-  * For mode='net', we solve Gross via bisection on the deduction function,
-  * then split using the formula above.
+  * For mode='net', the shared lib/payrollCompensation engine back-calculates
+  * Gross and Basic from the target take-home pay.
   */
  app.post('/payroll/profiles/auto-compute', requireAuth, requirePayrollAccess, requireAdminOrSuper, async (req, res) => {
-  const HOUSING_PCT   = 0.15;
-  const TRANSPORT_PCT = 0.10;
   try {
    await ensureHrPayrollSchema(pool);
    const fid    = facilityId(req);
@@ -916,96 +915,37 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
 
    const settings = await loadAllowanceSettings(pool, fid, sector);
    const year = new Date().getFullYear();
+   const ctx = {
+    role: emp.role,
+    roleTitle,
+    hireDate,
+    settings,
+    nightShifts,
+    onCallShifts: onCall,
+    isSpecialist: isSpec,
+   };
 
-   /** For a candidate basic, return the full breakdown. */
-   function breakdownFromBasic(basic) {
-    const b = Math.max(0, Math.round(basic));
-    const housing   = Math.round(b * HOUSING_PCT);
-    const transport = Math.round(b * TRANSPORT_PCT);
-    const allow = computeAllowances({
-     basicSalary:  b,
-     role:         emp.role,
-     roleTitle,
-     hireDate,
-     settings,
-     nightShifts,
-     onCallShifts: onCall,
-     isSpecialist: isSpec,
-    });
-    const lines = allow.lines || [];
-    const taxFreeTotal = lines
-      .filter((l) => l.code === 'night_duty' || l.code === 'on_call')
-      .reduce((sum, l) => sum + (parseInt(l.amount, 10) || 0), 0);
-    const taxableAllowances = Math.max(0, (allow.total || 0) - taxFreeTotal);
-    const taxableGross = b + housing + transport + taxableAllowances;
-    const gross = taxableGross + taxFreeTotal;
-    return { basic: b, housing, transport, allow, taxableGross, taxFreeTotal, gross };
-   }
-
-   /** Solve basic so that gross ≈ targetGross. Newton's method. */
-   function solveBasicForGross(targetGross) {
-    if (targetGross <= 0) return 0;
-    let basic = targetGross / 1.5; // initial guess
-    for (let i = 0; i < 30; i++) {
-     const cur = breakdownFromBasic(basic);
-     const diff = targetGross - cur.gross;
-     if (Math.abs(diff) < 1) break;
-     const slope = (breakdownFromBasic(basic + 1000).gross - cur.gross) / 1000;
-     if (!isFinite(slope) || slope <= 0) break;
-     basic = Math.max(0, basic + diff / slope);
-    }
-    return Math.max(0, Math.round(basic));
-   }
-
-   /** Solve gross from a target net via bisection over hmsPayrollCameroonCalculate. */
-   async function solveGrossForNet(targetNet) {
-    let lo = targetNet, hi = targetNet * 3;
-    let g  = targetNet * 1.3;
-    for (let i = 0; i < 40; i++) {
-     const calc = await hmsPayrollCameroonCalculate(pool, fid, year, g);
-     if (!calc) return targetNet;
-     const net = calc.net_salary;
-     if (Math.abs(net - targetNet) < 1) return Math.round(g);
-     if (net < targetNet) lo = g; else hi = g;
-     g = (lo + hi) / 2;
-    }
-    return Math.round(g);
-   }
-
-   const targetGross = mode === 'gross' ? amount : await solveGrossForNet(amount);
-   const basic       = solveBasicForGross(targetGross);
-   const final       = breakdownFromBasic(basic);
-   const taxCalc     = await hmsPayrollCameroonCalculate(pool, fid, year, final.taxableGross);
+   // Same engine as the new-employee form, so both screens agree. In net mode it
+   // bisects on the statutory deductions and accounts for tax-free night-duty /
+   // on-call allowances that sit outside the taxable gross.
+   const comp = mode === 'net'
+    ? await computeFromNet(pool, fid, year, amount, ctx)
+    : await computeFromGross(pool, fid, year, amount, ctx);
 
    return res.json({
     ok:                       true,
     mode,
     input:                    amount,
-    basic_salary:             final.basic,
-    housing_allowance:        final.housing,
-    transport_allowance:      final.transport,
+    basic_salary:             comp.basic_salary,
+    housing_allowance:        comp.housing_allowance,
+    transport_allowance:      comp.transport_allowance,
     medical_risk_allowance:   0,
     responsibility_allowance: 0,
-    allowance_lines:          final.allow.lines || [],
-    allowance_total:          final.allow.total || 0,
-    gross:                    final.gross,
-    net:                      taxCalc ? taxCalc.net_salary + final.taxFreeTotal : null,
-    deductions:               taxCalc ? {
-     cnps:    taxCalc.cnps_employee,
-     cfc:     taxCalc.cimr_employee,
-     crtv:    taxCalc.crtv_deduction,
-     council: taxCalc.council_tax_deduction,
-     fne:     taxCalc.development_tax_deduction,
-     irpp:    taxCalc.income_tax,
-     cac:     taxCalc.cnhc_deduction,
-     total:   (taxCalc.cnps_employee || 0)
-            + (taxCalc.cimr_employee || 0)
-            + (taxCalc.crtv_deduction || 0)
-            + (taxCalc.council_tax_deduction || 0)
-            + (taxCalc.development_tax_deduction || 0)
-            + (taxCalc.income_tax || 0)
-            + (taxCalc.cnhc_deduction || 0),
-    } : null,
+    allowance_lines:          comp.allowance_lines || [],
+    allowance_total:          comp.allowance_total || 0,
+    gross:                    comp.gross,
+    net:                      comp.net,
+    deductions:               comp.deductions,
    });
   } catch (e) {
    console.error('AUTO-COMPUTE:', e);

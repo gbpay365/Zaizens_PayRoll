@@ -211,8 +211,8 @@
     calcGross: _t('profiles.calc_gross', { ns: 'payroll', defaultValue: 'Gross salary (before deductions)' }),
     calcNet: _t('profiles.calc_net', { ns: 'payroll', defaultValue: 'Net salary (take-home)' }),
     calcAmount: _t('profiles.calc_amount', { ns: 'payroll', defaultValue: 'Amount (XAF)' }),
-    calcAmountPh: _t('profiles.calc_amount_ph', { ns: 'payroll', defaultValue: 'e.g. 500000' }),
-    calcHint: _t('profiles.calc_hint', { ns: 'payroll', defaultValue: 'Housing is set to 15% of Basic and Transport to 10% of Basic. Statutory allowances (Medical Responsibility, Specialist Research, Risk, Technical, Seniority, etc.) are computed from role and hire date.' }),
+    calcAmountPh: _t('profiles.calc_amount_ph', { ns: 'payroll', defaultValue: 'e.g. 342000' }),
+    calcHint: _t('profiles.calc_hint', { ns: 'payroll', defaultValue: 'Enter the take-home pay you want and Gross plus Basic are back-calculated. Housing is 15% of Basic and Transport 10% of Basic; statutory allowances (Medical Responsibility, Specialist Research, Risk, Technical, Seniority, etc.) follow the role and hire date.' }),
     calcValidAmount: _t('profiles.calc_valid_amount', { ns: 'payroll', defaultValue: 'Enter an amount greater than 0' }),
     calculate: _t('common.calculate', { ns: 'payroll', defaultValue: 'Calculate' }),
     cancel: _t('common.cancel', { ns: 'payroll', defaultValue: 'Cancel' }),
@@ -257,8 +257,8 @@
           '<div class="form-group mb-2">' +
             '<label class="small font-weight-bold mb-1" style="color:#475569;">' + PAY_I18N.calcEnterAs + '</label>' +
             '<select id="calcMode" class="form-control form-control-sm hms-input">' +
+              '<option value="net" selected>' + PAY_I18N.calcNet + '</option>' +
               '<option value="gross">' + PAY_I18N.calcGross + '</option>' +
-              '<option value="net">' + PAY_I18N.calcNet + '</option>' +
             '</select>' +
           '</div>' +
           '<div class="form-group mb-2">' +
@@ -274,7 +274,7 @@
       confirmButtonColor: '#7c3aed',
       focusConfirm: false,
       preConfirm: function () {
-        var mode = (document.getElementById('calcMode') || {}).value || 'gross';
+        var mode = (document.getElementById('calcMode') || {}).value || 'net';
         var amount = parseFloat((document.getElementById('calcAmount') || {}).value);
         if (!amount || amount <= 0) {
           Swal.showValidationMessage(PAY_I18N.calcValidAmount);
@@ -360,4 +360,5 @@
 })();
 </script>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <%- include('partials/payroll-layout-end') %>

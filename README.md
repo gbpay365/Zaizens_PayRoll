@@ -46,7 +46,7 @@ All payroll features are enabled locally (profiles, monthly processing, payslips
 3. The preview panel shows the derived basic salary, housing (15%) and transport (10%), role allowances and every statutory deduction (CNPS, CFC, CRTV, council tax, FNE, IRPP, CAC), with the resulting net pay.
 4. Saving creates the employee, their pay profile and a pending payroll line for the chosen period, then opens the employee page with the full breakdown and a link to the payslip.
 
-The same calculation engine powers **Pay profiles →** the row calculator (enter a gross or net figure) and the monthly payroll run, so the numbers stay consistent.
+The same calculation engine powers **Pay profiles →** the row calculator (it defaults to a net figure and back-calculates gross; gross entry is still available) and the monthly payroll run, so the numbers stay consistent.
 
 ## Interface
 

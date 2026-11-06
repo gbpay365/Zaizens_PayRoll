@@ -28,6 +28,8 @@ const {
 const { allPresets: payrollTaxPresets, presetFor: payrollTaxPresetFor } = require('../lib/payrollTaxPresets');
 const { countRosterShiftsForMonth } = require('../lib/hmsRoster');
 const { syncPayrollPeriodToCoreAccount, syncPayrollPeriodsAfterDelete, formatCoreSyncNote } = require('../lib/coreAccountPayrollSync');
+const { logAdminAction } = require('../lib/adminAudit');
+const crypto = require('crypto');
 
 /**
  * Roster-based shift/on-call allowance codes. These are paid in addition to the
@@ -40,6 +42,65 @@ const TAX_FREE_ALLOWANCE_CODES = new Set(['night_duty', 'on_call']);
 // columns. CNPS mirrors the payslip (4.2% pension + 7% family benefits, capped).
 const DEFAULT_EMPLOYER_RATES = { cnps: 11.2, cfc: 1.5, fne: 1.0 };
 const EMPLOYER_CNPS_CAP = 750000;
+
+function auditAmount(value) {
+ return Math.round(Number(value) || 0).toLocaleString('en-US');
+}
+
+function payProfileAmounts(row) {
+ const p = row || {};
+ return {
+  basic_salary: Math.max(0, Math.round(Number(p.basic_salary) || 0)),
+  housing_allowance: Math.max(0, Math.round(Number(p.housing_allowance) || 0)),
+  transport_allowance: Math.max(0, Math.round(Number(p.transport_allowance) || 0)),
+  medical_risk_allowance: Math.max(0, Math.round(Number(p.medical_risk_allowance) || 0)),
+  responsibility_allowance: Math.max(0, Math.round(Number(p.responsibility_allowance) || 0)),
+ };
+}
+
+function payProfileAuditLine(amounts) {
+ const a = payProfileAmounts(amounts);
+ return `Basic ${auditAmount(a.basic_salary)}, Housing ${auditAmount(a.housing_allowance)}, ` +
+  `Transport ${auditAmount(a.transport_allowance)}, Medical risk ${auditAmount(a.medical_risk_allowance)}, ` +
+  `Responsibility ${auditAmount(a.responsibility_allowance)}`;
+}
+
+function payProfileSnapshot(row) {
+ const p = row || {};
+ return {
+  basic_salary: Math.max(0, Math.round(Number(p.basic_salary) || 0)),
+  housing_allowance: Math.max(0, Math.round(Number(p.housing_allowance) || 0)),
+  transport_allowance: Math.max(0, Math.round(Number(p.transport_allowance) || 0)),
+  other_allowances: Math.max(0, Math.round(Number(p.other_allowances) || 0)),
+  medical_risk_allowance: Math.max(0, Math.round(Number(p.medical_risk_allowance) || 0)),
+  responsibility_allowance: Math.max(0, Math.round(Number(p.responsibility_allowance) || 0)),
+  is_specialist: parseInt(p.is_specialist || 0, 10) === 1 ? 1 : 0,
+  night_shifts_per_month: Math.max(0, parseInt(p.night_shifts_per_month || 0, 10) || 0),
+  on_call_per_month: Math.max(0, parseInt(p.on_call_per_month || 0, 10) || 0),
+ };
+}
+
+function payProfileSnapshotChanged(before, after) {
+ if (!before) return true;
+ return Object.keys(after).some((key) => before[key] !== after[key]);
+}
+
+function manualPayProfileAuditLine(amounts) {
+ const a = payProfileSnapshot(amounts);
+ return `Basic ${auditAmount(a.basic_salary)}, Housing ${auditAmount(a.housing_allowance)}, ` +
+  `Transport ${auditAmount(a.transport_allowance)}, Other ${auditAmount(a.other_allowances)}, ` +
+  `Medical risk ${auditAmount(a.medical_risk_allowance)}, Responsibility ${auditAmount(a.responsibility_allowance)}; ` +
+  `Specialist ${a.is_specialist ? 'yes' : 'no'}, Night shifts ${a.night_shifts_per_month}, On-call ${a.on_call_per_month}`;
+}
+
+function payrollRecordAuditDetail(row) {
+ const r = row || {};
+ const name = `${r.first_name || ''} ${r.last_name || ''}`.trim() || `Employee #${r.employee_id || '—'}`;
+ const period = hmsFormatDate.formatMonthYear(new Date(Number(r.year) || 2000, (Number(r.month) || 1) - 1, 1));
+ return `Deleted payroll record for ${name} — ${period}: ` +
+  `Gross ${auditAmount(r.gross_salary)} XAF, Net ${auditAmount(r.net_salary)} XAF, ` +
+  `payout status ${r.payout_status || 'pending'}.`;
+}
 
 function csvCell(value) {
  const s = String(value == null ? '' : value);
@@ -58,6 +119,14 @@ function parsePeriodParam(value) {
 function normalizePeriodRange(from, to) {
  if (from && to && from.key > to.key) return { from: to, to: from };
  return { from, to };
+}
+
+function parseIsoDateParam(value) {
+ const raw = String(value || '').trim();
+ if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+ const d = new Date(`${raw}T00:00:00Z`);
+ if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== raw) return null;
+ return raw;
 }
 
 function applyPeriodRange(where, params, from, to) {
@@ -881,7 +950,11 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   try {
    await ensureHrPayrollSchema(pool);
    const [[row]] = await pool.query(
-    'SELECT year, month FROM tbl_hms_payroll_record WHERE id = ? AND facility_id = ? LIMIT 1',
+    `SELECT r.year, r.month, r.employee_id, r.gross_salary, r.net_salary, r.payout_status,
+            e.first_name, e.last_name
+     FROM tbl_hms_payroll_record r
+     LEFT JOIN tbl_employee e ON e.id = r.employee_id
+     WHERE r.id = ? AND r.facility_id = ? LIMIT 1`,
     [rid, fid]
    );
    const [r] = await pool.query(
@@ -889,6 +962,13 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     [rid, fid]
    );
    const ok = r.affectedRows > 0;
+   if (ok && row) {
+    await logAdminAction(pool, req, 'payroll.salary_delete', {
+     targetType: 'employee',
+     targetId: row.employee_id,
+     detail: payrollRecordAuditDetail(row),
+    });
+   }
    let syncNote = '';
    if (ok && row) {
     const syncResult = await syncPayrollPeriodsAfterDelete(pool, fid, [{ year: row.year, month: row.month }]).catch(
@@ -925,17 +1005,33 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   try {
    await ensureHrPayrollSchema(pool);
    const placeholders = ids.map(() => '?').join(',');
-   const [periodRows] = await pool.query(
-    `SELECT DISTINCT year, month FROM tbl_hms_payroll_record WHERE facility_id = ? AND id IN (${placeholders})`,
+   const [recordRows] = await pool.query(
+    `SELECT r.id, r.year, r.month, r.employee_id, r.gross_salary, r.net_salary, r.payout_status,
+            e.first_name, e.last_name
+     FROM tbl_hms_payroll_record r
+     LEFT JOIN tbl_employee e ON e.id = r.employee_id
+     WHERE r.facility_id = ? AND r.id IN (${placeholders})`,
     [fid, ...ids]
    );
+   const periodRows = [...new Map(
+    (recordRows || []).map((row) => [`${row.year}-${row.month}`, { year: row.year, month: row.month }])
+   ).values()];
    const [r] = await pool.query(
     `DELETE FROM tbl_hms_payroll_record WHERE facility_id = ? AND id IN (${placeholders})`,
     [fid, ...ids]
    );
    const n = r.affectedRows || 0;
+   if (n > 0) {
+    for (const row of recordRows || []) {
+     await logAdminAction(pool, req, 'payroll.salary_delete', {
+      targetType: 'employee',
+      targetId: row.employee_id,
+      detail: payrollRecordAuditDetail(row),
+     });
+    }
+   }
    let syncNote = '';
-   if (n > 0 && periodRows && periodRows.length) {
+   if (n > 0 && periodRows.length) {
     const syncResult = await syncPayrollPeriodsAfterDelete(pool, fid, periodRows).catch(() => null);
     syncNote = formatCoreSyncNote(syncResult);
    }
@@ -1237,6 +1333,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   *
   * For mode='net', the shared lib/payrollCompensation engine back-calculates
   * Gross and Basic from the target take-home pay.
+  *
+  * The recalculated basic, housing, transport and flat allowances are persisted
+  * to tbl_hms_pay_profile before returning, so applying a salary target saves it.
   */
  app.post('/payroll/profiles/auto-compute', requireAuth, requirePayrollAccess, requireAdminOrSuper, async (req, res) => {
   try {
@@ -1259,13 +1358,34 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    const roleTitle = String(emp.role_title || '').trim();
 
    const [[pp]] = await pool.query(
-    `SELECT hire_date, sector, night_shifts_per_month, on_call_per_month, is_specialist
+    `SELECT hire_date, DATE_FORMAT(hire_date, '%Y-%m-%d') AS hire_date_iso,
+            sector, night_shifts_per_month, on_call_per_month, is_specialist,
+            basic_salary, housing_allowance, transport_allowance,
+            medical_risk_allowance, responsibility_allowance
      FROM tbl_hms_pay_profile WHERE facility_id=? AND employee_id=? LIMIT 1`,
     [fid, eid]
    ).catch(() => [[null]]);
 
+   const previousProfile = pp ? {
+    basic_salary:             Math.max(0, Math.round(Number(pp.basic_salary) || 0)),
+    housing_allowance:        Math.max(0, Math.round(Number(pp.housing_allowance) || 0)),
+    transport_allowance:      Math.max(0, Math.round(Number(pp.transport_allowance) || 0)),
+    medical_risk_allowance:   Math.max(0, Math.round(Number(pp.medical_risk_allowance) || 0)),
+    responsibility_allowance: Math.max(0, Math.round(Number(pp.responsibility_allowance) || 0)),
+    is_specialist:            parseInt(pp.is_specialist || 0, 10) === 1 ? 1 : 0,
+    hire_date:                pp.hire_date_iso || null,
+    sector:                   String(pp.sector || 'medical').toLowerCase(),
+    night_shifts_per_month:   Math.max(0, parseInt(pp.night_shifts_per_month || 0, 10)),
+    on_call_per_month:        Math.max(0, parseInt(pp.on_call_per_month || 0, 10)),
+   } : null;
+
+   const [[facilitySettings]] = await pool.query(
+    `SELECT default_sector FROM tbl_hms_payroll_settings WHERE facility_id=? ORDER BY tax_year DESC LIMIT 1`,
+    [fid]
+   ).catch(() => [[null]]);
+
    const hireDate    = resolveHireDate(emp.joining_date, pp && pp.hire_date);
-   const sector      = String((pp && pp.sector) || 'medical').toLowerCase();
+   const sector      = String((pp && pp.sector) || (facilitySettings && facilitySettings.default_sector) || 'medical').toLowerCase();
    const nightShifts = parseInt((pp && pp.night_shifts_per_month) || 0, 10);
    const onCall      = parseInt((pp && pp.on_call_per_month) || 0, 10);
    const isSpec      = parseInt((pp && pp.is_specialist) || 0, 10) === 1;
@@ -1298,15 +1418,93 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     return Math.max(0, Math.round(Number(line && line.amount) || 0));
    };
 
+   const basicSalary = Math.max(0, Math.round(Number(comp.basic_salary) || 0));
+   const housingAllowance = Math.max(0, Math.round(Number(comp.housing_allowance) || 0));
+   const transportAllowance = Math.max(0, Math.round(Number(comp.transport_allowance) || 0));
+   const medicalRiskAllowance = allowanceAmount('medical_risk');
+   const responsibilityAllowance = allowanceAmount('medical_responsibility');
+
+   // Applying a salary target is an edit action: persist the recalculated
+   // profile immediately so the row cannot drift from what the user applied.
+   try {
+    await pool.query(
+     `INSERT INTO tbl_hms_pay_profile
+       (facility_id, employee_id, basic_salary, housing_allowance, transport_allowance,
+        medical_risk_allowance, responsibility_allowance, is_specialist,
+        hire_date, sector, night_shifts_per_month, on_call_per_month)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE
+       basic_salary=VALUES(basic_salary), housing_allowance=VALUES(housing_allowance),
+       transport_allowance=VALUES(transport_allowance),
+       medical_risk_allowance=VALUES(medical_risk_allowance),
+       responsibility_allowance=VALUES(responsibility_allowance),
+       is_specialist=VALUES(is_specialist),
+       hire_date=VALUES(hire_date), sector=VALUES(sector),
+       night_shifts_per_month=VALUES(night_shifts_per_month),
+       on_call_per_month=VALUES(on_call_per_month)`,
+     [
+      fid, eid, basicSalary, housingAllowance, transportAllowance,
+      medicalRiskAllowance, responsibilityAllowance, isSpec ? 1 : 0,
+      hireDate, sector, nightShifts, onCall,
+     ]
+    );
+   } catch (eSave) {
+    if (!eSave || eSave.code !== 'ER_BAD_FIELD_ERROR') throw eSave;
+    await pool.query(
+     `INSERT INTO tbl_hms_pay_profile
+       (facility_id, employee_id, basic_salary, housing_allowance, transport_allowance)
+      VALUES (?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE
+       basic_salary=VALUES(basic_salary), housing_allowance=VALUES(housing_allowance),
+       transport_allowance=VALUES(transport_allowance)`,
+     [fid, eid, basicSalary, housingAllowance, transportAllowance]
+    );
+   }
+
+   // A short-lived, session-bound snapshot powers the "Undo" action on the
+   // success dialog. Keeping it server-side means the client cannot choose the
+   // values that get restored.
+   const undoToken = crypto.randomUUID();
+   req.session.payProfileUndo = {
+    token: undoToken,
+    employeeId: eid,
+    facilityId: fid,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+    previousProfile,
+    calculation: {
+     mode,
+     target_amount: amount,
+     basic_salary: basicSalary,
+     housing_allowance: housingAllowance,
+     transport_allowance: transportAllowance,
+     medical_risk_allowance: medicalRiskAllowance,
+     responsibility_allowance: responsibilityAllowance,
+     gross: Math.max(0, Math.round(Number(comp.gross) || 0)),
+     net: Math.max(0, Math.round(Number(comp.net) || 0)),
+    },
+   };
+
+   await logAdminAction(pool, req, 'payroll.salary_calculate', {
+    targetType: 'employee',
+    targetId: eid,
+    detail:
+     `Calculated and saved salary from ${mode.toUpperCase()} target ${auditAmount(amount)} XAF. ` +
+     `Saved: ${payProfileAuditLine({ basic_salary: basicSalary, housing_allowance: housingAllowance, transport_allowance: transportAllowance, medical_risk_allowance: medicalRiskAllowance, responsibility_allowance: responsibilityAllowance })}; ` +
+     `Gross ${auditAmount(comp.gross)}, Net ${auditAmount(comp.net)}. ` +
+     (previousProfile ? `Previous: ${payProfileAuditLine(previousProfile)}.` : 'No previous pay profile existed.'),
+   });
+
    return res.json({
     ok:                       true,
+    saved:                    true,
+    undo_token:               undoToken,
     mode,
     input:                    amount,
-    basic_salary:             comp.basic_salary,
-    housing_allowance:        comp.housing_allowance,
-    transport_allowance:      comp.transport_allowance,
-    medical_risk_allowance:   allowanceAmount('medical_risk'),
-    responsibility_allowance: allowanceAmount('medical_responsibility'),
+    basic_salary:             basicSalary,
+    housing_allowance:        housingAllowance,
+    transport_allowance:      transportAllowance,
+    medical_risk_allowance:   medicalRiskAllowance,
+    responsibility_allowance: responsibilityAllowance,
     allowance_lines:          comp.allowance_lines || [],
     allowance_total:          comp.allowance_total || 0,
     gross:                    comp.gross,
@@ -1315,6 +1513,102 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    });
   } catch (e) {
    console.error('AUTO-COMPUTE:', e);
+   return res.status(500).json({ error: e.message });
+  }
+ });
+
+ /**
+  * Undo the most recent automatic pay-profile save for this session.
+  *
+  * Input (JSON): { employee_id:int, token:string }
+  * Restores the row values captured before auto-compute, or deletes the row if
+  * auto-compute created it. Tokens expire after ten minutes.
+  */
+ app.post('/payroll/profiles/undo-auto-compute', requireAuth, requirePayrollAccess, requireAdminOrSuper, async (req, res) => {
+  const fid = facilityId(req);
+  const eid = parseInt(req.body.employee_id, 10) || 0;
+  const token = String(req.body.token || '');
+  const undo = req.session && req.session.payProfileUndo;
+
+  if (eid < 1 || !token) {
+   return res.status(400).json({ error: 'employee_id and token required' });
+  }
+  if (!undo || undo.token !== token || undo.employeeId !== eid || undo.facilityId !== fid || Date.now() > undo.expiresAt) {
+   return res.status(410).json({ code: 'undo_unavailable', error: 'This change can no longer be undone.' });
+  }
+
+  try {
+   await ensureHrPayrollSchema(pool);
+   const snapshot = undo.previousProfile;
+   const [[currentRow]] = await pool.query(
+    `SELECT basic_salary, housing_allowance, transport_allowance,
+            medical_risk_allowance, responsibility_allowance
+     FROM tbl_hms_pay_profile WHERE facility_id=? AND employee_id=? LIMIT 1`,
+    [fid, eid]
+   ).catch(() => [[null]]);
+
+   if (!snapshot) {
+    await pool.query(
+     `DELETE FROM tbl_hms_pay_profile WHERE facility_id=? AND employee_id=?`,
+     [fid, eid]
+    );
+   } else {
+    try {
+     await pool.query(
+      `INSERT INTO tbl_hms_pay_profile
+        (facility_id, employee_id, basic_salary, housing_allowance, transport_allowance,
+         medical_risk_allowance, responsibility_allowance, is_specialist,
+         hire_date, sector, night_shifts_per_month, on_call_per_month)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE
+        basic_salary=VALUES(basic_salary), housing_allowance=VALUES(housing_allowance),
+        transport_allowance=VALUES(transport_allowance),
+        medical_risk_allowance=VALUES(medical_risk_allowance),
+        responsibility_allowance=VALUES(responsibility_allowance),
+        is_specialist=VALUES(is_specialist),
+        hire_date=VALUES(hire_date), sector=VALUES(sector),
+        night_shifts_per_month=VALUES(night_shifts_per_month),
+        on_call_per_month=VALUES(on_call_per_month)`,
+      [
+       fid, eid, snapshot.basic_salary, snapshot.housing_allowance, snapshot.transport_allowance,
+       snapshot.medical_risk_allowance, snapshot.responsibility_allowance, snapshot.is_specialist,
+       snapshot.hire_date, snapshot.sector, snapshot.night_shifts_per_month, snapshot.on_call_per_month,
+      ]
+     );
+    } catch (eRestore) {
+     if (!eRestore || eRestore.code !== 'ER_BAD_FIELD_ERROR') throw eRestore;
+     await pool.query(
+      `INSERT INTO tbl_hms_pay_profile
+        (facility_id, employee_id, basic_salary, housing_allowance, transport_allowance)
+       VALUES (?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE
+        basic_salary=VALUES(basic_salary), housing_allowance=VALUES(housing_allowance),
+        transport_allowance=VALUES(transport_allowance)`,
+      [fid, eid, snapshot.basic_salary, snapshot.housing_allowance, snapshot.transport_allowance]
+     );
+    }
+   }
+
+   const calc = undo.calculation || null;
+   const calcLabel = calc
+    ? `${String(calc.mode || '').toUpperCase()} target ${auditAmount(calc.target_amount)} XAF`
+    : 'salary calculation';
+   const undoDetail = snapshot
+    ? `Undid ${calcLabel}; restored ${payProfileAuditLine(snapshot)}. ` +
+      (currentRow ? `Previous saved values were: ${payProfileAuditLine(currentRow)}.` : '')
+    : `Undid ${calcLabel}; removed the pay profile created by that calculation` +
+      (currentRow ? ` (${payProfileAuditLine(currentRow)})` : '') + '.';
+
+   await logAdminAction(pool, req, 'payroll.salary_undo', {
+    targetType: 'employee',
+    targetId: eid,
+    detail: undoDetail,
+   });
+
+   delete req.session.payProfileUndo;
+   return res.json({ ok: true, undone: true, deleted: !snapshot, profile: snapshot });
+  } catch (e) {
+   console.error('AUTO-COMPUTE UNDO:', e);
    return res.status(500).json({ error: e.message });
   }
  });
@@ -1335,13 +1629,26 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     pageEids.push(eid);
    }
    const hireByEmp = new Map();
+   const profileBeforeByEmp = new Map();
    if (pageEids.length) {
+    const placeholders = pageEids.map(() => '?').join(',');
     const [empRows] = await pool.query(
-     `SELECT id, joining_date FROM tbl_employee WHERE id IN (${pageEids.map(() => '?').join(',')})`,
+     `SELECT id, joining_date FROM tbl_employee WHERE id IN (${placeholders})`,
      pageEids
     );
     for (const er of empRows || []) {
      hireByEmp.set(parseInt(er.id, 10), resolveHireDate(er.joining_date, null));
+    }
+    const [profileRows] = await pool.query(
+     `SELECT employee_id, basic_salary, housing_allowance, transport_allowance, other_allowances,
+             medical_risk_allowance, responsibility_allowance, is_specialist,
+             night_shifts_per_month, on_call_per_month
+      FROM tbl_hms_pay_profile
+      WHERE facility_id = ? AND employee_id IN (${placeholders})`,
+     [fid, ...pageEids]
+    );
+    for (const pr of profileRows || []) {
+     profileBeforeByEmp.set(parseInt(pr.employee_id, 10), payProfileSnapshot(pr));
     }
    }
    for (const eid of pageEids) {
@@ -1386,6 +1693,29 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
       [fid, eid, b, h, t, o]
      );
     }
+    const [[savedRow]] = await pool.query(
+     `SELECT basic_salary, housing_allowance, transport_allowance, other_allowances,
+             medical_risk_allowance, responsibility_allowance, is_specialist,
+             night_shifts_per_month, on_call_per_month
+      FROM tbl_hms_pay_profile WHERE facility_id = ? AND employee_id = ? LIMIT 1`,
+     [fid, eid]
+    ).catch(() => [[null]]);
+    const before = profileBeforeByEmp.get(eid) || null;
+    const after = payProfileSnapshot(savedRow || {
+     basic_salary: b, housing_allowance: h, transport_allowance: t, other_allowances: o,
+     medical_risk_allowance: mra, responsibility_allowance: ra, is_specialist: isSpecialist,
+     night_shifts_per_month: nightShifts, on_call_per_month: onCall,
+    });
+    const hasProfileValues = Object.values(after).some((value) => Number(value) > 0);
+    if (payProfileSnapshotChanged(before, after) && (before || hasProfileValues)) {
+     await logAdminAction(pool, req, 'payroll.profile_save', {
+      targetType: 'employee',
+      targetId: eid,
+      detail: before
+       ? `Manual pay-profile save. Now: ${manualPayProfileAuditLine(after)}. Previous: ${manualPayProfileAuditLine(before)}.`
+       : `Manual pay-profile save created the pay profile. ${manualPayProfileAuditLine(after)}.`,
+     });
+    }
     saved++;
    }
    const q = new URLSearchParams();
@@ -1402,6 +1732,91 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    if (retQ) q.set('q', retQ);
    if (retP > 1) q.set('p', String(retP));
    res.redirect('/payroll/profiles?' + q.toString());
+  }
+ });
+
+ // ═══════════════════════════════════════════════════════════════════════════
+ // Payroll-specific audit trail
+ // ═══════════════════════════════════════════════════════════════════════════
+ app.get('/payroll/audit', requireAuth, requirePayrollAccess, async (req, res) => {
+  try {
+   const rawEmployee = parseInt(req.query.employee, 10) || 0;
+   const employeeId = rawEmployee > 0 ? rawEmployee : 0;
+   const rawAction = String(req.query.action || '').trim().slice(0, 60);
+   const action = rawAction.startsWith('payroll.') ? rawAction : '';
+   const rawFrom = String(req.query.from || '').trim();
+   const rawTo = String(req.query.to || '').trim();
+   const from = rawFrom ? parseIsoDateParam(rawFrom) : null;
+   const to = rawTo ? parseIsoDateParam(rawTo) : null;
+   let filterError = '';
+   if (rawFrom && !from) filterError = 'From date must be a valid date (YYYY-MM-DD).';
+   else if (rawTo && !to) filterError = 'To date must be a valid date (YYYY-MM-DD).';
+   else if (from && to && from > to) filterError = 'From date must be on or before the To date.';
+
+   const where = ["a.action LIKE 'payroll.%'"];
+   const params = [];
+   if (employeeId) {
+    where.push("a.target_type = 'employee' AND a.target_id = ?");
+    params.push(String(employeeId));
+   }
+   if (action) {
+    where.push('a.action = ?');
+    params.push(action);
+   }
+   if (from) {
+    where.push('DATE(a.created_at) >= ?');
+    params.push(from);
+   }
+   if (to) {
+    where.push('DATE(a.created_at) <= ?');
+    params.push(to);
+   }
+   const whereSql = where.join(' AND ');
+
+   const [employeeOptions] = await pool.query(
+    `SELECT DISTINCT e.id, e.first_name, e.last_name, e.employee_id
+     FROM tbl_admin_audit a
+     JOIN tbl_employee e ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+     WHERE a.action LIKE 'payroll.%'
+     ORDER BY e.first_name, e.last_name
+     LIMIT 500`
+   ).catch(() => [[]]);
+   const [actionOptions] = await pool.query(
+    `SELECT action, COUNT(*) AS entry_count
+     FROM tbl_admin_audit
+     WHERE action LIKE 'payroll.%'
+     GROUP BY action
+     ORDER BY action`
+   ).catch(() => [[]]);
+   const [[countRow]] = await pool.query(
+    `SELECT COUNT(*) AS total FROM tbl_admin_audit a WHERE ${whereSql}`,
+    params
+   ).catch(() => [[{ total: 0 }]]);
+   const [rows] = await pool.query(
+    `SELECT a.id, a.created_at, a.actor_name, a.action, a.target_type, a.target_id,
+            a.detail, a.ip,
+            e.first_name, e.last_name, e.employee_id AS matricule
+     FROM tbl_admin_audit a
+     LEFT JOIN tbl_employee e ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+     WHERE ${whereSql}
+     ORDER BY a.id DESC
+     LIMIT 500`,
+    params
+   );
+
+   return res.render('payroll-audit', {
+    title: 'Payroll audit — Zaizens Payroll',
+    payNavActive: 'payroll-audit',
+    auditRows: rows || [],
+    total: Number(countRow && countRow.total) || 0,
+    employeeOptions: employeeOptions || [],
+    actionOptions: actionOptions || [],
+    filters: { employee: employeeId, action, from, to },
+    filterError,
+   });
+  } catch (e) {
+   console.error('[payroll/audit]', e.message);
+   return res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });
   }
  });
 

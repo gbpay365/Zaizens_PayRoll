@@ -11,6 +11,32 @@
   .pay-profiles-wide .pay-table td { white-space: nowrap; }
   .pay-profiles-wide .pay-staff-name { white-space: nowrap; }
   .pay-totals-row td { background: #f8fafc; border-top: 2px solid #cbd5e1; padding: 12px 14px; }
+  .pay-undo-toast {
+    position: fixed; right: 20px; bottom: 20px; z-index: 1045;
+    display: flex; align-items: center; gap: 12px;
+    max-width: calc(100vw - 32px); padding: 12px 14px;
+    background: #123c2c; color: #fff; border: 1px solid #2c6b4f;
+    border-radius: 10px; box-shadow: 0 12px 30px rgba(15, 23, 42, .24);
+  }
+  .pay-undo-toast[hidden] { display: none; }
+  .pay-undo-toast-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%;
+    background: rgba(255, 255, 255, .14); color: #bbf7d0;
+  }
+  .pay-undo-toast-copy { min-width: 0; line-height: 1.3; }
+  .pay-undo-toast-copy strong { display: block; font-size: .88rem; }
+  .pay-undo-toast-copy span { display: block; margin-top: 2px; color: #d1fae5; font-size: .76rem; }
+  .pay-undo-toast-btn {
+    flex: 0 0 auto; border: 0; border-radius: 7px; padding: 7px 12px;
+    background: #fff; color: #14532d; font-size: .8rem; font-weight: 700;
+  }
+  .pay-undo-toast-btn:hover, .pay-undo-toast-btn:focus { background: #dcfce7; outline: none; }
+  .pay-undo-toast-btn:disabled { opacity: .65; cursor: wait; }
+  @media (max-width: 575px) {
+    .pay-undo-toast { left: 16px; right: 16px; bottom: 16px; }
+    .pay-undo-toast-copy span { display: none; }
+  }
 </style>
 <script>
   (function () {
@@ -23,7 +49,7 @@
   <div>
     <p class="sage-eyebrow">Payroll &middot; Compensation</p>
     <h1><%= _t('profiles.title', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></h1>
-    <p>Basic, housing, transport and statutory allowances per employee. Use the calculator on a row to derive the full breakdown from a gross or net figure.</p>
+    <p>Basic, housing, transport and statutory allowances per employee. Use <strong>Net / Gross</strong> on a row to enter either salary basis; the breakdown is recalculated and saved immediately.</p>
   </div>
   <div class="pay-hero-actions no-print">
     <a href="/payroll/employees/new" class="btn btn-sage"><i class="fa fa-user-plus mr-1"></i> New employee</a>
@@ -118,8 +144,11 @@
                     data-eid="<%= eid %>"
                     data-name="<%= fullName.trim().replace(/"/g, '&quot;') %>"
                     data-role="<%= roleLab.replace(/"/g, '&quot;') %>"
+                    data-net="<%= Math.round(Number(p.monthly_net) || 0) %>"
+                    data-gross="<%= Math.round(Number(p.monthly_gross) || 0) %>"
                     title="<%= _t('profiles.calc_btn_title', { ns: 'payroll', defaultValue: 'Auto-calculate compensation from Gross or Net' }) %>">
               <i class="fa fa-calculator" style="color:#7c3aed;font-size:.9rem;"></i>
+              <span class="small" style="font-weight:700;">Net / Gross</span>
             </button>
           </td>
           <td><small class="text-muted"><%= em.employee_ref || em.id %></small></td>
@@ -246,23 +275,35 @@
   </div>
 </form>
 
+<div id="payUndoToast" class="pay-undo-toast no-print" role="status" aria-live="polite" hidden>
+  <span class="pay-undo-toast-icon" aria-hidden="true"><i class="fa fa-check"></i></span>
+  <span class="pay-undo-toast-copy">
+    <strong id="payUndoToastTitle"></strong>
+    <span id="payUndoToastHint"></span>
+  </span>
+  <button type="button" class="pay-undo-toast-btn" id="payUndoToastBtn">Undo</button>
+</div>
+
 <script>
 (function () {
   var PAY_I18N = <%- JSON.stringify({
     swalMissing: _t('profiles.swal_missing', { ns: 'payroll', defaultValue: 'SweetAlert not loaded — refresh the page.' }),
-    calcTitle: _t('profiles.calc_title', { ns: 'payroll', defaultValue: 'Auto-calculate compensation' }),
+    calcTitle: _t('profiles.calc_title', { ns: 'payroll', defaultValue: 'Edit salary from net or gross' }),
     calcRole: _t('profiles.calc_role', { ns: 'payroll', defaultValue: 'Role:' }),
-    calcEnterAs: _t('profiles.calc_enter_as', { ns: 'payroll', defaultValue: 'Enter amount as' }),
+    calcEnterAs: _t('profiles.calc_enter_as', { ns: 'payroll', defaultValue: 'Salary basis' }),
     calcGross: _t('profiles.calc_gross', { ns: 'payroll', defaultValue: 'Gross salary (before deductions)' }),
     calcNet: _t('profiles.calc_net', { ns: 'payroll', defaultValue: 'Net salary (take-home)' }),
     calcAmount: _t('profiles.calc_amount', { ns: 'payroll', defaultValue: 'Amount (XAF)' }),
+    calcNetLabel: _t('profiles.calc_net_label', { ns: 'payroll', defaultValue: 'Net monthly salary (XAF)' }),
+    calcGrossLabel: _t('profiles.calc_gross_label', { ns: 'payroll', defaultValue: 'Gross monthly salary (XAF)' }),
     calcAmountPh: _t('profiles.calc_amount_ph', { ns: 'payroll', defaultValue: 'e.g. 342000' }),
     calcHint: _t('profiles.calc_hint', { ns: 'payroll', defaultValue: 'Enter the take-home pay you want and Gross plus Basic are back-calculated. Housing is 15% of Basic and Transport 10% of Basic; statutory allowances (Medical Responsibility, Specialist Research, Risk, Technical, Seniority, etc.) follow the role and hire date.' }),
+    calcHintGross: _t('profiles.calc_hint_gross', { ns: 'payroll', defaultValue: 'Enter the gross pay you want and Basic, Housing (15%), Transport (10%) and role allowances are derived from it. Statutory deductions then determine the net.' }),
     calcValidAmount: _t('profiles.calc_valid_amount', { ns: 'payroll', defaultValue: 'Enter an amount greater than 0' }),
-    calculate: _t('common.calculate', { ns: 'payroll', defaultValue: 'Calculate' }),
+    calculate: _t('profiles.calc_apply', { ns: 'payroll', defaultValue: 'Calculate & save' }),
     cancel: _t('common.cancel', { ns: 'payroll', defaultValue: 'Cancel' }),
     calcLoading: _t('profiles.calc_loading', { ns: 'payroll', defaultValue: 'Calculating…' }),
-    calcFailed: _t('profiles.calc_failed', { ns: 'payroll', defaultValue: 'Calculation failed' }),
+    calcFailed: _t('profiles.calc_failed', { ns: 'payroll', defaultValue: 'Could not calculate and save the salary' }),
     noEngineAllowances: _t('profiles.no_engine_allowances', { ns: 'payroll', defaultValue: 'No engine allowances for this role.' }),
     basicSalary: _t('profiles.basic_salary', { ns: 'payroll', defaultValue: 'Basic salary' }),
     housingPct: _t('profiles.housing_pct', { ns: 'payroll', defaultValue: 'Housing (15%)' }),
@@ -271,11 +312,49 @@
     totalDeductions: _t('profiles.total_deductions', { ns: 'payroll', defaultValue: 'Total deductions' }),
     net: _t('profiles.net', { ns: 'payroll', defaultValue: 'Net' }),
     engineAllowanceCodes: ['seniority', 'technical', 'specialist_research'],
-    calcSavedHint: _t('profiles.calc_saved_hint', { ns: 'payroll', defaultValue: 'Values have been filled into the row. Click <strong>Save this page</strong> to persist.' }),
-    calcDoneTitle: _t('profiles.calc_done_title', { ns: 'payroll', defaultValue: 'Compensation calculated' }),
+    calcSavedHint: _t('profiles.calc_saved_hint', { ns: 'payroll', defaultValue: 'The recalculated values were saved automatically. Use Undo to restore the previous values.' }),
+    calcDoneTitle: _t('profiles.calc_done_title', { ns: 'payroll', defaultValue: 'Compensation calculated and saved' }),
     done: _t('common.done', { ns: 'payroll', defaultValue: 'Done' }),
+    undo: _t('common.undo', { ns: 'payroll', defaultValue: 'Undo' }),
+    undoing: _t('profiles.calc_undoing', { ns: 'payroll', defaultValue: 'Undoing…' }),
+    undoFailed: _t('profiles.calc_undo_failed', { ns: 'payroll', defaultValue: 'Could not undo the salary change' }),
+    undoExpired: _t('profiles.calc_undo_expired', { ns: 'payroll', defaultValue: 'This change can no longer be undone.' }),
+    undoDoneTitle: _t('profiles.calc_undo_done_title', { ns: 'payroll', defaultValue: 'Salary change undone' }),
+    undoDoneHint: _t('profiles.calc_undo_done_hint', { ns: 'payroll', defaultValue: 'The previous pay-profile values were restored.' }),
+    undoBarTitle: _t('profiles.calc_undo_bar_title', { ns: 'payroll', defaultValue: 'Salary calculation saved' }),
+    undoBarHint: _t('profiles.calc_undo_bar_hint', { ns: 'payroll', defaultValue: 'Undo is available for 10 minutes.' }),
     networkError: _t('profiles.network_error', { ns: 'payroll', defaultValue: 'Network error' })
   }) %>;
+
+  var undoToast = document.getElementById('payUndoToast');
+  var undoToastTitle = document.getElementById('payUndoToastTitle');
+  var undoToastHint = document.getElementById('payUndoToastHint');
+  var undoToastBtn = document.getElementById('payUndoToastBtn');
+  var undoToastTimer = null;
+  var activeUndo = null;
+
+  function hideUndoToast() {
+    if (undoToastTimer) {
+      clearTimeout(undoToastTimer);
+      undoToastTimer = null;
+    }
+    activeUndo = null;
+    if (undoToast) undoToast.hidden = true;
+  }
+
+  function showUndoToast(eid, token, previousState, employeeName) {
+    if (!undoToast || !token) return;
+    activeUndo = { eid: eid, token: token, previousState: previousState, busy: false };
+    if (undoToastTitle) undoToastTitle.textContent = PAY_I18N.undoBarTitle + (employeeName ? ' — ' + employeeName : '');
+    if (undoToastHint) undoToastHint.textContent = PAY_I18N.undoBarHint;
+    if (undoToastBtn) {
+      undoToastBtn.disabled = false;
+      undoToastBtn.textContent = PAY_I18N.undo;
+    }
+    undoToast.hidden = false;
+    if (undoToastTimer) clearTimeout(undoToastTimer);
+    undoToastTimer = setTimeout(hideUndoToast, 10 * 60 * 1000);
+  }
 
   function fmt(n) { return Math.round(Number(n) || 0).toLocaleString('fr-FR'); }
   function setInputValue(name, val) {
@@ -284,6 +363,78 @@
     el.value = (val == null ? '' : Math.round(Number(val) || 0));
     el.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
+  }
+
+  function captureCalculationState(eid) {
+    var fields = ['basic_', 'housing_', 'transport_', 'med_risk_', 'responsibility_'];
+    var state = {};
+    fields.forEach(function (prefix) {
+      var el = document.querySelector('[name="' + prefix + eid + '"]');
+      state[prefix] = el ? el.value : '';
+    });
+    var cell = document.querySelector('.pay-engine-allowances[data-eid="' + eid + '"]');
+    state.engineHtml = cell ? cell.innerHTML : null;
+    return state;
+  }
+
+  function restoreCalculationState(eid, state) {
+    if (!state) return;
+    ['basic_', 'housing_', 'transport_', 'med_risk_', 'responsibility_'].forEach(function (prefix) {
+      var el = document.querySelector('[name="' + prefix + eid + '"]');
+      if (!el) return;
+      el.value = state[prefix] == null ? '' : String(state[prefix]);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    var cell = document.querySelector('.pay-engine-allowances[data-eid="' + eid + '"]');
+    if (cell && state.engineHtml != null) cell.innerHTML = state.engineHtml;
+  }
+
+  async function undoCalculation(eid, token, previousState) {
+    // Move focus out of the persistent bar before SweetAlert hides the page
+    // behind its modal, so assistive technology can safely apply aria-hidden.
+    if (undoToast && undoToast.contains(document.activeElement) && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
+    Swal.fire({
+      title: PAY_I18N.undoing,
+      didOpen: function () { Swal.showLoading(); },
+      allowOutsideClick: false,
+      showConfirmButton: false
+    });
+
+    try {
+      var res = await fetch('/payroll/profiles/undo-auto-compute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ employee_id: eid, token: token })
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok || data.error) {
+        Swal.close();
+        var expired = data.code === 'undo_unavailable';
+        if (expired) hideUndoToast();
+        var message = expired
+          ? PAY_I18N.undoExpired
+          : (data.error || ('HTTP ' + res.status));
+        HMS.alert(PAY_I18N.undoFailed, message, 'error');
+        return false;
+      }
+
+      hideUndoToast();
+      restoreCalculationState(eid, previousState);
+      Swal.fire({
+        title: PAY_I18N.undoDoneTitle,
+        text: PAY_I18N.undoDoneHint,
+        icon: 'success',
+        confirmButtonText: PAY_I18N.done,
+        confirmButtonColor: '#15803d'
+      });
+      return true;
+    } catch (err) {
+      Swal.close();
+      HMS.alert(PAY_I18N.networkError, String((err && err.message) || err), 'error');
+      return false;
+    }
   }
 
   // Seniority / technical / specialist-research amounts are derived, not editable;
@@ -317,11 +468,15 @@
     });
   }
 
-  async function openCalc(eid, name, role) {
+  async function openCalc(eid, name, role, currentNet, currentGross) {
     if (typeof Swal === 'undefined') {
       alert(PAY_I18N.swalMissing);
       return;
     }
+    currentNet = Math.round(Number(currentNet) || 0);
+    currentGross = Math.round(Number(currentGross) || 0);
+    var initialMode = currentNet > 0 || currentGross <= 0 ? 'net' : 'gross';
+    var initialAmount = initialMode === 'gross' ? currentGross : currentNet;
     var formResp = await Swal.fire({
       title: PAY_I18N.calcTitle,
       width: 520,
@@ -334,22 +489,39 @@
           '<div class="form-group mb-2">' +
             '<label class="small font-weight-bold mb-1" style="color:#475569;">' + PAY_I18N.calcEnterAs + '</label>' +
             '<select id="calcMode" class="form-control form-control-sm hms-input">' +
-              '<option value="net" selected>' + PAY_I18N.calcNet + '</option>' +
-              '<option value="gross">' + PAY_I18N.calcGross + '</option>' +
+              '<option value="net"' + (initialMode === 'net' ? ' selected' : '') + '>' + PAY_I18N.calcNet + '</option>' +
+              '<option value="gross"' + (initialMode === 'gross' ? ' selected' : '') + '>' + PAY_I18N.calcGross + '</option>' +
             '</select>' +
           '</div>' +
           '<div class="form-group mb-2">' +
-            '<label class="small font-weight-bold mb-1" style="color:#475569;">' + PAY_I18N.calcAmount + '</label>' +
-            '<input id="calcAmount" type="number" min="0" step="1000" inputmode="numeric"' +
+            '<label id="calcAmountLabel" class="small font-weight-bold mb-1" style="color:#475569;">' + (initialMode === 'gross' ? PAY_I18N.calcGrossLabel : PAY_I18N.calcNetLabel) + '</label>' +
+            '<input id="calcAmount" type="number" min="0" step="1" inputmode="numeric" value="' + (initialAmount > 0 ? initialAmount : '') + '"' +
                   ' class="form-control form-control-sm hms-input" placeholder="' + PAY_I18N.calcAmountPh + '" autofocus>' +
           '</div>' +
-          '<small class="text-muted">' + PAY_I18N.calcHint + '</small>' +
+          '<small id="calcHint" class="text-muted">' + (initialMode === 'gross' ? PAY_I18N.calcHintGross : PAY_I18N.calcHint) + '</small>' +
         '</div>',
       showCancelButton: true,
       confirmButtonText: PAY_I18N.calculate,
       cancelButtonText: PAY_I18N.cancel,
       confirmButtonColor: '#7c3aed',
       focusConfirm: false,
+      didOpen: function () {
+        var modeEl = document.getElementById('calcMode');
+        var amountEl = document.getElementById('calcAmount');
+        var labelEl = document.getElementById('calcAmountLabel');
+        var hintEl = document.getElementById('calcHint');
+        if (!modeEl || !amountEl || !labelEl || !hintEl) return;
+        function syncBasis() {
+          var gross = modeEl.value === 'gross';
+          labelEl.textContent = gross ? PAY_I18N.calcGrossLabel : PAY_I18N.calcNetLabel;
+          hintEl.textContent = gross ? PAY_I18N.calcHintGross : PAY_I18N.calcHint;
+          amountEl.value = gross
+            ? (currentGross > 0 ? currentGross : '')
+            : (currentNet > 0 ? currentNet : '');
+        }
+        modeEl.addEventListener('change', syncBasis);
+        syncBasis();
+      },
       preConfirm: function () {
         var mode = (document.getElementById('calcMode') || {}).value || 'net';
         var amount = parseFloat((document.getElementById('calcAmount') || {}).value);
@@ -362,6 +534,7 @@
     });
     if (!formResp.value) return;
     var payload = formResp.value;
+    var previousState = captureCalculationState(eid);
 
     Swal.fire({
       title: PAY_I18N.calcLoading,
@@ -413,17 +586,45 @@
           '<div class="small text-muted mt-2">' + PAY_I18N.calcSavedHint + '</div>' +
         '</div>';
 
-      Swal.fire({
+      if (data.undo_token) showUndoToast(eid, data.undo_token, previousState, name);
+
+      var savedDialog = Swal.fire({
         title: PAY_I18N.calcDoneTitle,
         html: html,
         icon: 'success',
+        showDenyButton: !!data.undo_token,
+        denyButtonText: PAY_I18N.undo,
+        denyButtonColor: '#475569',
         confirmButtonColor: '#15803d',
         confirmButtonText: PAY_I18N.done
       });
+      if (data.undo_token) {
+        savedDialog.then(function (result) {
+          if (result.isDenied) undoCalculation(eid, data.undo_token, previousState);
+        });
+      }
     } catch (err) {
       Swal.close();
       HMS.alert(PAY_I18N.networkError, String((err && err.message) || err), 'error');
     }
+  }
+
+  if (undoToastBtn) {
+    undoToastBtn.addEventListener('click', function () {
+      if (!activeUndo || activeUndo.busy) return;
+      var current = activeUndo;
+      current.busy = true;
+      undoToastBtn.disabled = true;
+      undoToastBtn.textContent = PAY_I18N.undoing;
+      undoCalculation(current.eid, current.token, current.previousState).then(function (ok) {
+        if (activeUndo !== current) return;
+        current.busy = false;
+        if (!ok) {
+          undoToastBtn.disabled = false;
+          undoToastBtn.textContent = PAY_I18N.undo;
+        }
+      });
+    });
   }
 
   document.addEventListener('click', function (e) {
@@ -433,7 +634,9 @@
     var eid = parseInt(btn.getAttribute('data-eid'), 10);
     var name = btn.getAttribute('data-name') || '';
     var role = btn.getAttribute('data-role') || '';
-    if (eid > 0) openCalc(eid, name, role);
+    var currentNet = parseFloat(btn.getAttribute('data-net')) || 0;
+    var currentGross = parseFloat(btn.getAttribute('data-gross')) || 0;
+    if (eid > 0) openCalc(eid, name, role, currentNet, currentGross);
   });
 })();
 </script>

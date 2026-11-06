@@ -4,18 +4,50 @@ var _v = function (key, fallback) {
   var val = (locals.form || {})[key];
   return val == null || val === '' ? (fallback == null ? '' : fallback) : val;
 };
+var _basis = String(_v('salary_basis', 'net')).toLowerCase() === 'gross' ? 'gross' : 'net';
 %>
 
 <div class="sage-page-head">
   <div>
     <p class="sage-eyebrow">Employees &middot; Onboarding</p>
     <h1>New employee</h1>
-    <p class="sage-sub">Enter the net monthly salary and the payroll engine back-calculates basic, housing, transport, gross and every statutory deduction.</p>
+    <p class="sage-sub">Choose net or gross monthly salary and the payroll engine derives basic, housing, transport and every statutory deduction.</p>
   </div>
   <div class="sage-head-actions no-print">
     <a href="/staff" class="btn btn-sage-ghost"><i class="fa fa-angle-left mr-1"></i> Back to employees</a>
   </div>
 </div>
+
+<section class="sage-card bulk-onboarding no-print" id="bulkOnboarding">
+  <div class="sage-card-head">
+    <div>
+      <h2>Bulk onboarding</h2>
+      <p class="sage-card-sub">Create several employees, salary profiles and first payroll lines from one CSV.</p>
+    </div>
+    <a href="/payroll/employees/template.csv" class="btn btn-sage-ghost">
+      <i class="fa fa-download mr-1"></i> Download CSV template
+    </a>
+  </div>
+  <div class="sage-card-body">
+    <div class="bulk-import-row">
+      <div class="bulk-import-file">
+        <label for="bulkCsvFile">Employee + salary CSV</label>
+        <input type="file" id="bulkCsvFile" accept=".csv,text/csv">
+        <span class="sage-hint">
+          Up to 100 employees per file. The template includes one example row; replace or delete it before uploading.
+          Use an existing role name. Matricule can be left blank and will be generated. For the collective agreement,
+          use a key such as medical, education, banking, commerce, building, hotels, transport or mining; leave it blank
+          to use this facility's default.
+        </span>
+      </div>
+      <button type="button" class="btn btn-sage" id="bulkImportBtn">
+        <i class="fa fa-upload mr-1"></i> Import employees
+      </button>
+    </div>
+    <div class="bulk-import-status" id="bulkImportStatus" role="status" aria-live="polite"></div>
+    <ul class="bulk-import-errors" id="bulkImportErrors" hidden></ul>
+  </div>
+</section>
 
 <form method="POST" action="/payroll/employees/new" class="sage-form" id="employeeForm" novalidate>
   <div class="sage-form-layout">
@@ -145,14 +177,22 @@ var _v = function (key, fallback) {
 
       <section class="sage-card">
         <div class="sage-card-head">
-          <div><h2>Salary</h2><p class="sage-card-sub">Net monthly salary in XAF</p></div>
+          <div><h2>Salary</h2><p class="sage-card-sub">Net or gross monthly salary in XAF</p></div>
         </div>
         <div class="sage-card-body">
           <div class="sage-form-grid">
             <div class="sage-field">
-              <label for="net">Net monthly salary (XAF) <span class="text-danger">*</span></label>
-              <input type="number" min="1" step="1000" class="form-control" id="net" name="net" value="<%= _v('net') %>" required inputmode="numeric" placeholder="e.g. 342000">
-              <span class="sage-hint">Take-home pay after tax. Basic and gross are back-calculated from housing (15%), transport (10%), role allowances and statutory deductions.</span>
+              <label for="salaryBasis">Salary basis <span class="text-danger">*</span></label>
+              <select class="form-control" id="salaryBasis" name="salary_basis" required>
+                <option value="net" <%= _basis === 'net' ? 'selected' : '' %>>Net monthly salary</option>
+                <option value="gross" <%= _basis === 'gross' ? 'selected' : '' %>>Gross monthly salary</option>
+              </select>
+              <span class="sage-hint">Choose the figure you know. The other figure is derived automatically.</span>
+            </div>
+            <div class="sage-field">
+              <label for="net" id="salaryLabel"><%= _basis === 'gross' ? 'Gross' : 'Net' %> monthly salary (XAF) <span class="text-danger">*</span></label>
+              <input type="number" min="1" step="1" class="form-control" id="net" name="net" value="<%= _v('net') %>" required inputmode="numeric" placeholder="<%= _basis === 'gross' ? 'e.g. 450000' : 'e.g. 342000' %>">
+              <span class="sage-hint" id="salaryHint"><%= _basis === 'gross' ? 'Gross pay before statutory deductions. Basic, housing (15%), transport (10%) and role allowances are derived from this target.' : 'Take-home pay after tax. Basic and gross are back-calculated from housing (15%), transport (10%), role allowances and statutory deductions.' %></span>
             </div>
             <div class="sage-field">
               <label for="payMonth">First payroll period</label>
@@ -183,7 +223,7 @@ var _v = function (key, fallback) {
         <div class="sage-card-body" id="previewBody">
           <div class="sage-empty" id="previewEmpty">
             <i class="fa fa-calculator"></i>
-            Enter a net salary to preview the gross and deductions.
+            Enter a net or gross salary to preview the derived pay and deductions.
           </div>
           <div id="previewContent" style="display:none;">
             <dl class="sage-list">
@@ -228,6 +268,17 @@ var _v = function (key, fallback) {
   .sage-net span { font-size: 12px; font-weight: 600; color: #0a5c36; text-transform: uppercase; letter-spacing: 0.06em; }
   .sage-net strong { font-size: 20px; color: #0a5c36; font-variant-numeric: tabular-nums; }
   .sage-preview-note { margin: 12px 0 0; font-size: 11.5px; color: #5f6f68; line-height: 1.5; }
+  .bulk-onboarding { margin-bottom: 18px; }
+  .bulk-import-row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+  .bulk-import-file { flex: 1 1 420px; min-width: 0; }
+  .bulk-import-file label { display: block; margin-bottom: 5px; font-size: 12px; font-weight: 700; color: #33443c; }
+  .bulk-import-file input[type="file"] { display: block; width: 100%; font-size: 13px; }
+  .bulk-import-file .sage-hint { display: block; margin-top: 5px; line-height: 1.45; }
+  .bulk-import-status { margin-top: 10px; font-size: 12.5px; color: #4b5d54; }
+  .bulk-import-status.is-error { color: #9f241b; }
+  .bulk-import-status.is-success { color: #0a6b3d; font-weight: 600; }
+  .bulk-import-errors { margin: 10px 0 0; padding: 10px 12px 10px 30px; border: 1px solid #f0c7c2; border-radius: 5px; background: #fff7f5; color: #8f2118; font-size: 12.5px; line-height: 1.5; }
+  .bulk-import-errors[hidden] { display: none; }
   @media (max-width: 1100px) {
     .sage-form-layout { grid-template-columns: minmax(0, 1fr); }
     .sage-preview { position: static; }
@@ -240,6 +291,9 @@ var _v = function (key, fallback) {
   var form = document.getElementById('employeeForm');
   if (!form) return;
   var netEl = document.getElementById('net');
+  var basisEl = document.getElementById('salaryBasis');
+  var salaryLabel = document.getElementById('salaryLabel');
+  var salaryHint = document.getElementById('salaryHint');
   var roleEl = document.getElementById('role');
   var hireEl = document.getElementById('joiningDate');
   var sectorEl = document.getElementById('sector');
@@ -248,12 +302,26 @@ var _v = function (key, fallback) {
   var contentEl = document.getElementById('previewContent');
   var timer = null;
   var seq = 0;
+  var lastPreview = null;
+
+  function updateBasisUI() {
+    var gross = basisEl && basisEl.value === 'gross';
+    if (salaryLabel) {
+      salaryLabel.innerHTML = (gross ? 'Gross' : 'Net') + ' monthly salary (XAF) <span class="text-danger">*</span>';
+    }
+    if (salaryHint) {
+      salaryHint.textContent = gross
+        ? 'Gross pay before statutory deductions. Basic, housing (15%), transport (10%) and role allowances are derived from this target.'
+        : 'Take-home pay after tax. Basic and gross are back-calculated from housing (15%), transport (10%), role allowances and statutory deductions.';
+    }
+  }
 
   function row(label, value) {
     return '<div class="sage-list-row"><dt>' + label + '</dt><dd>' + fmt(value) + '</dd></div>';
   }
 
   function render(data) {
+    lastPreview = data;
     document.getElementById('pvBasic').textContent = fmt(data.basic_salary);
     document.getElementById('pvHousing').textContent = fmt(data.housing_allowance);
     document.getElementById('pvTransport').textContent = fmt(data.transport_allowance);
@@ -276,8 +344,11 @@ var _v = function (key, fallback) {
       : '<div class="sage-list-row"><dt>No statutory settings</dt><dd>—</dd></div>';
 
     document.getElementById('pvNet').textContent = fmt(data.net) + ' XAF';
+    var grossBasis = basisEl && basisEl.value === 'gross';
     document.getElementById('pvNote').textContent = data.statutory_ready
-      ? 'Gross, basic, housing (15%) and transport (10%) are back-calculated from the net. Deductions use the current tax year settings.'
+      ? (grossBasis
+        ? 'Basic, housing (15%), transport (10%) and role allowances are derived from the gross target. Deductions use the current tax year settings.'
+        : 'Gross, basic, housing (15%) and transport (10%) are back-calculated from the net. Deductions use the current tax year settings.')
       : 'Payroll tax settings are missing for this facility, so deductions cannot be calculated yet.';
     emptyEl.style.display = 'none';
     contentEl.style.display = '';
@@ -293,6 +364,7 @@ var _v = function (key, fallback) {
     var mySeq = ++seq;
     var payload = {
       net: net,
+      salary_basis: basisEl ? basisEl.value : 'net',
       role: roleEl.value,
       hire_date: hireEl.value,
       sector: sectorEl.value,
@@ -386,13 +458,107 @@ var _v = function (key, fallback) {
     });
   }
 
+  if (basisEl) {
+    basisEl.addEventListener('change', function () {
+      if (lastPreview) {
+        var key = basisEl.value === 'gross' ? 'gross' : 'net';
+        if (lastPreview[key] != null) netEl.value = Math.round(Number(lastPreview[key]) || 0);
+      }
+      updateBasisUI();
+      schedule();
+    });
+  }
+
   [netEl, roleEl, hireEl, sectorEl, specEl].forEach(function (el) {
     if (!el) return;
     el.addEventListener('change', schedule);
     el.addEventListener('input', schedule);
   });
 
+  updateBasisUI();
   if (parseFloat(netEl.value) > 0) refresh();
+})();
+</script>
+
+<script>
+(function () {
+  var fileEl = document.getElementById('bulkCsvFile');
+  var btn = document.getElementById('bulkImportBtn');
+  var statusEl = document.getElementById('bulkImportStatus');
+  var errorsEl = document.getElementById('bulkImportErrors');
+  if (!fileEl || !btn || !statusEl) return;
+
+  function setStatus(message, kind) {
+    statusEl.textContent = message || '';
+    statusEl.className = 'bulk-import-status' + (kind ? ' ' + kind : '');
+  }
+
+  function clearErrors() {
+    if (!errorsEl) return;
+    errorsEl.innerHTML = '';
+    errorsEl.hidden = true;
+  }
+
+  function showErrors(errors) {
+    if (!errorsEl) return;
+    clearErrors();
+    (errors || []).forEach(function (err) {
+      var li = document.createElement('li');
+      li.textContent = err.row ? 'Row ' + err.row + ': ' + err.message : (err.message || String(err));
+      errorsEl.appendChild(li);
+    });
+    errorsEl.hidden = !errorsEl.children.length;
+  }
+
+  btn.addEventListener('click', async function () {
+    clearErrors();
+    var file = fileEl.files && fileEl.files[0];
+    if (!file) {
+      setStatus('Choose a CSV file first.', 'is-error');
+      fileEl.focus();
+      return;
+    }
+    if (!/\.csv$/i.test(file.name) && file.type !== 'text/csv') {
+      setStatus('Choose a .csv file.', 'is-error');
+      return;
+    }
+    if (file.size > 1024 * 1024) {
+      setStatus('The CSV file is larger than 1 MB.', 'is-error');
+      return;
+    }
+
+    var original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i> Importing…';
+    setStatus('Reading and validating the CSV…');
+
+    try {
+      var text = await file.text();
+      var res = await fetch('/payroll/employees/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Accept': 'application/json' },
+        body: text,
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (!res.ok || !data.ok) {
+        setStatus(data.error || ('Import failed (HTTP ' + res.status + ').'), 'is-error');
+        showErrors(data.errors);
+        btn.disabled = false;
+        btn.innerHTML = original;
+        return;
+      }
+
+      setStatus(data.message || 'Employees imported.', 'is-success');
+      btn.innerHTML = '<i class="fa fa-check mr-1"></i> Imported';
+      setTimeout(function () {
+        window.location.href = '/staff?msg=' + encodeURIComponent(data.message || 'Employees imported.');
+      }, 700);
+    } catch (err) {
+      setStatus(String((err && err.message) || err), 'is-error');
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  });
 })();
 </script>
 

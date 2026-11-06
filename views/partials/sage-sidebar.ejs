@@ -34,6 +34,15 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
     </span>
   </div>
 
+  <div class="sage-rail-context">
+    <span class="sage-rail-context-icon"><i class="fa fa-building-o"></i></span>
+    <span class="sage-rail-context-text">
+      <strong><%= (locals.company && locals.company.legalName) || 'Payroll workspace' %></strong>
+      <small>Cameroon &middot; XAF</small>
+    </span>
+    <span class="sage-rail-context-dot" aria-hidden="true"></span>
+  </div>
+
   <nav class="sage-nav">
     <% if (_selfMode) { %>
       <p class="sage-nav-label">Home</p>
@@ -56,6 +65,7 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
       <% if (_canPayrollRead) { %>
       <a href="/payroll/monthly" class="<%= _active('/payroll/monthly') %>"><i class="fa fa-calendar-check-o"></i> Payroll runs</a>
       <a href="/payroll/optimizer" class="<%= _active('/payroll/optimizer') %>"><i class="fa fa-magic"></i> Payroll optimizer</a>
+      <a href="/payroll/audit" class="<%= _active('/payroll/audit') %>"><i class="fa fa-history"></i> Payroll audit</a>
       <% } %>
       <% if (_canWrite) { %>
       <a href="/payroll/profiles" class="<%= _active('/payroll/profiles') %>"><i class="fa fa-id-card-o"></i> Pay profiles</a>

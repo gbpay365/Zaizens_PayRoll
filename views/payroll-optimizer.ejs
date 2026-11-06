@@ -44,6 +44,8 @@
   .pay-opt-field small { display: block; margin-top: 3px; font-size: .66rem; color: #64748b; }
   .pay-opt-field.invalid input, .pay-opt-field.invalid select { border-color: #dc2626; background: #fff7f7; }
   .pay-opt-field.invalid label { color: #991b1b; }
+  .pay-opt-field input[readonly] { background: #f8fafc; color: #475569; cursor: not-allowed; }
+  .pay-opt-field .pay-opt-auto { display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 999px; background: #ede9fe; color: #6d28d9; font-size: .56rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
   .pay-opt-field-msg { display: block; margin-top: 4px; font-size: .66rem; line-height: 1.4; color: #b91c1c; font-weight: 600; }
   .pay-opt-limit { display: block; margin-top: 3px; font-size: .64rem; color: #64748b; }
   .pay-opt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
@@ -148,9 +150,25 @@
           <input type="hidden" name="employee_id" value="<%= form.employee_id || '' %>">
 
           <div class="pay-opt-section">Employee &amp; statutory profile</div>
+          <div class="pay-opt-row">
+            <div class="pay-opt-field">
+              <label for="entryMode">Salary entry method</label>
+              <select id="entryMode" name="entryMode">
+                <option value="base" <%= form.entryMode === 'base' ? 'selected' : '' %>>Base monthly salary</option>
+                <option value="gross" <%= form.entryMode === 'gross' ? 'selected' : '' %>>Gross monthly salary</option>
+                <option value="net" <%= form.entryMode === 'net' ? 'selected' : '' %>>Net monthly salary</option>
+              </select>
+              <small>Start from the figure you know; base salary is derived when using gross or net.</small>
+            </div>
+            <div class="pay-opt-field" data-salary-target-wrap>
+              <label for="salaryTarget" data-salary-target-label><%= form.entryMode === 'net' ? 'Net monthly salary (XAF)' : (form.entryMode === 'gross' ? 'Gross monthly salary (XAF)' : 'Gross / net target (optional)') %></label>
+              <input id="salaryTarget" type="number" name="salaryTarget" min="0" step="1" value="<%= form.salaryTarget || 0 %>">
+              <small data-salary-target-note>Used only when gross or net entry is selected; base salary is then auto-calculated.</small>
+            </div>
+          </div>
           <div class="pay-opt-field<%= _fieldClass('baseSalary') %>" data-field="baseSalary">
-            <label for="baseSalary">Base monthly salary (XAF)</label>
-            <input id="baseSalary" type="number" name="baseSalary" min="0" step="1000" value="<%= form.baseSalary %>">
+            <label for="baseSalary">Base monthly salary (XAF)<span class="pay-opt-auto" data-base-derived-badge style="<%= form.entryMode === 'base' ? 'display:none;' : '' %>">Auto</span></label>
+            <input id="baseSalary" type="number" name="baseSalary" min="0" step="1" value="<%= form.baseSalary %>" <%= form.entryMode !== 'base' ? 'readonly' : '' %>>
             <small class="pay-opt-limit" data-limit-for="baseSalary">Sectoral minimum: <%= _fmt(_profile ? _profile.smig : form.baseSalary) %> XAF</small>
             <% if (_fieldMessage('baseSalary')) { %><span class="pay-opt-field-msg"><%= _fieldMessage('baseSalary') %></span><% } %>
           </div>
@@ -196,7 +214,7 @@
             <% _allowanceFields.forEach(function (key) { %>
             <div class="pay-opt-field<%= _fieldClass(key) %>" data-field="<%= key %>">
               <label for="<%= key %>"><%= _labels[key] %></label>
-              <input id="<%= key %>" type="number" name="<%= key %>" min="0" step="<%= ['meal','dirtiness','clothing','tools'].indexOf(key) !== -1 ? '100' : '1000' %>" value="<%= form[key] || 0 %>">
+              <input id="<%= key %>" type="number" name="<%= key %>" min="0" step="1" value="<%= form[key] || 0 %>">
               <% if (key === 'other') { %>
               <small class="pay-opt-limit" data-limit-for="other">Fully taxable; no statutory exempt ceiling</small>
               <% } else if (key === 'transport' || key === 'representation') { %>
@@ -220,6 +238,9 @@
             <button type="submit" class="btn hms-btn-secondary" formaction="/payroll/optimizer/report" formmethod="get" formtarget="_blank" name="action" value="report">
               <i class="fa fa-print mr-1"></i> Print compliance report
             </button>
+            <button type="submit" class="btn hms-btn-secondary" formaction="/payroll/optimizer/report.csv" formmethod="get" name="action" value="export">
+              <i class="fa fa-file-excel-o mr-1"></i> Export Excel/CSV
+            </button>
             <% } %>
           </div>
           <p class="pay-opt-note" style="margin-top:10px;">The optimizer reallocates the same total gross cash into legally capped allowances. It does not create or edit payroll records.</p>
@@ -233,7 +254,7 @@
     <div class="alert alert-danger"><%= error %></div>
     <% } %>
     <div id="pay-opt-live-error" class="pay-opt-live-error"></div>
-    <div id="pay-opt-results" data-smig="<%= _profile ? _profile.smig : '' %>">
+    <div id="pay-opt-results" data-smig="<%= _profile ? _profile.smig : '' %>" data-gross="<%= result ? result.grossCash : (typeof preview !== 'undefined' ? preview.grossCash : '') %>" data-net="<%= result ? result.netPay : (typeof preview !== 'undefined' ? preview.netPay : '') %>">
       <%- include('partials/payroll-optimizer-results') %>
     </div>
   </div>
@@ -249,6 +270,11 @@
   var timer = null;
   var controller = null;
   var seq = 0;
+  var entryMode = form.querySelector('[name="entryMode"]');
+  var salaryTarget = form.querySelector('[name="salaryTarget"]');
+  var salaryTargetLabel = document.querySelector('[data-salary-target-label]');
+  var baseSalaryInput = form.querySelector('[name="baseSalary"]');
+  var baseDerivedBadge = document.querySelector('[data-base-derived-badge]');
 
   function fmt(n) {
     return Math.round(Number(n) || 0).toLocaleString('fr-FR');
@@ -273,6 +299,18 @@
       button.disabled = Boolean(blocked);
       button.title = blocked ? 'Resolve or waive the blocking exceptions first.' : '';
     });
+  }
+
+  function updateSalaryModeUI() {
+    var mode = entryMode ? entryMode.value : 'base';
+    var derived = mode === 'gross' || mode === 'net';
+    if (salaryTargetLabel) {
+      salaryTargetLabel.textContent = mode === 'net'
+        ? 'Net monthly salary (XAF)'
+        : (mode === 'gross' ? 'Gross monthly salary (XAF)' : 'Gross / net target (optional)');
+    }
+    if (baseSalaryInput) baseSalaryInput.readOnly = derived;
+    if (baseDerivedBadge) baseDerivedBadge.style.display = derived ? 'inline-block' : 'none';
   }
 
   function applyLimits(payload) {
@@ -320,6 +358,12 @@
     }
     showError('');
     if (payload.html) results.innerHTML = payload.html;
+    if (payload.entryMode && entryMode) entryMode.value = payload.entryMode;
+    if (payload.salaryTarget != null && salaryTarget) salaryTarget.value = payload.salaryTarget;
+    if (payload.baseSalary != null && baseSalaryInput) baseSalaryInput.value = payload.baseSalary;
+    if (payload.grossCash != null) results.dataset.gross = payload.grossCash;
+    if (payload.netPay != null) results.dataset.net = payload.netPay;
+    updateSalaryModeUI();
     applyFieldErrors(payload.fieldErrors);
     applyLimits(payload);
     setSubmitState(payload.blocked);
@@ -376,7 +420,16 @@
   }
 
   form.addEventListener('input', schedule);
-  form.addEventListener('change', schedule);
+  form.addEventListener('change', function (event) {
+    if (event.target && event.target.name === 'entryMode') {
+      var mode = event.target.value;
+      if (mode !== 'base' && salaryTarget) {
+        salaryTarget.value = mode === 'net' ? (results.dataset.net || '') : (results.dataset.gross || '');
+      }
+      updateSalaryModeUI();
+    }
+    schedule();
+  });
   form.addEventListener('click', function (event) {
     var button = event.target.closest('[data-opt-action]');
     if (!button) return;
@@ -462,6 +515,7 @@
     caps: <%- JSON.stringify(_caps) %>,
     profile: <%- JSON.stringify(_profile || {}) %>
   });
+  updateSalaryModeUI();
   if (results.querySelector('.pay-opt-blocked')) setSubmitState(true);
 })();
 </script>

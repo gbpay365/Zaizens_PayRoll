@@ -16,7 +16,7 @@ var _actionLabel = function (a) {
   <div>
     <p class="sage-eyebrow">Administration &middot; Audit</p>
     <h1>Admin activity</h1>
-    <p class="sage-sub">A record of account, role and security changes. Entries are written by the server and cannot be edited from the app.</p>
+    <p class="sage-sub">A record of account, role, security and payroll salary changes. Entries are written by the server and cannot be edited from the app.</p>
   </div>
   <div class="sage-head-actions no-print">
     <a href="/admin" class="btn btn-sage-ghost"><i class="fa fa-dashboard mr-1"></i> Overview</a>
@@ -39,7 +39,7 @@ var _actionLabel = function (a) {
       </thead>
       <tbody>
         <% if (!rows.length) { %>
-        <tr><td colspan="6" class="sage-empty"><i class="fa fa-history"></i>No admin activity recorded yet. Changes made in Administration will appear here.</td></tr>
+        <tr><td colspan="6" class="sage-empty"><i class="fa fa-history"></i>No activity recorded yet. Administrative changes and salary calculations will appear here.</td></tr>
         <% } %>
         <% rows.forEach(function (a) { %>
         <tr>

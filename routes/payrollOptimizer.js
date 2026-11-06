@@ -9,6 +9,8 @@ const DEFAULT_FORM = {
   regime: '1',
   risk: 'medium',
   mode: 'both',
+  entryMode: 'base',
+  salaryTarget: 0,
   transport: 30000,
   representation: 0,
   housing: 0,
@@ -35,6 +37,11 @@ function parseMode(value) {
   return ['employee', 'employer', 'both'].indexOf(mode) !== -1 ? mode : DEFAULT_FORM.mode;
 }
 
+function parseEntryMode(value) {
+  const mode = clean(value, 12).toLowerCase();
+  return ['base', 'gross', 'net'].indexOf(mode) !== -1 ? mode : DEFAULT_FORM.entryMode;
+}
+
 function parseForm(body) {
   const raw = body || {};
   return {
@@ -44,6 +51,8 @@ function parseForm(body) {
     regime: clean(raw.regime, 4) || DEFAULT_FORM.regime,
     risk: clean(raw.risk, 12).toLowerCase() || DEFAULT_FORM.risk,
     mode: parseMode(raw.mode),
+    entryMode: parseEntryMode(raw.entryMode),
+    salaryTarget: number(raw.salaryTarget),
     transport: number(raw.transport),
     representation: number(raw.representation),
     housing: number(raw.housing),
@@ -72,6 +81,42 @@ function withSettings(form, settings) {
     allowances: allowancesOf(form),
     settings: settings || {},
   };
+}
+
+function normalizeSalaryBasis(form, settings) {
+  if (form.entryMode !== 'gross' && form.entryMode !== 'net') return form;
+  const input = withSettings(form, settings);
+  form.baseSalary =
+    form.entryMode === 'gross'
+      ? optimizer.solveBaseForGross(form.salaryTarget, input)
+      : optimizer.solveBaseForNet(form.salaryTarget, input);
+  return form;
+}
+
+function csvCell(value) {
+  const text = String(value == null ? '' : value);
+  return /[";\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function csvRow(values) {
+  return (values || []).map(csvCell).join(';');
+}
+
+function csvAmount(value) {
+  return Math.round(Number(value) || 0);
+}
+
+function csvDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth, deps) {
@@ -257,6 +302,7 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
   async function buildModel(req, form, settings, options = {}) {
     const fid = facilityId(req);
     const employeeId = waiverEmployeeId(form);
+    normalizeSalaryBasis(form, settings);
     const input = withSettings(form, settings);
     const result = optimizer.computePayroll(input);
     const waivers = await loadWaivers(fid, employeeId);
@@ -339,6 +385,7 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
       waiverReasons: optimizer.WAIVER_REASONS,
       caps: preview.caps,
       profile: preview.profile,
+      preview,
       mode: form.mode || DEFAULT_FORM.mode,
       notice: options.notice || null,
       sectors: optimizer.SECTOR_PROFILES,
@@ -393,6 +440,10 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
         proposalEvaluation: model.proposalEvaluation,
         waiverHistory,
         waiverReasons: optimizer.WAIVER_REASONS,
+        exportHref: req.originalUrl.replace(
+          '/payroll/optimizer/report',
+          '/payroll/optimizer/report.csv'
+        ),
         reportDate: new Date().toLocaleString('fr-FR', {
           day: '2-digit',
           month: 'long',
@@ -408,6 +459,328 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
         message: err.message,
         status: 500,
       });
+    }
+  });
+
+  app.get('/payroll/optimizer/report.csv', requireAuth, requirePayrollAccess, async (req, res) => {
+    try {
+      const settings = await loadSettings(facilityId(req));
+      const form = parseForm(req.query);
+      const employee = await loadEmployeeForm(req, form.employee_id);
+      if (!employee) {
+        return res
+          .status(400)
+          .type('text/plain')
+          .send('Choose an employee before exporting an optimizer compliance report.');
+      }
+
+      const fid = facilityId(req);
+      const model = await buildModel(req, form, settings, { optimize: true, revokeStale: false });
+      const waiverHistory = await loadWaiverHistory(fid, waiverEmployeeId(form), 200);
+      const result = model.result;
+      const evaluation = model.evaluation;
+      const proposal = model.proposal;
+      const proposalEvaluation = model.proposalEvaluation;
+      const labelFor = {
+        transport: 'Transport',
+        representation: 'Representation',
+        housing: 'Housing',
+        electricity: 'Electricity',
+        water: 'Water',
+        meal: 'Meal',
+        dirtiness: 'Dirtiness',
+        clothing: 'Work clothing',
+        tools: 'Tools',
+        other: 'Other allowances',
+      };
+      const entryLabels = {
+        base: 'Base salary entered',
+        gross: 'Gross salary entered',
+        net: 'Net salary entered',
+      };
+      const modeLabels = {
+        employee: 'Employee net pay',
+        employer: 'Employer cost',
+        both: 'Employee + employer',
+      };
+      const status = evaluation.hasBlocking
+        ? 'Blocked'
+        : evaluation.waivedCount
+          ? 'Compliant with waivers'
+          : 'Compliant';
+      const reportDate = new Date().toLocaleString('fr-FR', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const lines = [];
+
+      lines.push(csvRow(['Payroll Optimizer - Compliance & Waiver Audit']));
+      lines.push(csvRow(['Employee', employee.name]));
+      lines.push(csvRow(['Matricule', employee.matricule || employee.id]));
+      lines.push(csvRow(['Sector', result.profile.sectorLabel]));
+      lines.push(csvRow(['CNPS regime', result.profile.regimeLabel]));
+      lines.push(csvRow(['Occupational risk', result.profile.riskLabel]));
+      lines.push(csvRow(['Salary entry', entryLabels[form.entryMode] || entryLabels.base]));
+      if (form.entryMode !== 'base') {
+        lines.push(csvRow(['Entered target (XAF)', csvAmount(form.salaryTarget)]));
+      }
+      lines.push(csvRow(['Base salary (XAF)', csvAmount(form.baseSalary)]));
+      lines.push(csvRow(['Gross cash (XAF)', csvAmount(result.grossCash)]));
+      lines.push(csvRow(['Net pay (XAF)', csvAmount(result.netPay)]));
+      lines.push(csvRow(['Compliance status', status]));
+      lines.push(csvRow(['Report generated', reportDate]));
+
+      lines.push('');
+      lines.push(csvRow(['Payroll summary']));
+      lines.push(csvRow(['Metric', 'Amount (XAF)']));
+      lines.push(csvRow(['Gross cash', csvAmount(result.grossCash)]));
+      lines.push(csvRow(['Gross taxable', csvAmount(result.grossTaxable)]));
+      lines.push(csvRow(['CNPS contributory base', csvAmount(result.cnpsBase)]));
+      lines.push(csvRow(['Net pay', csvAmount(result.netPay)]));
+      lines.push(csvRow(['Employee deductions', csvAmount(result.employeeDeductions)]));
+      lines.push(csvRow(['Employer contributions', csvAmount(result.employerContributions)]));
+      lines.push(csvRow(['Total employer cost', csvAmount(result.totalEmployerCost)]));
+      lines.push(csvRow(['Unresolved exceptions', evaluation.blocking.length]));
+
+      lines.push('');
+      lines.push(csvRow(['Compliance checks']));
+      lines.push(
+        csvRow([
+          'Code',
+          'Severity',
+          'Exception',
+          'Message',
+          'Rule',
+          'Amount (XAF)',
+          'Ceiling (XAF)',
+          'Excess (XAF)',
+          'Status',
+          'Waiver reason',
+          'Waiver note',
+        ])
+      );
+      const violations = evaluation.violations || [];
+      if (!violations.length) {
+        lines.push(csvRow(['No statutory exception was detected for this scenario.']));
+      } else {
+        violations.forEach((violation) => {
+          const waiver = violation.waiver || {};
+          const violationStatus = violation.waived
+            ? 'Waived'
+            : violation.blocking
+              ? 'Unresolved'
+              : 'Informational';
+          lines.push(
+            csvRow([
+              violation.code,
+              violation.severity,
+              violation.title,
+              violation.message,
+              violation.rule,
+              csvAmount(violation.amount),
+              violation.max != null ? csvAmount(violation.max) : '',
+              violation.excess > 0 ? csvAmount(violation.excess) : '',
+              violationStatus,
+              violation.waived
+                ? optimizer.WAIVER_REASONS[waiver.reason] || waiver.reason || 'Approved'
+                : '',
+              violation.waived ? waiver.note || '' : '',
+            ])
+          );
+        });
+      }
+
+      lines.push('');
+      lines.push(csvRow(['Pay structure']));
+      lines.push(csvRow(['Component', 'Amount (XAF)', 'Statutory ceiling']));
+      lines.push(
+        csvRow([
+          'Base salary',
+          csvAmount(form.baseSalary),
+          `${csvAmount(result.profile.smig)} minimum`,
+        ])
+      );
+      optimizer.ALLOWANCE_KEYS.forEach((key) => {
+        const amount = csvAmount(result.allowances[key]);
+        if (!amount) return;
+        const ceiling =
+          key === 'transport' || key === 'representation'
+            ? '400000 combined'
+            : key === 'other'
+              ? 'Fully taxable'
+              : csvAmount(result.caps[key]);
+        lines.push(csvRow([labelFor[key], amount, ceiling]));
+      });
+      lines.push(csvRow(['Total gross cash', csvAmount(result.grossCash), '']));
+
+      lines.push('');
+      lines.push(csvRow(['Optimization comparison']));
+      if (!proposal) {
+        lines.push(
+          csvRow([
+            'Optimization is unavailable while this scenario has unresolved statutory exceptions.',
+          ])
+        );
+      } else {
+        lines.push(
+          csvRow([
+            'Proposed composition',
+            'Current (XAF)',
+            'Optimized (XAF)',
+            'Change (XAF)',
+            'Legal ceiling',
+          ])
+        );
+        lines.push(
+          csvRow([
+            'Base salary',
+            csvAmount(form.baseSalary),
+            csvAmount(proposal.allocBase),
+            csvAmount(proposal.allocBase - form.baseSalary),
+            `${csvAmount(proposal.profile.smig)} minimum`,
+          ])
+        );
+        optimizer.ALLOWANCE_KEYS.forEach((key) => {
+          const currentAmount = csvAmount(result.allowances[key]);
+          const optimizedAmount = csvAmount(proposal.allocation[key]);
+          if (!currentAmount && !optimizedAmount) return;
+          const ceiling =
+            key === 'transport' || key === 'representation'
+              ? '400000 combined'
+              : key === 'other'
+                ? 'Fully taxable'
+                : csvAmount(proposal.after.caps[key]);
+          lines.push(
+            csvRow([
+              labelFor[key],
+              currentAmount,
+              optimizedAmount,
+              csvAmount(optimizedAmount - currentAmount),
+              ceiling,
+            ])
+          );
+        });
+        lines.push(
+          csvRow([
+            'Total gross cash',
+            csvAmount(result.grossCash),
+            csvAmount(proposal.after.grossCash),
+            csvAmount(proposal.after.grossCash - result.grossCash),
+            '',
+          ])
+        );
+
+        lines.push('');
+        lines.push(csvRow(['Payroll impact', 'Current (XAF)', 'Optimized (XAF)', 'Change (XAF)']));
+        [
+          ['Gross taxable', result.grossTaxable, proposal.after.grossTaxable],
+          ['CNPS contributory base', result.cnpsBase, proposal.after.cnpsBase],
+          ['Employee deductions', result.employeeDeductions, proposal.after.employeeDeductions],
+          ['Net pay', result.netPay, proposal.after.netPay],
+          ['Employer contributions', result.employerContributions, proposal.after.employerContributions],
+          ['Total employer cost', result.totalEmployerCost, proposal.after.totalEmployerCost],
+        ].forEach(([label, currentValue, optimizedValue]) => {
+          lines.push(
+            csvRow([
+              label,
+              csvAmount(currentValue),
+              csvAmount(optimizedValue),
+              csvAmount(optimizedValue - currentValue),
+            ])
+          );
+        });
+
+        lines.push('');
+        lines.push(csvRow(['Optimization summary', 'Amount (XAF)']));
+        lines.push(csvRow(['Net pay change', csvAmount(proposal.savings.netPay)]));
+        lines.push(
+          csvRow(['Employee deduction change', csvAmount(proposal.savings.employeeDeductions)])
+        );
+        lines.push(csvRow(['Employer cost change', csvAmount(-proposal.savings.employerCost)]));
+        lines.push(csvRow(['Total burden saving', csvAmount(proposal.savings.totalBurden)]));
+        lines.push(csvRow(['Optimization focus', modeLabels[form.mode] || modeLabels.both]));
+        lines.push(
+          csvRow([
+            'Proposal status',
+            proposalEvaluation && proposalEvaluation.hasBlocking
+              ? 'Review only - proposal still has a blocking exception'
+              : 'Advisory proposal',
+          ])
+        );
+        lines.push(
+          csvRow([
+            'Note',
+            'The proposal is advisory and has not been applied to the employee pay profile.',
+          ])
+        );
+      }
+
+      lines.push('');
+      lines.push(csvRow(['Waiver audit trail']));
+      lines.push(
+        csvRow([
+          'Recorded',
+          'Exception',
+          'Code',
+          'Amount (XAF)',
+          'Ceiling (XAF)',
+          'Reason',
+          'Note',
+          'Recorded by',
+          'Status',
+          'Revoked at',
+          'Revocation reason',
+        ])
+      );
+      if (!waiverHistory.length) {
+        lines.push(csvRow(['No waiver has been recorded for this employee.']));
+      } else {
+        waiverHistory.forEach((waiver) => {
+          lines.push(
+            csvRow([
+              csvDate(waiver.created_at),
+              String(waiver.violation_key || '').replace(/_/g, ' '),
+              waiver.violation_code || '',
+              csvAmount(waiver.amount),
+              csvAmount(waiver.max_amount),
+              optimizer.WAIVER_REASONS[waiver.reason] || waiver.reason || '',
+              waiver.note || '',
+              waiver.created_by_name || 'Payroll user',
+              waiver.revoked_at ? 'Revoked' : 'Active',
+              waiver.revoked_at ? csvDate(waiver.revoked_at) : '',
+              waiver.revoked_reason || '',
+            ])
+          );
+        });
+      }
+
+      lines.push('');
+      lines.push(
+        csvRow([
+          'This report is an advisory compliance snapshot. It does not create or modify payroll records, pay profiles or posted payroll runs.',
+        ])
+      );
+      if (evaluation.hasBlocking) {
+        lines.push(
+          csvRow(['This scenario remains blocked by unresolved statutory exceptions.'])
+        );
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const safeMatricule = String(employee.matricule || employee.id).replace(
+        /[^a-z0-9_-]+/gi,
+        '_'
+      );
+      const filename = `optimizer_compliance_${safeMatricule}_${stamp}.csv`;
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send('\uFEFF' + lines.join('\r\n'));
+    } catch (err) {
+      console.error('PAYROLL OPTIMIZER CSV:', err.message);
+      res.status(500).type('text/plain').send(err.message);
     }
   });
 
@@ -430,6 +803,8 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
           ...form,
           baseSalary: proposal.allocBase,
           ...proposal.allocation,
+          entryMode: 'base',
+          salaryTarget: 0,
         };
         notice = `The proposed structure was loaded into the form. Nothing was saved to payroll records.`;
         model = await buildModel(req, form, settings, { optimize: false });
@@ -463,6 +838,11 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
         caps: model.result.caps,
         profile: model.result.profile,
         hasProposal: Boolean(model.proposal),
+        baseSalary: form.baseSalary,
+        entryMode: form.entryMode,
+        salaryTarget: form.salaryTarget,
+        grossCash: model.result.grossCash,
+        netPay: model.result.netPay,
       });
     } catch (err) {
       console.error('PAYROLL OPTIMIZER LIVE:', err.message);
@@ -489,6 +869,7 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
       if (employeeId > 0 && !(await loadEmployeeForm(req, employeeId))) {
         return res.status(400).json({ ok: false, error: 'The selected employee is not available in this facility.' });
       }
+      normalizeSalaryBasis(form, settings);
       const input = withSettings(form, settings);
       const result = optimizer.computePayroll(input);
       const active = await loadWaivers(fid, employeeId);
@@ -548,6 +929,11 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
         fieldErrors: model.evaluation.fieldErrors,
         caps: model.result.caps,
         profile: model.result.profile,
+        baseSalary: form.baseSalary,
+        entryMode: form.entryMode,
+        salaryTarget: form.salaryTarget,
+        grossCash: model.result.grossCash,
+        netPay: model.result.netPay,
       });
     } catch (err) {
       console.error('PAYROLL OPTIMIZER WAIVE:', err.message);
@@ -580,6 +966,11 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
         fieldErrors: model.evaluation.fieldErrors,
         caps: model.result.caps,
         profile: model.result.profile,
+        baseSalary: form.baseSalary,
+        entryMode: form.entryMode,
+        salaryTarget: form.salaryTarget,
+        grossCash: model.result.grossCash,
+        netPay: model.result.netPay,
       });
     } catch (err) {
       console.error('PAYROLL OPTIMIZER REVOKE:', err.message);

@@ -77,6 +77,7 @@
   };
   var allowanceKeys = ['transport', 'representation', 'housing', 'electricity', 'water', 'meal', 'dirtiness', 'clothing', 'tools', 'other'];
   var modeLabels = { employee: 'Employee net pay', employer: 'Employer cost', both: 'Employee + employer' };
+  var entryLabels = { base: 'Base salary entered', gross: 'Gross salary entered', net: 'Net salary entered' };
   var statusLabel = evaluation.hasBlocking ? 'Blocked' : (evaluation.waivedCount ? 'Compliant with waivers' : 'Compliant');
   var statusClass = evaluation.hasBlocking ? 'bad' : (evaluation.waivedCount ? 'warn' : 'ok');
   var activeWaivers = (waiverHistory || []).filter(function (w) { return !w.revoked_at; });
@@ -95,6 +96,7 @@
 <div class="toolbar no-print">
   <a href="/payroll/optimizer?employee_id=<%= encodeURIComponent(employee.id) %>"><i class="fa fa-arrow-left"></i> Back to optimizer</a>
   <span class="spacer"></span>
+  <a href="<%= exportHref %>"><i class="fa fa-file-excel-o"></i> Export Excel/CSV</a>
   <button type="button" class="primary" onclick="window.print()"><i class="fa fa-print"></i> Print / Save as PDF</button>
 </div>
 
@@ -122,6 +124,8 @@
   <h2>Scenario</h2>
   <div class="meta-grid">
     <div><div class="lbl">Base salary</div><div class="val"><%= fmt(form.baseSalary) %> XAF</div></div>
+    <div><div class="lbl">Salary entry</div><div class="val"><%= entryLabels[form.entryMode] || entryLabels.base %></div></div>
+    <% if (form.entryMode !== 'base') { %><div><div class="lbl">Entered target</div><div class="val"><%= fmt(form.salaryTarget) %> XAF</div></div><% } %>
     <div><div class="lbl">Gross cash</div><div class="val"><%= fmt(result.grossCash) %> XAF</div></div>
     <div><div class="lbl">Sectoral SMIG</div><div class="val"><%= fmt(result.profile.smig) %> XAF</div></div>
     <div><div class="lbl">Optimization focus</div><div class="val"><%= modeLabels[form.mode] || modeLabels.both %></div></div>

@@ -844,6 +844,39 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    ).catch(() => [[null]]);
    const facilitySector = String((settingsRow && settingsRow.default_sector) || 'medical').toLowerCase();
 
+   // Seniority, technical and specialist-research allowances are derived from the
+   // role, hire date and specialist grade. They have no editable column, so show
+   // them read-only; the monthly run recomputes the same values from this data.
+   const ENGINE_ONLY_CODES = ['seniority', 'technical', 'specialist_research'];
+   const settingsBySector = new Map();
+   const sectorsOnPage = new Set(profiles.map((p) => String((p.pay && p.pay.sector) || facilitySector).toLowerCase()));
+   sectorsOnPage.add(facilitySector);
+   for (const sector of sectorsOnPage) {
+    settingsBySector.set(sector, await loadAllowanceSettings(pool, fid, sector));
+   }
+   for (const p of profiles) {
+    const pay = p.pay || {};
+    const sector = String(pay.sector || facilitySector).toLowerCase();
+    let lines = [];
+    try {
+     lines = computeAllowances({
+      basicSalary: Number(pay.basic_salary) || 0,
+      role: p.role,
+      roleTitle: p.role_title || '',
+      hireDate: pay.hire_date || null,
+      settings: settingsBySector.get(sector) || [],
+      nightShifts: 0,
+      onCallShifts: 0,
+      isSpecialist: Boolean(pay.is_specialist),
+     }).lines || [];
+    } catch (e) {
+     console.warn('[payroll/profiles] engine allowance preview:', e.message);
+    }
+    pay.engine_allowance_lines = lines
+     .filter((l) => ENGINE_ONLY_CODES.includes(l.code))
+     .map((l) => ({ code: l.code, label: l.label, amount: Math.round(Number(l.amount) || 0) }));
+   }
+
    res.render('payroll-profiles', {
     title: 'Pay profiles - ZAIZENS',
     profiles,

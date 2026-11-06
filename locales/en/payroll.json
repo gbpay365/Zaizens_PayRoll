@@ -200,6 +200,8 @@
     "role_badge_title": "Role {{id}} from employee record",
     "med_risk_title": "Flat monthly Medical Risk Premium (Prime de Risque Médical)",
     "resp_title": "Flat monthly Responsibility / Specialist Supplement (Indemnité de Responsabilité)",
+    "engine_allowances": "Engine allowances",
+    "engine_allowances_title": "Auto-calculated Seniority, Technical and Specialist Research allowances. Read-only: payroll recomputes them from role, hire date and specialist grade.",
     "hire_from_record": "From employee record (Date of Joining). Edit under Employees.",
     "night_input_title": "Night shifts this month — nurses & clinical staff only",
     "oncall_instead": "Doctors use On-Call sessions instead",

@@ -200,6 +200,8 @@
     "role_badge_title": "Rôle {{id}} depuis la fiche employé",
     "med_risk_title": "Prime mensuelle fixe de risque médical (Prime de Risque Médical)",
     "resp_title": "Supplément mensuel fixe responsabilité / spécialité (Indemnité de Responsabilité)",
+    "engine_allowances": "Indemnités calculées",
+    "engine_allowances_title": "Indemnités d'ancienneté, technique et de recherche spécialiste calculées automatiquement. Lecture seule : la paie les recalcule selon le rôle, la date d'embauche et le grade de spécialiste.",
     "hire_from_record": "Depuis la fiche employé (date d'embauche). Modifier dans Employés.",
     "night_input_title": "Gardes de nuit ce mois — infirmiers et personnel clinique uniquement",
     "oncall_instead": "Les médecins utilisent les sessions d'astreinte",

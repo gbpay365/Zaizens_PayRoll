@@ -64,7 +64,7 @@
   function canNight(em)  { return isNightStaff(em); }
 %>
   <div class="pay-table-wrap" style="overflow-x:auto;">
-    <table class="pay-table" style="min-width:1500px;table-layout:auto;">
+    <table class="pay-table" style="min-width:1680px;table-layout:auto;">
       <thead>
         <tr>
           <th style="min-width:200px;"><%= _t('common.staff', { ns: 'payroll', defaultValue: 'Staff' }) %></th>
@@ -78,6 +78,9 @@
           </th>
           <th style="min-width:120px;" title="<%= _t('profiles.responsibility_title', { ns: 'payroll', defaultValue: 'Responsibility / Specialist Supplement — flat monthly XAF (Indemnité de Responsabilité / Spécialité)' }) %>">
             <%= _t('profiles.responsibility', { ns: 'payroll', defaultValue: 'Responsibility' }) %> <i class="fa fa-info-circle text-muted" style="font-size:.8em;"></i>
+          </th>
+          <th style="min-width:170px;" title="<%= _t('profiles.engine_allowances_title', { ns: 'payroll', defaultValue: 'Auto-calculated Seniority, Technical and Specialist Research allowances. Read-only: payroll recomputes them from role, hire date and specialist grade.' }) %>">
+            <%= _t('profiles.engine_allowances', { ns: 'payroll', defaultValue: 'Engine allowances' }) %> <i class="fa fa-info-circle text-muted" style="font-size:.8em;"></i>
           </th>
           <th style="min-width:120px;" title="<%= _t('profiles.hire_date_title', { ns: 'payroll', defaultValue: "Date of joining from employee record — Seniority Bonus (Prime d'Ancienneté). Edit under Employees." }) %>">
             <%= _t('profiles.hire_date', { ns: 'payroll', defaultValue: 'Hire Date' }) %> <i class="fa fa-info-circle text-muted" style="font-size:.8em;"></i>
@@ -132,6 +135,15 @@
           <td><input class="form-control form-control-sm pay-input-xaf hms-input" name="responsibility_<%= eid %>"
                 value="<%= p.responsibility_allowance || 0 %>" inputmode="numeric"
                 title="<%= _t('profiles.resp_title', { ns: 'payroll', defaultValue: 'Flat monthly Responsibility / Specialist Supplement (Indemnité de Responsabilité)' }) %>"></td>
+          <td class="pay-engine-allowances" data-eid="<%= eid %>">
+            <% if (!p.engine_allowance_lines || !p.engine_allowance_lines.length) { %>
+              <span class="text-muted small">—</span>
+            <% } else { %>
+              <% p.engine_allowance_lines.forEach(function(l){ %>
+                <div class="small text-nowrap"><span class="text-muted"><%= l.label %></span> <strong><%= Number(l.amount || 0).toLocaleString('fr-FR') %></strong></div>
+              <% }); %>
+            <% } %>
+          </td>
           <input type="hidden" name="other_<%= eid %>" value="0">
           <td>
             <span class="small text-nowrap" title="<%= _t('profiles.hire_from_record', { ns: 'payroll', defaultValue: 'From employee record (Date of Joining). Edit under Employees.' }) %>">
@@ -190,7 +202,7 @@
         </tr>
       <% }); %>
       <% if (!profiles.length) { %>
-        <tr><td colspan="12" class="text-center text-muted py-5"><%= _t('profiles.no_staff_match', { ns: 'payroll', defaultValue: 'No staff match your search.' }) %></td></tr>
+        <tr><td colspan="13" class="text-center text-muted py-5"><%= _t('profiles.no_staff_match', { ns: 'payroll', defaultValue: 'No staff match your search.' }) %></td></tr>
       <% } %>
       </tbody>
     </table>
@@ -225,6 +237,7 @@
     gross: _t('profiles.gross', { ns: 'payroll', defaultValue: 'Gross' }),
     totalDeductions: _t('profiles.total_deductions', { ns: 'payroll', defaultValue: 'Total deductions' }),
     net: _t('profiles.net', { ns: 'payroll', defaultValue: 'Net' }),
+    engineAllowanceCodes: ['seniority', 'technical', 'specialist_research'],
     calcSavedHint: _t('profiles.calc_saved_hint', { ns: 'payroll', defaultValue: 'Values have been filled into the row. Click <strong>Save this page</strong> to persist.' }),
     calcDoneTitle: _t('profiles.calc_done_title', { ns: 'payroll', defaultValue: 'Compensation calculated' }),
     done: _t('common.done', { ns: 'payroll', defaultValue: 'Done' }),
@@ -238,6 +251,37 @@
     el.value = (val == null ? '' : Math.round(Number(val) || 0));
     el.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
+  }
+
+  // Seniority / technical / specialist-research amounts are derived, not editable;
+  // keep the read-only row cell in step with the calculator preview.
+  function renderEngineAllowances(eid, lines) {
+    var cell = document.querySelector('.pay-engine-allowances[data-eid="' + eid + '"]');
+    if (!cell) return;
+    var rows = (lines || []).filter(function (l) {
+      return PAY_I18N.engineAllowanceCodes.indexOf(l.code) !== -1;
+    });
+    cell.innerHTML = '';
+    if (!rows.length) {
+      var empty = document.createElement('span');
+      empty.className = 'text-muted small';
+      empty.textContent = '—';
+      cell.appendChild(empty);
+      return;
+    }
+    rows.forEach(function (l) {
+      var line = document.createElement('div');
+      line.className = 'small text-nowrap';
+      var label = document.createElement('span');
+      label.className = 'text-muted';
+      label.textContent = l.label || l.code;
+      var amount = document.createElement('strong');
+      amount.textContent = fmt(l.amount);
+      line.appendChild(label);
+      line.appendChild(document.createTextNode(' '));
+      line.appendChild(amount);
+      cell.appendChild(line);
+    });
   }
 
   async function openCalc(eid, name, role) {
@@ -311,6 +355,7 @@
       setInputValue('transport_' + eid, data.transport_allowance);
       setInputValue('med_risk_' + eid, data.medical_risk_allowance);
       setInputValue('responsibility_' + eid, data.responsibility_allowance);
+      renderEngineAllowances(eid, data.allowance_lines);
 
       var ded = data.deductions || {};
       var lines = (data.allowance_lines || []).map(function (l) {

@@ -102,6 +102,23 @@ var _calcLabels = {
           <input type="email" name="employer_email" class="form-control" value="<%= cur.employer_email || '' %>" maxlength="128" <%= _canEdit ? '' : 'readonly' %>>
         </div>
       </div>
+      <hr class="my-4">
+      <h2 class="h6 font-weight-bold mb-2"><%= _t('settings.employer_contributions', { ns: 'payroll', defaultValue: 'Employer contributions (%)' }) %></h2>
+      <p class="small text-muted mb-3"><%= _t('settings.employer_contributions_hint', { ns: 'payroll', defaultValue: 'Used for the pay-profile cost total and payslips. Employer CNPS applies to gross up to 750 000 XAF per employee.' }) %></p>
+      <div class="row">
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.employer_cnps_rate', { ns: 'payroll', defaultValue: 'Employer CNPS — pension + family (%)' }) %></label>
+          <input type="number" step="0.01" min="0" max="100" name="employer_cnps_rate" class="form-control" value="<%= cur.employer_cnps_rate != null ? cur.employer_cnps_rate : 11.2 %>" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.employer_cfc_rate', { ns: 'payroll', defaultValue: 'CFC — Crédit Foncier employer (%)' }) %></label>
+          <input type="number" step="0.01" min="0" max="100" name="employer_cfc_rate" class="form-control" value="<%= cur.employer_cfc_rate != null ? cur.employer_cfc_rate : 1.5 %>" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+        <div class="col-md-4 form-group">
+          <label class="small font-weight-bold text-muted text-uppercase"><%= _t('settings.employer_fne_rate', { ns: 'payroll', defaultValue: 'FNE — employer (%)' }) %></label>
+          <input type="number" step="0.01" min="0" max="100" name="employer_fne_rate" class="form-control" value="<%= cur.employer_fne_rate != null ? cur.employer_fne_rate : 1.0 %>" <%= _canEdit ? '' : 'readonly' %>>
+        </div>
+      </div>
       </div>
 
       <div class="pay-settings-section" data-pay-settings-section="deductions" hidden>

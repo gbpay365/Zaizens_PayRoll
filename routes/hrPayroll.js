@@ -36,12 +36,10 @@ const { syncPayrollPeriodToCoreAccount, syncPayrollPeriodsAfterDelete, formatCor
  *  - on_call     → doctors on on-call roster (tbl_doctor_duty_schedule.duty_type='night')
  */
 const TAX_FREE_ALLOWANCE_CODES = new Set(['night_duty', 'on_call']);
-// Employer-side charges shown in the pay-profile totals. CNPS mirrors the payslip
-// (4.2% pension + 7% family benefits, capped); FNE is the 1% employer contribution.
-const EMPLOYER_CNPS_RATE = 11.2;
+// Fallbacks for employer-side charges when the settings row predates the rate
+// columns. CNPS mirrors the payslip (4.2% pension + 7% family benefits, capped).
+const DEFAULT_EMPLOYER_RATES = { cnps: 11.2, cfc: 1.5, fne: 1.0 };
 const EMPLOYER_CNPS_CAP = 750000;
-const EMPLOYER_CFC_RATE = 1.5;
-const EMPLOYER_FNE_RATE = 1.0;
 
 module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) {
  const { requirePayrollAccess, requireAdminOrSuper, requireHrSelfService } = deps;
@@ -258,7 +256,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
 
    // Fetch employer settings (address, CNPS no, NIU, phone)
    const [[empSettings]] = await pool.query(
-    'SELECT employer_cnps_number, employer_niu, employer_address, employer_phone, employer_email FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1',
+    `SELECT employer_cnps_number, employer_niu, employer_address, employer_phone, employer_email,
+            employer_cnps_rate, employer_cfc_rate, employer_fne_rate
+       FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1`,
     [fid]
    ).catch(() => [[{}]]);
 
@@ -288,11 +288,16 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     (parseFloat(row.development_tax_deduction) || 0) +
     (parseFloat(row.cnhc_deduction) || 0) +
     (parseFloat(row.income_tax) || 0);
-   // CNPS employer: 4.2% pension + 7% family benefits = 11.2% (baseline, capped at 750K)
-   const cnpsBase = Math.min(gross, 750000);
-   const cnpsEmployer = Math.round(cnpsBase * 11.2) / 100;
-   // CFC employer: 1.5% of gross (Crédit Foncier du Cameroun)
-   const cimrEmployer = Math.round(gross * 1.5) / 100; // column kept as cimrEmployer for compat
+   // Employer rates come from the payroll settings (fall back to statutory defaults).
+   const rateOr = (value, fallback) => {
+    const n = parseFloat(value);
+    return Number.isFinite(n) ? n : fallback;
+   };
+   const cnpsEmployerRate = rateOr(empSettings && empSettings.employer_cnps_rate, DEFAULT_EMPLOYER_RATES.cnps);
+   const cfcEmployerRate = rateOr(empSettings && empSettings.employer_cfc_rate, DEFAULT_EMPLOYER_RATES.cfc);
+   const cnpsBase = Math.min(gross, EMPLOYER_CNPS_CAP);
+   const cnpsEmployer = Math.round((cnpsBase * cnpsEmployerRate) / 100);
+   const cimrEmployer = Math.round((gross * cfcEmployerRate) / 100); // column kept as cimrEmployer for compat
    const dept = String(row.primary_department || '').trim();
    const printed = hmsFormatDate.formatDisplayDate(new Date());
 
@@ -817,10 +822,19 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
 
    // Load facility-wide default sector from settings
    const [[settingsRow]] = await pool.query(
-    'SELECT default_sector FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1',
+    `SELECT default_sector, employer_cnps_rate, employer_cfc_rate, employer_fne_rate
+       FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1`,
     [fid]
    ).catch(() => [[null]]);
    const facilitySector = String((settingsRow && settingsRow.default_sector) || 'medical').toLowerCase();
+   const employerRates = {
+    cnps: parseFloat(settingsRow && settingsRow.employer_cnps_rate),
+    cfc: parseFloat(settingsRow && settingsRow.employer_cfc_rate),
+    fne: parseFloat(settingsRow && settingsRow.employer_fne_rate),
+   };
+   if (!Number.isFinite(employerRates.cnps)) employerRates.cnps = DEFAULT_EMPLOYER_RATES.cnps;
+   if (!Number.isFinite(employerRates.cfc)) employerRates.cfc = DEFAULT_EMPLOYER_RATES.cfc;
+   if (!Number.isFinite(employerRates.fne)) employerRates.fne = DEFAULT_EMPLOYER_RATES.fne;
 
    const mapProfile = (row) => {
     const mat =
@@ -947,9 +961,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    for (const p of allProfiles) {
     const pay = p.pay || {};
     const grossPay = Number(pay.monthly_gross) || 0;
-    const employerCnps = Math.round((Math.min(grossPay, EMPLOYER_CNPS_CAP) * EMPLOYER_CNPS_RATE) / 100);
-    const employerCfc = Math.round((grossPay * EMPLOYER_CFC_RATE) / 100);
-    const employerFne = Math.round((grossPay * EMPLOYER_FNE_RATE) / 100);
+    const employerCnps = Math.round((Math.min(grossPay, EMPLOYER_CNPS_CAP) * employerRates.cnps) / 100);
+    const employerCfc = Math.round((grossPay * employerRates.cfc) / 100);
+    const employerFne = Math.round((grossPay * employerRates.fne) / 100);
     totals.gross += grossPay;
     totals.employerCnps += employerCnps;
     totals.employerCfc += employerCfc;
@@ -1222,6 +1236,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     council_tax_rate: 0,       // Council tax: computed from fixed scale
     development_tax_rate: 1.0, // FNE (Fonds National de l'Emploi) 2025
     cnhc_rate: 0,              // CAC: 10 % of IRPP, computed automatically
+    employer_cnps_rate: DEFAULT_EMPLOYER_RATES.cnps, // employer: pension 4.2 + family 7
+    employer_cfc_rate: DEFAULT_EMPLOYER_RATES.cfc,
+    employer_fne_rate: DEFAULT_EMPLOYER_RATES.fne,
     tax_brackets: '',
     default_sector: 'medical'
    };
@@ -1355,6 +1372,13 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   const council  = parseFloat(req.body.council_tax_rate)    || 0;    // fixed scale
   const dev      = parseFloat(req.body.development_tax_rate) || 1.0; // FNE
   const cnhc     = parseFloat(req.body.cnhc_rate)           || 0;    // CAC auto
+  const rateOr = (value, fallback) => {
+   const n = parseFloat(value);
+   return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback;
+  };
+  const employer_cnps_rate = rateOr(req.body.employer_cnps_rate, DEFAULT_EMPLOYER_RATES.cnps);
+  const employer_cfc_rate = rateOr(req.body.employer_cfc_rate, DEFAULT_EMPLOYER_RATES.cfc);
+  const employer_fne_rate = rateOr(req.body.employer_fne_rate, DEFAULT_EMPLOYER_RATES.fne);
   const requestedSector = String(req.body.default_sector || 'medical').trim().toLowerCase().slice(0, 40);
   const defaultSector = ALLOWANCE_SECTORS[requestedSector] ? requestedSector : 'medical';
   let brackets = JSON.stringify([
@@ -1372,8 +1396,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
       facility_id, tax_year, employer_cnps_number, employer_niu, cnps_regime,
       employer_address, employer_phone, employer_email,
       cnps_employee_rate, cimr_employee_rate, crtv_rate, council_tax_rate, development_tax_rate, cnhc_rate,
+      employer_cnps_rate, employer_cfc_rate, employer_fne_rate,
       tax_brackets, default_sector
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON DUPLICATE KEY UPDATE
       employer_cnps_number = VALUES(employer_cnps_number),
       employer_niu = VALUES(employer_niu),
@@ -1387,6 +1412,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
       council_tax_rate = VALUES(council_tax_rate),
       development_tax_rate = VALUES(development_tax_rate),
       cnhc_rate = VALUES(cnhc_rate),
+      employer_cnps_rate = VALUES(employer_cnps_rate),
+      employer_cfc_rate = VALUES(employer_cfc_rate),
+      employer_fne_rate = VALUES(employer_fne_rate),
       tax_brackets = VALUES(tax_brackets),
       default_sector = VALUES(default_sector)`,
     [
@@ -1404,6 +1432,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      council,
      dev,
      cnhc,
+     employer_cnps_rate,
+     employer_cfc_rate,
+     employer_fne_rate,
      brackets,
      defaultSector
     ]

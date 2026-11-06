@@ -211,9 +211,9 @@
           <td colspan="13">
             <div class="d-flex flex-wrap align-items-center justify-content-between" style="gap:12px 24px;">
               <div>
-                <strong><%= _t('profiles.page_totals', { ns: 'payroll', defaultValue: 'Page totals' }) %></strong>
+                <strong><%= _t('profiles.filtered_totals', { ns: 'payroll', defaultValue: 'Filtered staff totals' }) %></strong>
                 <span class="text-muted small">
-                  &middot; <%= _t('profiles.staff_on_page', { ns: 'payroll', defaultValue: '{{count}} staff on this page' }).replace('{{count}}', totals.count) %>
+                  &middot; <%= _t('profiles.filtered_staff_count', { ns: 'payroll', defaultValue: '{{count}} staff' }).replace('{{count}}', totals.count) %>
                 </span>
               </div>
               <div class="d-flex flex-wrap" style="gap:24px;">

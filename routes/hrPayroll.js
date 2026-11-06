@@ -807,7 +807,16 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     dataParams: listParams,
    });
    const roleLabels = await loadRoleTitleMap(pool);
-   const profiles = (pageResult.rows || []).map((row) => {
+   const pager = pageResult.pager;
+
+   // Load facility-wide default sector from settings
+   const [[settingsRow]] = await pool.query(
+    'SELECT default_sector FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1',
+    [fid]
+   ).catch(() => [[null]]);
+   const facilitySector = String((settingsRow && settingsRow.default_sector) || 'medical').toLowerCase();
+
+   const mapProfile = (row) => {
     const mat =
      row.employee_id != null && String(row.employee_id).trim() !== ''
       ? String(row.employee_id).trim()
@@ -835,26 +844,26 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
       on_call_per_month: row.on_call_per_month || 0,
      },
     };
-   });
-   const pager = pageResult.pager;
-   // Load facility-wide default sector from settings
-   const [[settingsRow]] = await pool.query(
-    'SELECT default_sector FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1',
-    [fid]
-   ).catch(() => [[null]]);
-   const facilitySector = String((settingsRow && settingsRow.default_sector) || 'medical').toLowerCase();
+   };
+
+   // Totals must cover every filtered employee, not only the visible page.
+   const [allRows] = await pool.query(
+    `${selectCols} ${fullSql} ORDER BY e.last_name, e.first_name`,
+    listParams
+   );
+   const allProfiles = (allRows || []).map(mapProfile);
 
    // Seniority, technical and specialist-research allowances are derived from the
    // role, hire date and specialist grade. They have no editable column, so show
    // them read-only; the monthly run recomputes the same values from this data.
    const ENGINE_ONLY_CODES = ['seniority', 'technical', 'specialist_research'];
    const settingsBySector = new Map();
-   const sectorsOnPage = new Set(profiles.map((p) => String((p.pay && p.pay.sector) || facilitySector).toLowerCase()));
-   sectorsOnPage.add(facilitySector);
-   for (const sector of sectorsOnPage) {
+   const sectorsToLoad = new Set(allProfiles.map((p) => String((p.pay && p.pay.sector) || facilitySector).toLowerCase()));
+   sectorsToLoad.add(facilitySector);
+   for (const sector of sectorsToLoad) {
     settingsBySector.set(sector, await loadAllowanceSettings(pool, fid, sector));
    }
-   for (const p of profiles) {
+   for (const p of allProfiles) {
     const pay = p.pay || {};
     const sector = String(pay.sector || facilitySector).toLowerCase();
     let lines = [];
@@ -897,27 +906,30 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     pay._tax_free_total = taxFreeTotal;
    }
 
-   // Expected net for the summary row. The tax engine needs the taxable gross
-   // only, so run these in parallel to keep the page fast on a full page of staff.
+   // Expected net for the summary row. Batch the tax-engine calls so a large
+   // filtered list cannot flood the connection pool.
    const taxYear = new Date().getFullYear();
-   await Promise.all(
-    profiles.map(async (p) => {
-     const pay = p.pay || {};
-     if (!(pay._taxable_gross > 0)) {
-      pay.monthly_net = 0;
-      return;
-     }
-     try {
-      const tax = await hmsPayrollCameroonCalculate(pool, fid, taxYear, pay._taxable_gross);
-      pay.monthly_net = tax ? Math.round((Number(tax.net_salary) || 0) + (pay._tax_free_total || 0)) : null;
-     } catch (e) {
-      console.warn('[payroll/profiles] expected net:', e.message);
-      pay.monthly_net = null;
-     }
-    })
-   );
-   const totals = { count: profiles.length, gross: 0, net: 0, netComplete: true };
-   for (const p of profiles) {
+   const TAX_BATCH = 10;
+   for (let i = 0; i < allProfiles.length; i += TAX_BATCH) {
+    await Promise.all(
+     allProfiles.slice(i, i + TAX_BATCH).map(async (p) => {
+      const pay = p.pay || {};
+      if (!(pay._taxable_gross > 0)) {
+       pay.monthly_net = 0;
+       return;
+      }
+      try {
+       const tax = await hmsPayrollCameroonCalculate(pool, fid, taxYear, pay._taxable_gross);
+       pay.monthly_net = tax ? Math.round((Number(tax.net_salary) || 0) + (pay._tax_free_total || 0)) : null;
+      } catch (e) {
+       console.warn('[payroll/profiles] expected net:', e.message);
+       pay.monthly_net = null;
+      }
+     })
+    );
+   }
+   const totals = { count: allProfiles.length, gross: 0, net: 0, netComplete: true };
+   for (const p of allProfiles) {
     const pay = p.pay || {};
     totals.gross += Number(pay.monthly_gross) || 0;
     if (pay.monthly_net == null) totals.netComplete = false;
@@ -925,6 +937,11 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     delete pay._taxable_gross;
     delete pay._tax_free_total;
    }
+
+   // Keep the page's SQL order, but reuse the already-computed package (and its
+   // engine allowances) for each visible employee.
+   const profileById = new Map(allProfiles.map((p) => [p.id, p]));
+   const profiles = (pageResult.rows || []).map((row) => profileById.get(row.id) || mapProfile(row));
 
    res.render('payroll-profiles', {
     title: 'Pay profiles - ZAIZENS',

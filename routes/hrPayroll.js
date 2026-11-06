@@ -46,6 +46,34 @@ function csvCell(value) {
  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+function parsePeriodParam(value) {
+ const m = /^(\d{4})-(\d{2})$/.exec(String(value || '').trim());
+ if (!m) return null;
+ const year = parseInt(m[1], 10);
+ const month = parseInt(m[2], 10);
+ if (year < 2000 || year > 2100 || month < 1 || month > 12) return null;
+ return { year, month, key: year * 100 + month, value: `${m[1]}-${m[2]}` };
+}
+
+function normalizePeriodRange(from, to) {
+ if (from && to && from.key > to.key) return { from: to, to: from };
+ return { from, to };
+}
+
+function applyPeriodRange(where, params, from, to) {
+ let sql = where;
+ const values = params.slice();
+ if (from) {
+  sql += ' AND (p.year * 100 + p.month) >= ?';
+  values.push(from.key);
+ }
+ if (to) {
+  sql += ' AND (p.year * 100 + p.month) <= ?';
+  values.push(to.key);
+ }
+ return { where: sql, params: values };
+}
+
 /** Employer contributions for every payroll run matching the supplied filter. */
 async function loadEmployerRunTotals(pool, fid, fromJoin, listParams) {
  const [[rateRow]] = await pool.query(
@@ -197,6 +225,12 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    const cy = new Date().getFullYear();
 
    const searchQ = String(req.query.q || '').trim();
+   const range = normalizePeriodRange(
+    parsePeriodParam(req.query.from),
+    parsePeriodParam(req.query.to)
+   );
+   const runFrom = range.from;
+   const runTo = range.to;
    let where = 'p.facility_id = ?';
    const listParams = [fid];
    if (!admin) {
@@ -252,7 +286,11 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    let runTotals = [];
    let runTotalsSummary = null;
    try {
-    const totals = await loadEmployerRunTotals(pool, fid, fromJoin, listParams);
+    const filtered = applyPeriodRange(where, listParams, runFrom, runTo);
+    const totalsJoin =
+     'FROM tbl_hms_payroll_record p INNER JOIN tbl_employee e ON e.id = p.employee_id WHERE ' +
+     filtered.where;
+    const totals = await loadEmployerRunTotals(pool, fid, totalsJoin, filtered.params);
     runTotals = totals.runTotals;
     runTotalsSummary = totals.summary;
    } catch (err) {
@@ -273,6 +311,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     allDeletableIds,
     runTotals,
     runTotalsSummary,
+    runFrom: runFrom ? runFrom.value : '',
+    runTo: runTo ? runTo.value : '',
     flash: req.query.msg || null,
     error: req.query.err || null
    });
@@ -290,6 +330,10 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    const uid = sessionEmpId(req);
    const admin = isPayrollAdmin(req);
    const searchQ = String(req.query.q || '').trim();
+   const range = normalizePeriodRange(
+    parsePeriodParam(req.query.from),
+    parsePeriodParam(req.query.to)
+   );
    let where = 'p.facility_id = ?';
    const listParams = [fid];
    if (!admin) {
@@ -302,14 +346,15 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      ' AND (e.first_name LIKE ? OR e.last_name LIKE ? OR CONCAT(e.first_name, " ", e.last_name) LIKE ?)';
     listParams.push(like, like, like);
    }
+   const filtered = applyPeriodRange(where, listParams, range.from, range.to);
    const fromJoin =
     'FROM tbl_hms_payroll_record p INNER JOIN tbl_employee e ON e.id = p.employee_id WHERE ' +
-    where;
+    filtered.where;
    const { runTotals, summary, rates } = await loadEmployerRunTotals(
     pool,
     fid,
     fromJoin,
-    listParams
+    filtered.params
    );
    const lines = [
     [

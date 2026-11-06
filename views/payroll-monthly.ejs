@@ -5,6 +5,14 @@ var _fmtXaf = function(n) { return (Number(n) || 0).toLocaleString('fr-FR', { ma
 var m = locals.metrics || {};
 var _runTotals = Array.isArray(locals.runTotals) ? locals.runTotals : [];
 var _runSummary = locals.runTotalsSummary || null;
+var _runFrom = locals.runFrom || '';
+var _runTo = locals.runTo || '';
+var _exportQs = [];
+if (typeof searchQ === 'string' && searchQ) _exportQs.push('q=' + encodeURIComponent(searchQ));
+if (_runFrom) _exportQs.push('from=' + encodeURIComponent(_runFrom));
+if (_runTo) _exportQs.push('to=' + encodeURIComponent(_runTo));
+var _exportHref = '/payroll/monthly/export.csv' + (_exportQs.length ? '?' + _exportQs.join('&') : '');
+var _clearHref = '/payroll/monthly' + (typeof searchQ === 'string' && searchQ ? '?q=' + encodeURIComponent(searchQ) : '');
 %>
 
 <div class="pay-hero">
@@ -42,13 +50,30 @@ var _runSummary = locals.runTotalsSummary || null;
   </div>
 </div>
 
-<% if(_runTotals.length){ %>
+<% if(_runTotals.length || _runFrom || _runTo){ %>
 <div class="pay-panel pay-run-costs">
   <div class="pay-panel-head">
-    <h2><%= _t('monthly.employer_cost_by_run', { ns: 'payroll', defaultValue: 'Employer cost by run' }) %></h2>
-    <div class="pay-toolbar">
+    <div>
+      <h2><%= _t('monthly.employer_cost_by_run', { ns: 'payroll', defaultValue: 'Employer cost by run' }) %></h2>
       <small class="text-muted"><%= _t('monthly.employer_cost_hint', { ns: 'payroll', defaultValue: 'Gross salary plus configured employer CNPS, CFC and FNE.' }) %></small>
-      <a class="btn btn-sm hms-btn-secondary no-print" href="/payroll/monthly/export.csv<%= searchQ ? '?q=' + encodeURIComponent(searchQ) : '' %>">
+    </div>
+    <div class="pay-toolbar">
+      <form method="GET" action="/payroll/monthly" class="pay-run-filter no-print">
+        <% if(typeof searchQ === 'string' && searchQ){ %><input type="hidden" name="q" value="<%= searchQ %>"><% } %>
+        <label class="pay-run-filter-label">
+          <span><%= _t('monthly.from', { ns: 'payroll', defaultValue: 'From' }) %></span>
+          <input type="month" name="from" class="form-control form-control-sm" value="<%= _runFrom %>">
+        </label>
+        <label class="pay-run-filter-label">
+          <span><%= _t('monthly.to', { ns: 'payroll', defaultValue: 'To' }) %></span>
+          <input type="month" name="to" class="form-control form-control-sm" value="<%= _runTo %>">
+        </label>
+        <button type="submit" class="btn btn-sm hms-btn-secondary"><%= _t('monthly.apply', { ns: 'payroll', defaultValue: 'Apply' }) %></button>
+        <% if(_runFrom || _runTo){ %>
+        <a href="<%= _clearHref %>" class="btn btn-sm hms-btn-secondary"><%= _t('monthly.clear_filter', { ns: 'payroll', defaultValue: 'Clear' }) %></a>
+        <% } %>
+      </form>
+      <a class="btn btn-sm hms-btn-secondary no-print" href="<%= _exportHref %>">
         <i class="fa fa-download mr-1"></i><%= _t('monthly.export_csv', { ns: 'payroll', defaultValue: 'Export CSV' }) %>
       </a>
     </div>
@@ -67,6 +92,9 @@ var _runSummary = locals.runTotalsSummary || null;
         </tr>
       </thead>
       <tbody>
+        <% if(!_runTotals.length){ %>
+        <tr><td colspan="7" class="text-center text-muted py-4"><%= _t('monthly.no_runs_in_range', { ns: 'payroll', defaultValue: 'No payroll runs in this range.' }) %></td></tr>
+        <% } %>
         <% _runTotals.forEach(function(run){ %>
         <tr>
           <td class="font-weight-bold"><%= months[run.month] || run.month %> <%= run.year %></td>

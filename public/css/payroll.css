@@ -348,7 +348,38 @@
 }
 
 .pay-module .pay-run-costs .pay-panel-head small {
+  display: block;
   font-size: 0.74rem;
+}
+
+.pay-module .pay-run-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.pay-module .pay-run-filter-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: 0.64rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.pay-module .pay-run-filter input[type="month"] {
+  width: 145px;
+  height: 33px;
+  padding: 4px 8px;
+  border: 1px solid var(--pay-border);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  color: #334155;
+  background: #fff;
 }
 
 .pay-module .pay-run-table tfoot td {

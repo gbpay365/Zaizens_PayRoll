@@ -27,7 +27,7 @@ var hasFilters = !!(f.employee || f.action || f.from || f.to);
   <div>
     <p class="sage-eyebrow">Payroll &middot; Audit</p>
     <h1>Payroll audit</h1>
-    <p class="sage-sub">Every salary calculation, salary change and payroll undo recorded by the payroll module. Entries are written by the server and cannot be edited here.</p>
+    <p class="sage-sub">Every salary calculation, salary change and payroll undo recorded by the payroll module for the current facility. Entries are written by the server and cannot be edited here.</p>
   </div>
   <div class="sage-head-actions no-print">
     <a href="/admin/activity" class="btn btn-sage-ghost"><i class="fa fa-history mr-1"></i> All activity</a>
@@ -92,7 +92,7 @@ var hasFilters = !!(f.employee || f.action || f.from || f.to);
   <div class="pay-table-wrap">
     <table class="pay-table">
       <thead>
-        <tr><th>When</th><th>Employee</th><th>Action</th><th>Detail</th><th>By</th><th>IP</th></tr>
+        <tr><th>When</th><th>Employee / target</th><th>Action</th><th>Detail</th><th>By</th><th>IP</th></tr>
       </thead>
       <tbody>
         <% if (!rows.length) { %>

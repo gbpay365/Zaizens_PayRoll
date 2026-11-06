@@ -28,6 +28,7 @@
  <td>
  <% if(paySt==='paid'){ %><span class="badge badge-success"><%= _tl('tax_payroll_lines.paid', 'Paid') %></span>
  <% } else if(paySt==='pending'){ %><span class="badge badge-secondary"><%= _tl('tax_payroll_lines.pending', 'Pending') %></span>
+ <% } else if(paySt==='reversed'){ %><span class="badge badge-warning"><%= _tl('tax_payroll_lines.reversed', 'Reversed') %></span>
  <% } else { %><span class="badge badge-light text-dark"><%= paySt %></span><% } %>
  </td>
  </tr>

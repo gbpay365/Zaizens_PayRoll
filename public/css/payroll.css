@@ -412,6 +412,11 @@
   color: #475569;
 }
 
+.pay-module .pay-badge-reversed {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .pay-module .pay-input-xaf {
   text-align: left;
   font-variant-numeric: tabular-nums;

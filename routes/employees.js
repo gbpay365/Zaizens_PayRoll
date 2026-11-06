@@ -38,7 +38,7 @@ const FALLBACK_ROLES = [
   { id: 99, title: 'Super Admin' },
 ];
 
-const IMPORT_MAX_ROWS = 100;
+const IMPORT_MAX_ROWS = 250;
 const IMPORT_MAX_BYTES = 1024 * 1024;
 const IMPORT_TEMPLATE_HEADERS = [
   'first_name', 'last_name', 'matricule', 'cnps_number', 'tax_niu', 'nic_number',
@@ -976,8 +976,10 @@ module.exports = function registerEmployeeRoutes(app, pool, requireAuth, deps) {
         `SELECT id, first_name, last_name, username, employee_id, emailid, phone, gender, dob,
                 joining_date, role, status, primary_department, job_title, cnps_number, tax_niu,
                 nic_number, bank_name, bank_account_no, address
-         FROM tbl_employee WHERE id = ? LIMIT 1`,
-        [id]
+         FROM tbl_employee
+         WHERE id = ? AND (default_facility_id IS NULL OR default_facility_id = ?)
+         LIMIT 1`,
+        [id, fid]
       );
       if (!employee) return res.status(404).render('error', { title: 'Not found', message: 'Employee not found.', status: 404 });
 

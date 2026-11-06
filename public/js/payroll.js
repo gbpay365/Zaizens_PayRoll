@@ -240,6 +240,32 @@
     });
   }
 
+  /** Reverse paid payroll line modal */
+  function initReverseModal() {
+    var modal = document.getElementById('hmsPayrollReverseModal');
+    if (!modal) return;
+    var idInput = modal.querySelector('input[name="payroll_record_id"]');
+    var reasonInput = modal.querySelector('textarea[name="reason"]');
+    var labelEl = modal.querySelector('[data-pay-reverse-label]');
+    document.querySelectorAll('[data-pay-reverse]').forEach(function (btn) {
+      if (btn.dataset.payReverseBound) return;
+      btn.dataset.payReverseBound = '1';
+      btn.addEventListener('click', function () {
+        if (idInput) idInput.value = btn.getAttribute('data-payroll-id') || '';
+        if (reasonInput) reasonInput.value = '';
+        if (labelEl) labelEl.textContent = btn.getAttribute('data-payroll-label') || 'this payroll line';
+        if (typeof window.jQuery !== 'undefined' && window.jQuery.fn && window.jQuery.fn.modal) {
+          window.jQuery(modal).modal('show');
+        } else {
+          modal.classList.add('show');
+          modal.style.display = 'block';
+          modal.removeAttribute('aria-hidden');
+        }
+        if (reasonInput) reasonInput.focus();
+      });
+    });
+  }
+
   /** Settings page tab switching */
   function initSettingsTabs() {
     var root = document.getElementById('paySettingsTabs');
@@ -282,6 +308,7 @@
     initProfileInputs();
     initPayrollBulkSelect();
     initPayrollModals();
+    initReverseModal();
     initSettingsTabs();
   });
 })();

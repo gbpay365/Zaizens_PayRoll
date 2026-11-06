@@ -27,7 +27,7 @@ var _clearHref = '/payroll/monthly' + (typeof searchQ === 'string' && searchQ ? 
   <div>
     <p class="sage-eyebrow">Payroll &middot; Runs</p>
     <h1><%= _t('monthly.title', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></h1>
-    <p>Every payroll line for the facility, with gross, IRPP and net. Process a month to generate lines and payslips.</p>
+    <p>Every payroll line for the facility, with gross, IRPP and net. Process a month to generate lines and payslips. Paid lines can be reversed and then corrected without deleting their audit record.</p>
   </div>
   <% if(isAdmin){ %>
   <div class="pay-hero-actions no-print">
@@ -42,7 +42,7 @@ var _clearHref = '/payroll/monthly' + (typeof searchQ === 'string' && searchQ ? 
 <div class="pay-kpi-row no-print">
   <div class="pay-kpi">
     <div class="pay-kpi-label"><%= _t('monthly.lines_current_month', { ns: 'payroll', defaultValue: 'Lines (current month)' }) %></div>
-    <div class="pay-kpi-value"><%= (m.pendingCount || 0) + (m.paidCount || 0) %></div>
+    <div class="pay-kpi-value"><%= (m.pendingCount || 0) + (m.paidCount || 0) + (m.reversedCount || 0) %></div>
   </div>
   <div class="pay-kpi">
     <div class="pay-kpi-label"><%= _t('monthly.pending_payout', { ns: 'payroll', defaultValue: 'Pending payout' }) %></div>
@@ -204,7 +204,7 @@ var _clearHref = '/payroll/monthly' + (typeof searchQ === 'string' && searchQ ? 
         <tr data-pay-row="1" data-pay-search="<%= searchKey %>" data-payroll-id="<%= pid %>">
           <% if(isAdmin){ %>
           <td class="pay-col-check no-print">
-            <% if(pid > 0){ %>
+            <% if(pid > 0 && paySt !== 'paid' && paySt !== 'reversed'){ %>
             <input type="checkbox" class="pay-row-check pay-line-select" value="<%= pid %>" aria-label="<%= _t('monthly.select_employee', { ns: 'payroll', defaultValue: 'Select' }) %> <%= r.first_name %> <%= r.last_name %>">
             <% } %>
           </td>
@@ -217,10 +217,12 @@ var _clearHref = '/payroll/monthly' + (typeof searchQ === 'string' && searchQ ? 
           <td>
             <% if(paySt==='paid'){ %><span class="pay-badge pay-badge-paid"><%= _t('status_paid', { ns: 'payroll', defaultValue: 'Paid' }) %></span>
             <% } else if(paySt==='pending'){ %><span class="pay-badge pay-badge-pending"><%= _t('status_pending', { ns: 'payroll', defaultValue: 'Pending' }) %></span>
+            <% } else if(paySt==='reversed'){ %><span class="pay-badge pay-badge-reversed" title="<%= r.reversal_reason || '' %>"><%= _t('status_reversed', { ns: 'payroll', defaultValue: 'Reversed' }) %></span>
+              <% if (r.reversal_reason) { %><small class="d-block text-muted mt-1" style="max-width:180px;white-space:normal;font-size:11px;"><%= r.reversal_reason %></small><% } %>
             <% } else { %><span class="pay-badge"><%= paySt %></span><% } %>
           </td>
           <td class="text-right text-nowrap no-print">
-            <% var _hasSlip = canSlip && pid > 0; var _hasMark = isAdmin && paySt==='pending' && pid > 0; var _canDel = isAdmin && pid > 0; %>
+            <% var _hasSlip = canSlip && pid > 0; var _hasMark = isAdmin && paySt==='pending' && pid > 0; var _canDel = isAdmin && paySt !== 'paid' && paySt !== 'reversed' && pid > 0; var _canReverse = isAdmin && paySt==='paid' && pid > 0; %>
             <% if(_hasSlip){ %>
             <a href="/payroll/payslip/<%= pid %>" target="_blank" rel="noopener" class="btn btn-sm hms-btn-secondary"><%= _t('monthly.payslip', { ns: 'payroll', defaultValue: 'Payslip' }) %></a>
             <% } %>
@@ -230,19 +232,27 @@ var _clearHref = '/payroll/monthly' + (typeof searchQ === 'string' && searchQ ? 
               <button type="submit" class="btn btn-sm btn-success font-weight-bold"><%= _t('monthly.mark_paid', { ns: 'payroll', defaultValue: 'Mark paid' }) %></button>
             </form>
             <% } %>
+            <% if(_canReverse){ %>
+            <button type="button" class="btn btn-sm btn-warning font-weight-bold ml-1"
+                    data-pay-reverse
+                    data-payroll-id="<%= pid %>"
+                    data-payroll-label="<%= r.first_name %> <%= r.last_name %> — <%= months[mid] || '' %> <%= r.year %>"
+                    title="<%= _t('monthly.reverse_title', { ns: 'payroll', defaultValue: 'Reverse this paid line, then re-process the month' }) %>">
+              <i class="fa fa-undo"></i> <%= _t('monthly.reverse', { ns: 'payroll', defaultValue: 'Reverse' }) %>
+            </button>
+            <% } %>
             <% if(_canDel){ %>
             <form method="POST" action="/payroll/delete-record" class="d-inline ml-1"
                   data-pay-confirm="<%= _t('monthly.delete_confirm_prefix', { ns: 'payroll', defaultValue: 'Delete this payroll record for' }) %> <%= r.first_name %> <%= r.last_name %> (<%= months[mid]||'' %> <%= r.year %>)?&#10;&#10;<%= _t('monthly.delete_confirm_suffix', { ns: 'payroll', defaultValue: 'The record will be permanently removed so you can re-process this period.' }) %>">
               <input type="hidden" name="payroll_record_id" value="<%= pid %>">
               <input type="hidden" name="_return_q" value="<%= typeof searchQ === 'string' ? searchQ : '' %>">
               <button type="submit" class="btn btn-sm btn-danger font-weight-bold"
-                      title="<%= _t('monthly.delete_title', { ns: 'payroll', defaultValue: 'Delete record and allow re-generation' }) %>"
-                      style="opacity:<%= paySt==='paid' ? '0.65' : '1' %>">
+                      title="<%= _t('monthly.delete_title', { ns: 'payroll', defaultValue: 'Delete record and allow re-generation' }) %>">
                 <i class="fa fa-trash"></i>
               </button>
             </form>
             <% } %>
-            <% if(!_hasSlip && !_hasMark && !_canDel){ %><span class="text-muted small">—</span><% } %>
+            <% if(!_hasSlip && !_hasMark && !_canDel && !_canReverse){ %><span class="text-muted small">—</span><% } %>
           </td>
         </tr>
       <% }); %>

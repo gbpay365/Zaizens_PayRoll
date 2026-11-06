@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node --watch app.js",
+    "test": "node --test test/payrollAudit.test.js test/payrollOptimizerReport.test.js test/employeeDeletion.test.js test/dbIntegration.test.js",
     "db:create": "node scripts/create-database.js",
     "db:seed": "node scripts/seed-admin.js",
     "sync:core": "node scripts/resync-payroll-to-core.js",

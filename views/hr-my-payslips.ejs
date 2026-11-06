@@ -73,7 +73,7 @@ var _ytd = ytd || { gross: 0, tax: 0, net: 0, deductions: 0, count: 0 };
           <td class="pay-num"><%= _fmtXaf(r.gross_salary) %></td>
           <td class="pay-num"><%= _fmtXaf(r.income_tax) %></td>
           <td class="pay-num"><strong><%= _fmtXaf(r.net_salary) %></strong></td>
-          <td><span class="pay-badge <%= st === 'paid' ? 'pay-badge-paid' : 'pay-badge-pending' %>"><%= st === 'paid' ? 'Paid' : 'Pending' %></span></td>
+          <td><span class="pay-badge <%= st === 'paid' ? 'pay-badge-paid' : (st === 'reversed' ? 'pay-badge-reversed' : 'pay-badge-pending') %>"><%= st === 'paid' ? 'Paid' : (st === 'reversed' ? 'Reversed' : 'Pending') %></span></td>
           <td class="text-right no-print">
             <% if (pid > 0) { %>
             <a href="/payroll/payslip/<%= pid %>" target="_blank" rel="noopener" class="btn btn-sage-ghost btn-sm">View / Print</a>

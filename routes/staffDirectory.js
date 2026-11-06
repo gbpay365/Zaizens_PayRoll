@@ -31,12 +31,16 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
    * Remove employees and their login accounts (tbl_employee) together with the
    * payroll, leave and attendance rows that belong to them.
    */
-  async function removeEmployees(pool, ids, actorId) {
+  async function removeEmployees(pool, ids, actorId, facilityIdArg) {
     if (!ids.length) return { deleted: [], skipped: [] };
+    const fid = Math.max(1, parseInt(facilityIdArg, 10) || 1);
     const placeholders = ids.map(() => '?').join(',');
     const [rows] = await pool.query(
-      `SELECT id, first_name, last_name, username, role FROM tbl_employee WHERE id IN (${placeholders})`,
-      ids
+      `SELECT id, first_name, last_name, username, role
+       FROM tbl_employee
+       WHERE id IN (${placeholders})
+         AND (default_facility_id IS NULL OR default_facility_id = ?)`,
+      [...ids, fid]
     );
     const deleted = [];
     const skipped = [];
@@ -52,6 +56,29 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
       const conn = await pool.getConnection();
       try {
         await conn.beginTransaction();
+        // Lock the employee's payroll rows before deleting anything. Paid lines
+        // are an audit/accounting record and must survive employee deletion.
+        let payrollRows = [];
+        try {
+          const [locked] = await conn.query(
+            `SELECT id, payout_status FROM tbl_hms_payroll_record WHERE employee_id = ? FOR UPDATE`,
+            [row.id]
+          );
+          payrollRows = locked || [];
+        } catch (e) {
+          if (e.code !== 'ER_NO_SUCH_TABLE') throw e;
+        }
+        const paidRows = payrollRows.filter(
+          (p) => String(p.payout_status || 'pending').toLowerCase() === 'paid'
+        );
+        if (paidRows.length) {
+          const error = new Error(
+            'Employee has paid payroll records and cannot be deleted. Reverse or archive those records first.'
+          );
+          error.paidPayroll = true;
+          error.paidCount = paidRows.length;
+          throw error;
+        }
         for (const table of EMPLOYEE_CHILD_TABLES) {
           try {
             await conn.query(`DELETE FROM ${table} WHERE employee_id = ?`, [row.id]);
@@ -66,7 +93,13 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
         deleted.push(row);
       } catch (e) {
         await conn.rollback().catch(() => {});
-        skipped.push({ id: row.id, reason: e.message || 'Delete failed.' });
+        skipped.push({
+          id: row.id,
+          reason: e.message || 'Delete failed.',
+          paidPayroll: e.paidPayroll === true,
+          paidCount: Math.max(0, parseInt(e.paidCount, 10) || 0),
+          employee: row,
+        });
       } finally {
         conn.release();
       }
@@ -83,6 +116,20 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
         .catch((e) => console.warn('[staff/delete] orphan pay profile cleanup:', e.message));
     }
     return { deleted, skipped };
+  }
+
+  async function auditBlockedPaidDeletions(req, skipped) {
+    for (const item of skipped || []) {
+      if (!item.paidPayroll) continue;
+      const row = item.employee || {};
+      const name = `${row.first_name || ''} ${row.last_name || ''}`.trim() || `Employee #${item.id}`;
+      await logAdminAction(pool, req, 'employee.delete_blocked', {
+        targetType: 'employee',
+        targetId: item.id,
+        detail: `Blocked deletion of ${name}${row.username ? ` (@${row.username})` : ''}: ` +
+          `${item.paidCount || 1} paid payroll record(s) must be reversed or archived first.`,
+      });
+    }
   }
 
   function requireAdminOrPayrollWrite(req, res, next) {
@@ -113,8 +160,9 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
          FROM tbl_employee e
          LEFT JOIN tbl_hms_pay_profile pp ON pp.employee_id = e.id AND pp.facility_id = ?
          WHERE ${hmsStaffAccountGuard.STAFF_HEADCOUNT_SQL}
+           AND (e.default_facility_id IS NULL OR e.default_facility_id = ?)
          ORDER BY e.last_name ASC, e.first_name ASC`
-        , [fid]
+        , [fid, fid]
       );
       const roleMap = await loadRoleTitleMap(pool).catch(() => ({}));
       const rows = (Array.isArray(staff) ? staff : []).map((row) => ({
@@ -145,7 +193,7 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
     if (!ids.length) return res.redirect('/staff?err=' + encodeURIComponent('Select at least one employee to delete.'));
     try {
       const actorId = Number(req.session.user?.id) || 0;
-      const { deleted, skipped } = await removeEmployees(pool, ids, actorId);
+      const { deleted, skipped } = await removeEmployees(pool, ids, actorId, req.session.facilityId);
       for (const row of deleted) {
         await logAdminAction(pool, req, 'employee.delete', {
           targetType: 'employee',
@@ -153,6 +201,7 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
           detail: `Deleted employee ${row.first_name} ${row.last_name} (@${row.username || '—'}) and their login account`,
         });
       }
+      await auditBlockedPaidDeletions(req, skipped);
       const msg = `${deleted.length} employee(s) and their accounts deleted.` +
         (skipped.length ? ` ${skipped.length} skipped: ${skipped.map((s) => s.reason).join(' ')}` : '');
       return res.redirect('/staff?msg=' + encodeURIComponent(msg));
@@ -170,8 +219,9 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
     if (id < 1) return res.redirect('/staff?err=' + encodeURIComponent('Employee not found.'));
     try {
       const actorId = Number(req.session.user?.id) || 0;
-      const { deleted, skipped } = await removeEmployees(pool, [id], actorId);
+      const { deleted, skipped } = await removeEmployees(pool, [id], actorId, req.session.facilityId);
       if (!deleted.length) {
+        await auditBlockedPaidDeletions(req, skipped);
         return res.redirect('/staff?err=' + encodeURIComponent(skipped[0]?.reason || 'Employee not found.'));
       }
       const row = deleted[0];
@@ -194,7 +244,11 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
       const date = String(req.query.date || '').trim() || new Date().toISOString().split('T')[0];
 
       const [staffRows] = await pool.query(
-        'SELECT id, first_name, last_name FROM tbl_employee WHERE status = 1 ORDER BY last_name ASC, first_name ASC'
+        `SELECT id, first_name, last_name FROM tbl_employee
+         WHERE status = 1
+           AND (default_facility_id IS NULL OR default_facility_id = ?)
+         ORDER BY last_name ASC, first_name ASC`,
+        [fid]
       ).catch(() => [[]]);
       const rows = Array.isArray(staffRows) ? staffRows : [];
       const existing = {};
@@ -237,10 +291,18 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
     const attendance = req.body.attendance && typeof req.body.attendance === 'object' ? req.body.attendance : {};
     try {
       await ensureHrPayrollSchema(pool);
+      const [allowedRows] = await pool.query(
+        `SELECT id FROM tbl_employee
+         WHERE status = 1
+           AND (default_facility_id IS NULL OR default_facility_id = ?)`,
+        [fid]
+      ).catch(() => [[]]);
+      const allowedIds = new Set((allowedRows || []).map((r) => parseInt(r.id, 10)));
 
       for (const [eidStr, row] of Object.entries(attendance)) {
         const employee_id = parseInt(eidStr, 10) || 0;
         if (employee_id < 1 || !row || typeof row !== 'object') continue;
+        if (!allowedIds.has(employee_id)) continue;
         const status = String(row.status || 'present').trim().slice(0, 24) || 'present';
         let cin = row.in != null && String(row.in).trim() !== '' ? String(row.in).trim() : null;
         let cout = row.out != null && String(row.out).trim() !== '' ? String(row.out).trim() : null;

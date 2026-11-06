@@ -99,7 +99,11 @@ module.exports = function registerHrHomeRoutes(app, pool, requireAuth) {
 
       // ── People ────────────────────────────────────────────────
       const [[headcount]] = await pool
-        .query('SELECT COUNT(*) AS c FROM tbl_employee WHERE status = 1')
+        .query(
+          `SELECT COUNT(*) AS c FROM tbl_employee
+           WHERE status = 1 AND (default_facility_id IS NULL OR default_facility_id = ?)`,
+          [fid]
+        )
         .catch(() => [[{ c: 0 }]]);
 
       const [offToday] = await pool

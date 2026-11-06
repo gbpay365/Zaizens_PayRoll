@@ -212,7 +212,7 @@ var latest = rows.length ? rows[0] : null;
           <td class="pay-num"><strong><%= _fmtXaf(r.net_salary) %></strong></td>
           <td>
             <% var st = String(r.payout_status || 'pending').toLowerCase(); %>
-            <span class="pay-badge <%= st === 'paid' ? 'pay-badge-paid' : 'pay-badge-pending' %>"><%= st === 'paid' ? 'Paid' : 'Pending' %></span>
+            <span class="pay-badge <%= st === 'paid' ? 'pay-badge-paid' : (st === 'reversed' ? 'pay-badge-reversed' : 'pay-badge-pending') %>"><%= st === 'paid' ? 'Paid' : (st === 'reversed' ? 'Reversed' : 'Pending') %></span>
           </td>
           <td class="text-right no-print">
             <a href="/payroll/payslip/<%= r.id %>" target="_blank" rel="noopener" class="btn btn-sage-ghost btn-sm">Payslip</a>

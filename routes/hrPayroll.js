@@ -10,7 +10,11 @@ const {
   resolveRoleTitle,
 } = require('../lib/hmsEmployeeHr');
 const hmsFormatDate = require('../lib/hmsFormatDate');
-const { hmsPayrollCameroonCalculate, defaultBracketsJson } = require('../lib/hmsPayrollCameroon');
+const {
+ hmsPayrollCameroonCalculate,
+ parseBrackets,
+ DEFAULT_IRPP_BRACKETS,
+} = require('../lib/hmsPayrollCameroon');
 const { computeFromGross, computeFromNet } = require('../lib/payrollCompensation');
 const { loadPayrollDashboard } = require('../lib/hmsPayrollDashboard');
 const pagination = require('../lib/pagination');
@@ -102,6 +106,15 @@ function payrollRecordAuditDetail(row) {
   `payout status ${r.payout_status || 'pending'}.`;
 }
 
+function payrollRecordReversalDetail(row, reason) {
+ const r = row || {};
+ const name = `${r.first_name || ''} ${r.last_name || ''}`.trim() || `Employee #${r.employee_id || '—'}`;
+ const period = hmsFormatDate.formatMonthYear(new Date(Number(r.year) || 2000, (Number(r.month) || 1) - 1, 1));
+ return `Reversed paid payroll record for ${name} — ${period}: ` +
+  `Gross ${auditAmount(r.gross_salary)} XAF, Net ${auditAmount(r.net_salary)} XAF. ` +
+  `Reason: ${reason || '—'}.`;
+}
+
 function csvCell(value) {
  const s = String(value == null ? '' : value);
  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -166,6 +179,7 @@ async function loadEmployerRunTotals(pool, fid, fromJoin, listParams) {
           COALESCE(SUM(ROUND(COALESCE(p.gross_salary, 0) * ? / 100)), 0) AS employer_cfc,
           COALESCE(SUM(ROUND(COALESCE(p.gross_salary, 0) * ? / 100)), 0) AS employer_fne
      ${fromJoin}
+       AND LOWER(COALESCE(p.payout_status, 'pending')) <> 'reversed'
     GROUP BY p.year, p.month
     ORDER BY p.year DESC, p.month DESC`,
   [EMPLOYER_CNPS_CAP, rates.cnps, rates.cfc, rates.fne, ...listParams]
@@ -244,19 +258,29 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   return res.redirect('/payroll?err=' + encodeURIComponent(msg));
  }
 
- /** Active staff list (same scope as PHP simplified: all active employees). */
- async function activeStaff() {
+ /** Active staff list for the current facility (legacy unassigned rows included). */
+ async function activeStaff(facilityIdArg) {
+  const fid = Math.max(1, parseInt(facilityIdArg, 10) || 1);
   let rows = [];
   try {
    const [r] = await pool.query(
     `SELECT e.id, e.first_name, e.last_name, e.role, e.employee_id, e.joining_date,
             COALESCE((SELECT MIN(title) FROM tbl_role WHERE CAST(role AS UNSIGNED) = CAST(e.role AS UNSIGNED)), '') AS role_title
-     FROM tbl_employee e WHERE e.status = 1 ORDER BY e.last_name, e.first_name`
+     FROM tbl_employee e
+     WHERE e.status = 1
+       AND (e.default_facility_id IS NULL OR e.default_facility_id = ?)
+     ORDER BY e.last_name, e.first_name`,
+    [fid]
    );
    rows = r || [];
   } catch (e) {
    const [r] = await pool.query(
-    'SELECT id, first_name, last_name, role FROM tbl_employee WHERE status = 1 ORDER BY last_name, first_name'
+    `SELECT id, first_name, last_name, role
+     FROM tbl_employee
+     WHERE status = 1
+       AND (default_facility_id IS NULL OR default_facility_id = ?)
+     ORDER BY last_name, first_name`,
+    [fid]
    );
    rows = r || [];
   }
@@ -343,7 +367,10 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    let allDeletableIds = [];
    if (admin) {
     const [idRows] = await pool
-     .query(`SELECT p.id ${fromJoin} ORDER BY p.year DESC, p.month DESC, p.id`, listParams)
+     .query(
+      `SELECT p.id ${fromJoin} AND LOWER(COALESCE(p.payout_status, 'pending')) NOT IN ('paid', 'reversed') ORDER BY p.year DESC, p.month DESC, p.id`,
+      listParams
+     )
      .catch(() => [[]]);
     allDeletableIds = (idRows || [])
      .map((r) => parseInt(r.id, 10))
@@ -677,14 +704,18 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   const year = Math.max(2000, Math.min(2100, parseInt(req.body.year, 10) || new Date().getFullYear()));
   try {
    await ensureHrPayrollSchema(pool);
-   const staff = await activeStaff();
+   const staff = await activeStaff(fid);
    let processed = 0;
+   let corrected = 0;
    let skipped = 0;
-   let errMsg = '';
-   for (const em of staff) {
-    const eid = parseInt(em.id, 10) || 0;
-    if (eid < 1) continue;
-    const [[pr]] = await pool
+   let conn = null;
+   try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+    for (const em of staff) {
+     const eid = parseInt(em.id, 10) || 0;
+     if (eid < 1) continue;
+     const [[pr]] = await conn
      .query(
       `SELECT basic_salary, housing_allowance, transport_allowance, other_allowances,
               COALESCE(medical_risk_allowance, 0) AS medical_risk_allowance,
@@ -703,11 +734,12 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     const ra  = parseFloat(pr?.responsibility_allowance) || 0;
     if (b + h + t + o + mra + ra <= 0) continue;
 
-    const [[ex]] = await pool.query(
-     'SELECT id FROM tbl_hms_payroll_record WHERE facility_id = ? AND employee_id = ? AND year = ? AND month = ? LIMIT 1',
+    const [[ex]] = await conn.query(
+     'SELECT id, payout_status FROM tbl_hms_payroll_record WHERE facility_id = ? AND employee_id = ? AND year = ? AND month = ? LIMIT 1 FOR UPDATE',
      [fid, eid, year, month]
     );
-    if (ex) {
+    const exStatus = ex ? String(ex.payout_status || 'pending').toLowerCase() : '';
+    if (ex && exStatus !== 'reversed') {
      skipped++;
      continue;
     }
@@ -715,11 +747,11 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     // Roster-based shift counts (Night Shifts / On-Call sessions) for this month.
     // These drive the night_duty + on_call allowances directly from the duty roster,
     // not from manual pay-profile figures, and they are paid TAX-FREE.
-    const rosterCounts = await countRosterShiftsForMonth(pool, fid, eid, year, month);
+    const rosterCounts = await countRosterShiftsForMonth(conn, fid, eid, year, month);
 
     const empSector = String(pr?.sector || 'medical').toLowerCase();
     const isSpec = parseInt(pr?.is_specialist, 10) === 1;
-    const allowSettings = await loadAllowanceSettings(pool, fid, empSector);
+    const allowSettings = await loadAllowanceSettings(conn, fid, empSector);
     const allowResult = computeAllowances({
      basicSalary: b,
      role: em.role,
@@ -776,10 +808,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
 
     // Gross used to compute statutory deductions excludes the tax-free allowances.
     const taxableGross = b + h + t + o + taxableAllowancesTotal;
-    const tax = await hmsPayrollCameroonCalculate(pool, fid, year, taxableGross);
+    const tax = await hmsPayrollCameroonCalculate(conn, fid, year, taxableGross);
     if (!tax) {
-     errMsg = 'Configure payroll tax: add a row in tbl_hms_payroll_settings for this facility (or run app once to seed).';
-     break;
+     throw new Error('Configure payroll tax: add a row in tbl_hms_payroll_settings for this facility (or run app once to seed).');
     }
 
     // Headline gross on the payslip = taxable gross + tax-free shift/on-call.
@@ -787,7 +818,42 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     const displayGross = taxableGross + taxFreeTotal;
     const displayNet   = (parseFloat(tax.net_salary) || 0) + taxFreeTotal;
 
-    await pool.query(
+    if (ex) {
+     const [upd] = await conn.query(
+      `UPDATE tbl_hms_payroll_record SET
+        gross_salary = ?, cnps_employee = ?, cimr_employee = ?, crtv_deduction = ?, council_tax_deduction = ?,
+        development_tax_deduction = ?, cnhc_deduction = ?, taxable_income = ?, income_tax = ?, net_salary = ?,
+        basic_salary_snap = ?, housing_allowance_snap = ?, transport_allowance_snap = ?, other_allowances_snap = ?,
+        payout_status = 'pending', allowances_snap = ?, non_taxable_allowance = ?,
+        payment_date = NULL, reversed_at = NULL, reversal_reason = NULL, reversed_by = NULL
+       WHERE id = ? AND facility_id = ? AND LOWER(COALESCE(payout_status, 'pending')) = 'reversed'`,
+      [
+       displayGross,
+       tax.cnps_employee,
+       tax.cimr_employee,
+       tax.crtv_deduction,
+       tax.council_tax_deduction,
+       tax.development_tax_deduction,
+       tax.cnhc_deduction,
+       tax.taxable_income,
+       tax.income_tax,
+       displayNet,
+       b,
+       h,
+       t,
+       o,
+       allowancesSnap,
+       taxFreeTotal,
+       ex.id,
+       fid,
+      ]
+     );
+     if (!upd.affectedRows) throw new Error('Reversed payroll record could not be corrected. Refresh and try again.');
+     corrected++;
+     continue;
+    }
+
+    await conn.query(
      `INSERT INTO tbl_hms_payroll_record (
       facility_id, employee_id, year, month,
       gross_salary, cnps_employee, cimr_employee, crtv_deduction, council_tax_deduction, development_tax_deduction, cnhc_deduction,
@@ -819,7 +885,14 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
       taxFreeTotal
      ]
     );
-    processed++;
+     processed++;
+    }
+    await conn.commit();
+   } catch (txErr) {
+    if (conn) await conn.rollback().catch(() => {});
+    throw txErr;
+   } finally {
+    if (conn) conn.release();
    }
    let syncNote = '';
    try {
@@ -838,9 +911,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    } catch (syncErr) {
     syncNote = ` Core sync error: ${syncErr.message || syncErr}.`;
    }
-   const q = errMsg
-    ? 'err=' + encodeURIComponent(errMsg)
-    : 'msg=' + encodeURIComponent(`Payroll run: ${processed} new record(s). Skipped (already exists): ${skipped}.${syncNote}`);
+   const q = 'msg=' + encodeURIComponent(`Payroll run: ${processed} new record(s), ${corrected} corrected reversed record(s). Skipped (already exists): ${skipped}.${syncNote}`);
    res.redirect('/payroll/monthly?' + q);
   } catch (e) {
    res.redirect('/payroll/monthly?err=' + encodeURIComponent(e.message));
@@ -853,7 +924,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   try {
    await ensureHrPayrollSchema(pool);
    const [r] = await pool.query(
-    'UPDATE tbl_hms_payroll_record SET payout_status = ? WHERE id = ? AND facility_id = ? AND payout_status = ? LIMIT 1',
+    'UPDATE tbl_hms_payroll_record SET payout_status = ?, payment_date = COALESCE(payment_date, CURDATE()) WHERE id = ? AND facility_id = ? AND payout_status = ? LIMIT 1',
     ['paid', rid, fid, 'pending']
    );
    const ok = r.affectedRows > 0;
@@ -873,7 +944,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   try {
    await ensureHrPayrollSchema(pool);
    const [r] = await pool.query(
-    'UPDATE tbl_hms_payroll_record SET payout_status = ? WHERE facility_id = ? AND year = ? AND month = ? AND payout_status = ?',
+    'UPDATE tbl_hms_payroll_record SET payout_status = ?, payment_date = COALESCE(payment_date, CURDATE()) WHERE facility_id = ? AND year = ? AND month = ? AND payout_status = ?',
     ['paid', fid, year, month, 'pending']
    );
    const count = r.affectedRows || 0;
@@ -940,6 +1011,88 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   return '/payroll/monthly' + (q.toString() ? '?' + q.toString() : '');
  }
 
+ /** Reverse a paid payroll record, preserving its values for audit. */
+ app.post('/payroll/reverse-record', requireAuth, requirePayrollAccess, requireAdminOrSuper, async (req, res) => {
+  const fid = facilityId(req);
+  const rid = parseInt(req.body.payroll_record_id, 10) || 0;
+  const reason = String(req.body.reason || '').trim().slice(0, 500);
+  const back = monthlyListReturnPath(req);
+  const sep = back.includes('?') ? '&' : '?';
+  if (rid < 1) return res.redirect(back + sep + 'err=' + encodeURIComponent('Invalid record ID.'));
+  if (!reason) return res.redirect(back + sep + 'err=' + encodeURIComponent('A reversal reason is required.'));
+  let row = null;
+  let conn = null;
+  try {
+   await ensureHrPayrollSchema(pool);
+   conn = await pool.getConnection();
+   await conn.beginTransaction();
+   const [[r]] = await conn.query(
+    `SELECT * FROM tbl_hms_payroll_record
+      WHERE id = ? AND facility_id = ? LIMIT 1 FOR UPDATE`,
+    [rid, fid]
+   );
+   row = r || null;
+   if (!row) throw new Error('Paid payroll record not found.');
+   if (String(row.payout_status || '').toLowerCase() !== 'paid') {
+    throw new Error('Only paid payroll records can be reversed.');
+   }
+   await conn.query(
+    `INSERT INTO tbl_hms_payroll_reversal
+      (payroll_record_id, facility_id, employee_id, year, month, gross_salary, net_salary,
+       payout_status, reason, reversed_by, snapshot_json)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    [
+     row.id,
+     row.facility_id,
+     row.employee_id,
+     row.year,
+     row.month,
+     row.gross_salary,
+     row.net_salary,
+     row.payout_status,
+     reason,
+     parseInt(req.session.user && req.session.user.id, 10) || null,
+     JSON.stringify(row),
+    ]
+   );
+   const [upd] = await conn.query(
+    `UPDATE tbl_hms_payroll_record
+        SET payout_status = 'reversed', reversed_at = NOW(), reversal_reason = ?, reversed_by = ?
+      WHERE id = ? AND facility_id = ? AND payout_status = 'paid'`,
+    [reason, parseInt(req.session.user && req.session.user.id, 10) || null, rid, fid]
+   );
+   if (!upd.affectedRows) throw new Error('Paid payroll record not found.');
+   await conn.commit();
+  } catch (e) {
+   if (conn) await conn.rollback().catch(() => {});
+   return res.redirect(back + sep + 'err=' + encodeURIComponent(e.message));
+  } finally {
+   if (conn) conn.release();
+  }
+  const [[named]] = await pool.query(
+   `SELECT e.first_name, e.last_name FROM tbl_employee e WHERE e.id = ? LIMIT 1`,
+   [row.employee_id]
+  ).catch(() => [[null]]);
+  const auditRow = { ...row, ...(named || {}) };
+  await logAdminAction(pool, req, 'payroll.salary_reverse', {
+   targetType: 'employee',
+   targetId: row.employee_id,
+   detail: payrollRecordReversalDetail(auditRow, reason),
+  });
+  const syncResult = await syncPayrollPeriodsAfterDelete(pool, fid, [
+   { year: row.year, month: row.month },
+  ]).catch(() => null);
+  res.redirect(
+   back +
+    sep +
+    'msg=' +
+    encodeURIComponent(
+     'Paid record reversed. Run Process month to regenerate the corrected line.' +
+      formatCoreSyncNote(syncResult)
+    )
+  );
+ });
+
  /** Delete a single payroll record so it can be re-generated. */
  app.post('/payroll/delete-record', requireAuth, requirePayrollAccess, requireAdminOrSuper, async (req, res) => {
   const fid = facilityId(req);
@@ -957,8 +1110,17 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      WHERE r.id = ? AND r.facility_id = ? LIMIT 1`,
     [rid, fid]
    );
+   const rowStatus = row ? String(row.payout_status || 'pending').toLowerCase() : '';
+   if (rowStatus === 'paid' || rowStatus === 'reversed') {
+    return res.redirect(
+     back + sep + 'err=' + encodeURIComponent('Paid payroll records cannot be deleted. Paid or reversed records are preserved for audit.')
+    );
+   }
    const [r] = await pool.query(
-    'DELETE FROM tbl_hms_payroll_record WHERE id = ? AND facility_id = ? LIMIT 1',
+    `DELETE FROM tbl_hms_payroll_record
+      WHERE id = ? AND facility_id = ?
+        AND LOWER(COALESCE(payout_status, 'pending')) NOT IN ('paid', 'reversed')
+      LIMIT 1`,
     [rid, fid]
    );
    const ok = r.affectedRows > 0;
@@ -1013,16 +1175,23 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      WHERE r.facility_id = ? AND r.id IN (${placeholders})`,
     [fid, ...ids]
    );
+   const deletableRows = (recordRows || []).filter(
+    (row) => !['paid', 'reversed'].includes(String(row.payout_status || 'pending').toLowerCase())
+   );
+   const lockedCount = (recordRows || []).length - deletableRows.length;
    const periodRows = [...new Map(
-    (recordRows || []).map((row) => [`${row.year}-${row.month}`, { year: row.year, month: row.month }])
+    deletableRows.map((row) => [`${row.year}-${row.month}`, { year: row.year, month: row.month }])
    ).values()];
    const [r] = await pool.query(
-    `DELETE FROM tbl_hms_payroll_record WHERE facility_id = ? AND id IN (${placeholders})`,
+    `DELETE FROM tbl_hms_payroll_record
+      WHERE facility_id = ? AND id IN (${placeholders})
+        AND LOWER(COALESCE(payout_status, 'pending')) NOT IN ('paid', 'reversed')`,
     [fid, ...ids]
    );
    const n = r.affectedRows || 0;
+   const lockedNote = lockedCount > 0 ? ` ${lockedCount} paid/reversed line(s) were left unchanged.` : '';
    if (n > 0) {
-    for (const row of recordRows || []) {
+    for (const row of deletableRows) {
      await logAdminAction(pool, req, 'payroll.salary_delete', {
       targetType: 'employee',
       targetId: row.employee_id,
@@ -1043,9 +1212,11 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
         encodeURIComponent(
          (n === 1
           ? '1 payroll record deleted. You can now re-process the affected period(s).'
-          : `${n} payroll records deleted. You can now re-process the affected period(s).`) + syncNote
+          : `${n} payroll records deleted. You can now re-process the affected period(s).`) + syncNote + lockedNote
         )
-      : 'err=' + encodeURIComponent('No records were deleted (not found or already removed).'))
+      : 'err=' + encodeURIComponent(lockedCount > 0
+        ? 'Paid payroll records cannot be deleted. Paid or reversed records are preserved for audit.'
+        : 'No records were deleted (not found or already removed).'))
    );
   } catch (e) {
    res.redirect(back + sep + 'err=' + encodeURIComponent(e.message));
@@ -1059,7 +1230,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   try {
    await ensureHrPayrollSchema(pool);
    const [r] = await pool.query(
-    'UPDATE tbl_hms_payroll_record SET payout_status = ? WHERE facility_id = ? AND year = ? AND month = ? AND payout_status = ?',
+    'UPDATE tbl_hms_payroll_record SET payout_status = ?, payment_date = COALESCE(payment_date, CURDATE()) WHERE facility_id = ? AND year = ? AND month = ? AND payout_status = ?',
     ['paid', fid, yMark, mMark, 'pending']
    );
    const n = r.affectedRows || 0;
@@ -1085,8 +1256,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    // Idle visiting-doctor pool slots are not staff (the employee directory hides
    // them), so their pay profiles must not linger here either. Admin accounts keep
    // their profiles: they are hidden from the directory but still paid.
-   let where = `e.status = 1 AND ${hmsStaffAccountGuard.VISITING_DOCTOR_POOL_EXCLUDE_SQL}`;
-   const listParams = [fid];
+   let where = `e.status = 1 AND ${hmsStaffAccountGuard.VISITING_DOCTOR_POOL_EXCLUDE_SQL}
+     AND (e.default_facility_id IS NULL OR e.default_facility_id = ?)`;
+   const listParams = [fid, fid];
    if (searchQ) {
     const like = '%' + searchQ + '%';
     where +=
@@ -1350,10 +1522,11 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
 
    const [[emp]] = await pool.query(
     `SELECT e.id, e.role, e.joining_date,
-            COALESCE((SELECT MIN(title) FROM tbl_role WHERE CAST(role AS UNSIGNED) = CAST(e.role AS UNSIGNED)), '') AS role_title
-     FROM tbl_employee e WHERE e.id=? LIMIT 1`,
-    [eid]
-   );
+            COALESCE((SELECT MIN(title) FROM tbl_role WHERE CAST(role AS UNSIGNED) = CAST(e.role AS UNSIGNED)), '') AS role_title     FROM tbl_employee e
+     WHERE e.id = ? AND (e.default_facility_id IS NULL OR e.default_facility_id = ?)
+     LIMIT 1`,
+     [eid, fid]
+    );
    if (!emp) return res.status(404).json({ error: 'Employee not found' });
    const roleTitle = String(emp.role_title || '').trim();
 
@@ -1630,14 +1803,19 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    }
    const hireByEmp = new Map();
    const profileBeforeByEmp = new Map();
+   const permittedEids = new Set();
    if (pageEids.length) {
     const placeholders = pageEids.map(() => '?').join(',');
     const [empRows] = await pool.query(
-     `SELECT id, joining_date FROM tbl_employee WHERE id IN (${placeholders})`,
-     pageEids
+     `SELECT id, joining_date FROM tbl_employee
+      WHERE id IN (${placeholders})
+        AND (default_facility_id IS NULL OR default_facility_id = ?)`,
+     [...pageEids, fid]
     );
     for (const er of empRows || []) {
-     hireByEmp.set(parseInt(er.id, 10), resolveHireDate(er.joining_date, null));
+     const empId = parseInt(er.id, 10);
+     permittedEids.add(empId);
+     hireByEmp.set(empId, resolveHireDate(er.joining_date, null));
     }
     const [profileRows] = await pool.query(
      `SELECT employee_id, basic_salary, housing_allowance, transport_allowance, other_allowances,
@@ -1651,7 +1829,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      profileBeforeByEmp.set(parseInt(pr.employee_id, 10), payProfileSnapshot(pr));
     }
    }
-   for (const eid of pageEids) {
+   for (const eid of pageEids.filter((id) => permittedEids.has(id))) {
     const b   = parseFloat(req.body[`basic_${eid}`])          || 0;
     const h   = parseFloat(req.body[`housing_${eid}`])        || 0;
     const t   = parseFloat(req.body[`transport_${eid}`])      || 0;
@@ -1740,6 +1918,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
  // ═══════════════════════════════════════════════════════════════════════════
  app.get('/payroll/audit', requireAuth, requirePayrollAccess, async (req, res) => {
   try {
+   const fid = facilityId(req);
    const rawEmployee = parseInt(req.query.employee, 10) || 0;
    const employeeId = rawEmployee > 0 ? rawEmployee : 0;
    const rawAction = String(req.query.action || '').trim().slice(0, 60);
@@ -1753,8 +1932,11 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    else if (rawTo && !to) filterError = 'To date must be a valid date (YYYY-MM-DD).';
    else if (from && to && from > to) filterError = 'From date must be on or before the To date.';
 
-   const where = ["a.action LIKE 'payroll.%'"];
-   const params = [];
+   const where = [
+    "a.action LIKE 'payroll.%'",
+    '(a.facility_id = ? OR (a.facility_id IS NULL AND (e.default_facility_id IS NULL OR e.default_facility_id = ?)))',
+   ];
+   const params = [fid, fid];
    if (employeeId) {
     where.push("a.target_type = 'employee' AND a.target_id = ?");
     params.push(String(employeeId));
@@ -1778,23 +1960,31 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      FROM tbl_admin_audit a
      JOIN tbl_employee e ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
      WHERE a.action LIKE 'payroll.%'
+       AND (a.facility_id = ? OR (a.facility_id IS NULL AND (e.default_facility_id IS NULL OR e.default_facility_id = ?)))
      ORDER BY e.first_name, e.last_name
-     LIMIT 500`
+     LIMIT 500`,
+    [fid, fid]
    ).catch(() => [[]]);
    const [actionOptions] = await pool.query(
-    `SELECT action, COUNT(*) AS entry_count
-     FROM tbl_admin_audit
-     WHERE action LIKE 'payroll.%'
-     GROUP BY action
-     ORDER BY action`
+    `SELECT a.action, COUNT(*) AS entry_count
+     FROM tbl_admin_audit a
+     LEFT JOIN tbl_employee e ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+     WHERE a.action LIKE 'payroll.%'
+       AND (a.facility_id = ? OR (a.facility_id IS NULL AND (e.default_facility_id IS NULL OR e.default_facility_id = ?)))
+     GROUP BY a.action
+     ORDER BY a.action`,
+    [fid, fid]
    ).catch(() => [[]]);
    const [[countRow]] = await pool.query(
-    `SELECT COUNT(*) AS total FROM tbl_admin_audit a WHERE ${whereSql}`,
+    `SELECT COUNT(*) AS total
+     FROM tbl_admin_audit a
+     LEFT JOIN tbl_employee e ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+     WHERE ${whereSql}`,
     params
    ).catch(() => [[{ total: 0 }]]);
    const [rows] = await pool.query(
     `SELECT a.id, a.created_at, a.actor_name, a.action, a.target_type, a.target_id,
-            a.detail, a.ip,
+            a.detail, a.ip, a.facility_id,
             e.first_name, e.last_name, e.employee_id AS matricule
      FROM tbl_admin_audit a
      LEFT JOIN tbl_employee e ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
@@ -1878,19 +2068,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     default_sector: 'medical'
    };
    if (row && typeof row === 'object') Object.assign(current, row);
-   let b = [];
-   try {
-    b = JSON.parse(String(current.tax_brackets || '')) || [];
-   } catch (e) {
-    b = [];
-   }
-   if (!Array.isArray(b) || b.length < 5) {
-    try {
-     b = JSON.parse(defaultBracketsJson());
-    } catch (e2) {
-     b = [];
-    }
-   }
+   // Use the same four-band normalization as the payroll calculator, so a
+   // legacy row cannot show one scale while payroll applies another.
+   const b = parseBrackets(String(current.tax_brackets || ''));
    const perms = res.locals.userPerms || [];
    const canEdit =
     isPayrollAdmin(req) || perms.includes('*') || perms.includes('payroll.write');
@@ -1905,6 +2085,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     title: 'Payroll tax settings - ZAIZENS',
     current,
     brackets: b,
+    bracketDefaults: DEFAULT_IRPP_BRACKETS,
     canEdit,
     flash: req.query.msg || null,
     error: req.query.err || null,
@@ -2016,14 +2197,32 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   const employer_fne_rate = rateOr(req.body.employer_fne_rate, DEFAULT_EMPLOYER_RATES.fne);
   const requestedSector = String(req.body.default_sector || 'medical').trim().toLowerCase().slice(0, 40);
   const defaultSector = ALLOWANCE_SECTORS[requestedSector] ? requestedSector : 'medical';
-  let brackets = JSON.stringify([
-   { min: 0,      max: 166666, rate: parseFloat(req.body.tax_rate_1) || 10 },
-   { min: 166667, max: 250000, rate: parseFloat(req.body.tax_rate_2) || 15 },
-   { min: 250001, max: 416666, rate: parseFloat(req.body.tax_rate_3) || 25 },
-   { min: 416667, max: 833333, rate: parseFloat(req.body.tax_rate_4) || 35 },
-   { min: 833334, max: null,   rate: parseFloat(req.body.tax_rate_5) || 35 }
-  ]);
-  if (!brackets || brackets === 'null') brackets = defaultBracketsJson();
+  const bracketMaxes = [];
+  for (let i = 0; i < DEFAULT_IRPP_BRACKETS.length - 1; i += 1) {
+   const fallback = DEFAULT_IRPP_BRACKETS[i].max;
+   const raw = req.body[`tax_max_${i + 1}`];
+   const parsed = raw == null || String(raw).trim() === '' ? fallback : Math.round(Number(raw));
+   if (!Number.isFinite(parsed) || parsed < 0) {
+    return res.redirect(
+     '/payroll/settings?tab=irpp&err=' +
+      encodeURIComponent(`IRPP band ${i + 1} upper limit must be a whole number of XAF.`)
+    );
+   }
+   if (bracketMaxes.length && parsed <= bracketMaxes[bracketMaxes.length - 1]) {
+    return res.redirect(
+     '/payroll/settings?tab=irpp&err=' +
+      encodeURIComponent(`IRPP band ${i + 1} must end above band ${i}.`)
+    );
+   }
+   bracketMaxes.push(parsed);
+  }
+  const brackets = JSON.stringify(
+   DEFAULT_IRPP_BRACKETS.map((bracket, index) => ({
+    min: index === 0 ? 0 : bracketMaxes[index - 1] + 1,
+    max: index === DEFAULT_IRPP_BRACKETS.length - 1 ? null : bracketMaxes[index],
+    rate: rateOr(req.body[`tax_rate_${index + 1}`], bracket.rate),
+   }))
+  );
   try {
    await ensureHrPayrollSchema(pool);
    await pool.query(
@@ -2102,12 +2301,14 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   return `${fn} ${ln}`.trim();
  }
 
- async function loadLeaveApproverNames() {
+ async function loadLeaveApproverNames(facilityIdArg) {
+  const fid = Math.max(1, parseInt(facilityIdArg, 10) || 1);
   const [rows] = await pool
    .query(
     `SELECT DISTINCT e.first_name, e.last_name
      FROM tbl_employee e
      WHERE e.status = 1
+       AND (e.default_facility_id IS NULL OR e.default_facility_id = ?)
        AND (
         e.role IN ('1', '99')
         OR e.role IN (
@@ -2117,7 +2318,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
         )
        )
      ORDER BY e.last_name, e.first_name
-     LIMIT 12`
+     LIMIT 12`,
+    [fid]
    )
    .catch(() => [[]]);
   const names = (rows || [])
@@ -2198,7 +2400,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    await ensureHrPayrollSchema(pool);
    const fid = facilityId(req);
    const year = Math.max(2000, Math.min(2100, parseInt(req.query.year, 10) || new Date().getFullYear()));
-   const staff = await activeStaff();
+   const staff = await activeStaff(fid);
     const usedByEmp = new Map();
     const pendingByEmp = new Map();
     try {
@@ -2266,7 +2468,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   }
   try {
    await ensureHrPayrollSchema(pool);
-   const staff = await activeStaff();
+   const staff = await activeStaff(fid);
    for (const em of staff) {
     await pool.query(
      `INSERT INTO tbl_hms_leave_balance (facility_id, employee_id, leave_type, year, balance)
@@ -2288,7 +2490,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   const year = Math.max(2000, Math.min(2100, parseInt(req.body.year, 10) || new Date().getFullYear()));
   try {
    await ensureHrPayrollSchema(pool);
-   const staff = await activeStaff();
+   const staff = await activeStaff(fid);
    for (const em of staff) {
     const eid = em.id;
     const bal = parseFloat(req.body[`bal_${eid}`]) || 0;
@@ -2386,7 +2588,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
      [fid, uid]
     )
     .catch(() => [[]]);
-   const defaultSubmittedTo = await loadLeaveApproverNames();
+   const defaultSubmittedTo = await loadLeaveApproverNames(fid);
    const year = new Date().getFullYear();
    const [balanceRows] = await pool
     .query(

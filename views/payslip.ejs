@@ -408,6 +408,10 @@ if (typeof _tl !== 'function') {
 </div>
 
 <div class="payslip-doc">
+  <% var _payStatus = String(row.payout_status || 'pending').toLowerCase(); %>
+  <% if (_payStatus === 'reversed') { %>
+  <div style="background:#7f1d1d;color:#fff;text-align:center;padding:9px 14px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">Reversed payroll record &middot; not valid for payment</div>
+  <% } %>
   <div class="ps-topbar"></div>
 
   <!-- ── HEADER ── -->

@@ -147,6 +147,7 @@ module.exports = function registerTaxHub(app, pool, requireAuth, { requirePerm }
       FROM tbl_hms_payroll_record p
       JOIN tbl_employee e ON e.id = p.employee_id
       WHERE p.facility_id = ?
+        AND LOWER(COALESCE(p.payout_status, 'pending')) <> 'reversed'
       ORDER BY p.year DESC, p.month DESC, e.last_name, e.first_name
       LIMIT 500`,
      [fid]
@@ -174,6 +175,7 @@ module.exports = function registerTaxHub(app, pool, requireAuth, { requirePerm }
         SUM(CASE WHEN LOWER(TRIM(payout_status)) = 'paid' THEN 1 ELSE 0 END) AS paid_count
       FROM tbl_hms_payroll_record
       WHERE facility_id = ?
+        AND LOWER(COALESCE(payout_status, 'pending')) <> 'reversed'
       GROUP BY year, month
       ORDER BY year DESC, month DESC
       LIMIT 48`,
@@ -252,6 +254,7 @@ module.exports = function registerTaxHub(app, pool, requireAuth, { requirePerm }
       FROM tbl_hms_payroll_record p
       JOIN tbl_employee e ON e.id = p.employee_id
       WHERE p.facility_id = ? AND p.month = ? AND p.year = ?
+        AND LOWER(COALESCE(p.payout_status, 'pending')) <> 'reversed'
       ORDER BY e.last_name, e.first_name`,
      [fid, month, year]
     )

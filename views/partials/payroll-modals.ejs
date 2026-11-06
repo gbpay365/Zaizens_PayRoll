@@ -81,6 +81,35 @@ function _monthOptions(selected) {
   </div>
 </div>
 
+<div class="modal fade" id="hmsPayrollReverseModal" tabindex="-1" role="dialog" aria-labelledby="hmsPayrollReverseTitle" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <form method="POST" action="/payroll/reverse-record">
+        <div class="modal-header">
+          <h5 class="modal-title font-weight-bold" id="hmsPayrollReverseTitle"><%= _t('modals.reverse_title', { ns: 'payroll', defaultValue: 'Reverse paid payroll line' }) %></h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="<%= _t('common.close', { ns: 'payroll', defaultValue: 'Close' }) %>">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3"><%= _t('modals.reverse_confirm', { ns: 'payroll', defaultValue: 'Reverse' }) %> <strong data-pay-reverse-label>this payroll line</strong>. <%= _t('modals.reverse_hint', { ns: 'payroll', defaultValue: 'The paid record and its values are preserved for audit. After reversing, run Process month to generate a corrected pending line.' }) %></p>
+          <input type="hidden" name="payroll_record_id" value="">
+          <input type="hidden" name="_return_q" value="<%= typeof searchQ === 'string' ? searchQ : '' %>">
+          <input type="hidden" name="_return_p" value="<%= (locals.pager && locals.pager.page) ? locals.pager.page : 1 %>">
+          <div class="form-group mb-0">
+            <label for="hmsPayrollReverseReason" class="font-weight-bold small text-uppercase text-muted"><%= _t('modals.reverse_reason', { ns: 'payroll', defaultValue: 'Reason' }) %></label>
+            <textarea id="hmsPayrollReverseReason" name="reason" class="form-control" rows="3" maxlength="500" required placeholder="<%= _t('modals.reverse_reason_placeholder', { ns: 'payroll', defaultValue: 'Why is this paid line being reversed?' }) %>"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal"><%= _t('common.cancel', { ns: 'payroll', defaultValue: 'Cancel' }) %></button>
+          <button type="submit" class="btn btn-danger font-weight-bold"><i class="fa fa-undo mr-1"></i><%= _t('modals.reverse_submit', { ns: 'payroll', defaultValue: 'Reverse paid line' }) %></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="hmsPayrollResyncModal" tabindex="-1" role="dialog" aria-labelledby="hmsPayrollResyncTitle" aria-hidden="true">
   <div class="modal-dialog" role="document">
     <div class="modal-content">

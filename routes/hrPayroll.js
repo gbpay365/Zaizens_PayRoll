@@ -40,6 +40,7 @@ const TAX_FREE_ALLOWANCE_CODES = new Set(['night_duty', 'on_call']);
 // (4.2% pension + 7% family benefits, capped); FNE is the 1% employer contribution.
 const EMPLOYER_CNPS_RATE = 11.2;
 const EMPLOYER_CNPS_CAP = 750000;
+const EMPLOYER_CFC_RATE = 1.5;
 const EMPLOYER_FNE_RATE = 1.0;
 
 module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) {
@@ -937,6 +938,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     count: allProfiles.length,
     gross: 0,
     employerCnps: 0,
+    employerCfc: 0,
     employerFne: 0,
     cost: 0,
     net: 0,
@@ -946,11 +948,13 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     const pay = p.pay || {};
     const grossPay = Number(pay.monthly_gross) || 0;
     const employerCnps = Math.round((Math.min(grossPay, EMPLOYER_CNPS_CAP) * EMPLOYER_CNPS_RATE) / 100);
+    const employerCfc = Math.round((grossPay * EMPLOYER_CFC_RATE) / 100);
     const employerFne = Math.round((grossPay * EMPLOYER_FNE_RATE) / 100);
     totals.gross += grossPay;
     totals.employerCnps += employerCnps;
+    totals.employerCfc += employerCfc;
     totals.employerFne += employerFne;
-    totals.cost += grossPay + employerCnps + employerFne;
+    totals.cost += grossPay + employerCnps + employerCfc + employerFne;
     if (pay.monthly_net == null) totals.netComplete = false;
     else totals.net += Number(pay.monthly_net) || 0;
     delete pay._taxable_gross;

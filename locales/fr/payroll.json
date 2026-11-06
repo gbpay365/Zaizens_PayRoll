@@ -213,6 +213,7 @@
     "filtered_totals": "Totaux du personnel filtré",
     "filtered_staff_count": "{{count}} employés",
     "total_monthly_cost": "Coût mensuel total",
+    "employer_cfc": "CFC employeur",
     "employer_cnps": "CNPS employeur",
     "fne_employer": "FNE",
     "expected_net": "Net prévisionnel",

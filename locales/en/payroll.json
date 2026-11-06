@@ -213,6 +213,7 @@
     "filtered_totals": "Filtered staff totals",
     "filtered_staff_count": "{{count}} staff",
     "total_monthly_cost": "Total monthly cost",
+    "employer_cfc": "Employer CFC",
     "employer_cnps": "Employer CNPS",
     "fne_employer": "FNE",
     "expected_net": "Expected net",

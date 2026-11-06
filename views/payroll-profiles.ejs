@@ -223,6 +223,7 @@
                   <div class="text-muted" style="font-size:.72rem;line-height:1.35;">
                     <%= _t('profiles.gross', { ns: 'payroll', defaultValue: 'Gross' }) %> <%= Number(totals.gross || 0).toLocaleString('fr-FR') %>
                     + <%= _t('profiles.employer_cnps', { ns: 'payroll', defaultValue: 'Employer CNPS' }) %> <%= Number(totals.employerCnps || 0).toLocaleString('fr-FR') %>
+                    + <%= _t('profiles.employer_cfc', { ns: 'payroll', defaultValue: 'Employer CFC' }) %> <%= Number(totals.employerCfc || 0).toLocaleString('fr-FR') %>
                     + <%= _t('profiles.fne_employer', { ns: 'payroll', defaultValue: 'FNE' }) %> <%= Number(totals.employerFne || 0).toLocaleString('fr-FR') %>
                   </div>
                 </div>

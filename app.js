@@ -335,6 +335,7 @@ require('./routes/statutoryReports')(app, pool, requireAuth, { requirePerm });
 require('./routes/integrationSettings')(app, pool, requireAuth, { requireAdminOrSuper });
 require('./routes/employees')(app, pool, requireAuth, { requireAdminOrSuper });
 require('./routes/hrHome')(app, pool, requireAuth);
+require('./routes/payrollOptimizer')(app, pool, requireAuth, { requirePayrollAccess });
 require('./routes/admin')(app, pool, requireAuth);
 
 async function boot() {
@@ -345,6 +346,7 @@ async function boot() {
       await require('./lib/ensureHrPayrollSchema')(pool);
       await require('./lib/ensureFacilityIntegrationSchema')(pool);
       await require('./lib/ensureAdminSchema')(pool).catch((e) => console.warn('[admin schema]', e.message));
+      await require('./lib/ensurePayrollRoleProfiles')(pool).catch((e) => console.warn('[payroll roles]', e.message));
       console.log('[Zaizens_PayRoll] schema ready');
     } catch (e) {
       console.warn('[Zaizens_PayRoll] schema:', e.message);

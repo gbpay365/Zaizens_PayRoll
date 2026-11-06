@@ -7,6 +7,7 @@ if (!_mod) _mod = 'payroll';
 var _path = String(locals.hmsPath || '');
 var _section = 'Overview';
 if (_path.indexOf('/payroll/monthly') === 0) _section = 'Payroll runs';
+else if (_path.indexOf('/payroll/optimizer') === 0) _section = 'Payroll optimizer';
 else if (_path.indexOf('/payroll/profiles') === 0) _section = 'Pay profiles';
 else if (_path.indexOf('/payroll/employees/new') === 0) _section = 'New employee';
 else if (_path.indexOf('/payroll/employees') === 0) _section = 'Employee';

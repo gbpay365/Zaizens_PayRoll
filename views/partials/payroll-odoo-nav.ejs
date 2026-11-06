@@ -31,6 +31,7 @@ if (typeof _t !== 'function') {
   <nav class="o_nav_menu" aria-label="<%= _t('nav.aria_label', { ns: 'payroll', defaultValue: 'Payroll and HR' }) %>">
     <a href="/payroll" class="o_nav_link<%= _payActive('dashboard') %>"><%= _t('nav.dashboard', { ns: 'payroll', defaultValue: 'Dashboard' }) %></a>
     <a href="/payroll/monthly" class="o_nav_link<%= _payActive('monthly') %>"><%= _t('nav.monthly_payroll', { ns: 'payroll', defaultValue: 'Monthly payroll' }) %></a>
+    <a href="/payroll/optimizer" class="o_nav_link<%= _payActive('optimizer') %>"><%= _t('nav.payroll_optimizer', { ns: 'payroll', defaultValue: 'Payroll optimizer' }) %></a>
     <% if(_payCanWrite){ %>
     <a href="/payroll/profiles" class="o_nav_link<%= _payActive('profiles') %>"><%= _t('nav.pay_profiles', { ns: 'payroll', defaultValue: 'Pay profiles' }) %></a>
     <a href="/payroll/settings" class="o_nav_link<%= _payActive('settings') %>"><%= _t('nav.tax_settings', { ns: 'payroll', defaultValue: 'Tax settings' }) %></a>

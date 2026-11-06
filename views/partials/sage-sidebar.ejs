@@ -55,6 +55,7 @@ var _initials = String(_userName).split(/\s+/).filter(Boolean).slice(0, 2).map(f
       <a href="/payroll" class="<%= _active('/payroll', true) %>"><i class="fa fa-th-large"></i> Overview</a>
       <% if (_canPayrollRead) { %>
       <a href="/payroll/monthly" class="<%= _active('/payroll/monthly') %>"><i class="fa fa-calendar-check-o"></i> Payroll runs</a>
+      <a href="/payroll/optimizer" class="<%= _active('/payroll/optimizer') %>"><i class="fa fa-magic"></i> Payroll optimizer</a>
       <% } %>
       <% if (_canWrite) { %>
       <a href="/payroll/profiles" class="<%= _active('/payroll/profiles') %>"><i class="fa fa-id-card-o"></i> Pay profiles</a>

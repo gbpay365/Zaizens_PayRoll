@@ -1,0 +1,360 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'optimizer' }) %>
+<%
+  var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
+  var _fmt = function (n) { return Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+  var _labels = {
+    transport: 'Transport',
+    representation: 'Representation',
+    housing: 'Housing',
+    electricity: 'Electricity',
+    water: 'Water',
+    meal: 'Meal',
+    dirtiness: 'Dirtiness',
+    clothing: 'Work clothing',
+    tools: 'Tools',
+    other: 'Other allowances'
+  };
+  var _allowanceFields = ['transport', 'representation', 'housing', 'electricity', 'water', 'meal', 'dirtiness', 'clothing', 'tools', 'other'];
+  var _before = result || null;
+  var _after = proposal ? proposal.after : null;
+%>
+
+<style>
+  .pay-opt-grid { display: grid; grid-template-columns: minmax(340px, 1fr) minmax(0, 1.6fr); gap: 20px; align-items: start; }
+  @media (max-width: 1100px) { .pay-opt-grid { grid-template-columns: 1fr; } }
+  .pay-opt-card { background: #fff; border: 1px solid var(--pay-border); border-radius: var(--pay-radius); overflow: hidden; margin-bottom: 18px; }
+  .pay-opt-card-head { padding: 14px 18px; border-bottom: 1px solid var(--pay-border); background: #f8fafc; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .pay-opt-card-head h2 { margin: 0; font-size: .95rem; font-weight: 800; color: #0f172a; }
+  .pay-opt-body { padding: 16px 18px; }
+  .pay-opt-section { font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #64748b; margin: 18px 0 8px; border-bottom: 1px dashed var(--pay-border); padding-bottom: 5px; }
+  .pay-opt-section:first-child { margin-top: 0; }
+  .pay-opt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pay-opt-field { margin-bottom: 11px; }
+  .pay-opt-field label { display: block; font-size: .7rem; font-weight: 700; color: #334155; margin-bottom: 4px; }
+  .pay-opt-field input, .pay-opt-field select { width: 100%; padding: 8px 10px; border: 1px solid var(--pay-border); border-radius: 8px; font-size: .82rem; background: #fff; color: #0f172a; font-variant-numeric: tabular-nums; }
+  .pay-opt-field input:focus, .pay-opt-field select:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.12); }
+  .pay-opt-field small { display: block; margin-top: 3px; font-size: .66rem; color: #64748b; }
+  .pay-opt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .pay-opt-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .pay-opt-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .pay-opt-kpi { background: #fff; border: 1px solid var(--pay-border); border-radius: var(--pay-radius); padding: 14px 16px; }
+  .pay-opt-kpi .lbl { font-size: .62rem; text-transform: uppercase; letter-spacing: .07em; color: #64748b; font-weight: 800; }
+  .pay-opt-kpi .val { font-size: 1.2rem; font-weight: 800; margin-top: 4px; font-variant-numeric: tabular-nums; color: #0f172a; }
+  .pay-opt-kpi .sub { font-size: .68rem; color: #64748b; margin-top: 2px; }
+  .pay-opt-kpi.good .val { color: #15803d; }
+  .pay-opt-kpi.cost .val { color: #b91c1c; }
+  .pay-opt-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+  .pay-opt-table th { text-align: left; font-size: .62rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; padding: 8px 10px; border-bottom: 1px solid var(--pay-border); background: #f8fafc; }
+  .pay-opt-table td { padding: 8px 10px; border-bottom: 1px solid #eef2f7; vertical-align: top; }
+  .pay-opt-table .r { text-align: right; font-variant-numeric: tabular-nums; }
+  .pay-opt-table tr.total td { font-weight: 800; background: #f8fafc; border-top: 2px solid var(--pay-border); }
+  .pay-opt-table tr.sub td { color: #64748b; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; background: #fbfcfd; }
+  .pay-opt-note { font-size: .72rem; color: #64748b; line-height: 1.5; }
+  .pay-opt-badge { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; background: #e0f2fe; color: #0369a1; }
+  .pay-opt-badge.good { background: #dcfce7; color: #166534; }
+  .pay-opt-badge.warn { background: #fef3c7; color: #92400e; }
+  .pay-opt-badge.bad { background: #fee2e2; color: #991b1b; }
+  .pay-opt-alert { border-left: 4px solid #64748b; background: #fff; border-top: 1px solid var(--pay-border); border-right: 1px solid var(--pay-border); border-bottom: 1px solid var(--pay-border); border-radius: 8px; padding: 10px 13px; margin-bottom: 8px; }
+  .pay-opt-alert.critical { border-left-color: #b91c1c; }
+  .pay-opt-alert.high { border-left-color: #c2410c; }
+  .pay-opt-alert.info { border-left-color: #2563eb; }
+  .pay-opt-alert strong { display: block; font-size: .8rem; color: #0f172a; margin-bottom: 2px; }
+  .pay-opt-alert span { font-size: .75rem; color: #475569; }
+  .pay-opt-trace { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .73rem; line-height: 1.75; white-space: pre-wrap; background: #f8fafc; border: 1px solid var(--pay-border); border-radius: 8px; padding: 12px 14px; color: #334155; }
+  .pay-opt-delta { font-size: .68rem; font-weight: 700; margin-left: 5px; }
+  .pay-opt-delta.up { color: #15803d; }
+  .pay-opt-delta.down { color: #b91c1c; }
+  .pay-opt-employee-bar { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+  .pay-opt-employee-bar select { max-width: 340px; }
+</style>
+
+<div class="pay-hero">
+  <div>
+    <p class="sage-eyebrow">Payroll &middot; Optimizer</p>
+    <h1>Payroll Optimizer</h1>
+    <p>Model a legally compliant pay structure by CNPS regime and activity sector. Compare employee net pay, employer cost and total burden before changing a profile.</p>
+  </div>
+</div>
+
+<div class="pay-opt-grid">
+  <div>
+    <section class="pay-opt-card">
+      <div class="pay-opt-card-head">
+        <h2>Load an employee</h2>
+        <span class="pay-opt-badge">Optional</span>
+      </div>
+      <div class="pay-opt-body">
+        <form method="GET" action="/payroll/optimizer" class="pay-opt-employee-bar">
+          <div class="pay-opt-field" style="flex:1;min-width:220px;">
+            <label for="employeePicker">Start from a pay profile</label>
+            <select id="employeePicker" name="employee_id">
+              <option value="">Standalone calculation</option>
+              <% (employees || []).forEach(function (emp) { %>
+              <option value="<%= emp.id %>" <%= String(form.employee_id) === String(emp.id) ? 'selected' : '' %>>
+                <%= emp.last_name %>, <%= emp.first_name %><%= emp.employee_id ? ' — ' + emp.employee_id : '' %>
+              </option>
+              <% }); %>
+            </select>
+            <small>Loads basic, housing, transport and other allowances into the form.</small>
+          </div>
+          <button type="submit" class="btn btn-sm hms-btn-secondary" style="margin-bottom:11px;">Load</button>
+        </form>
+        <% if (employee) { %>
+        <p class="pay-opt-note" style="margin:10px 0 0;">
+          Loaded <strong><%= employee.name %></strong><%= employee.matricule ? ' (' + employee.matricule + ')' : '' %>.
+          Nothing is saved until you update the pay profile yourself.
+        </p>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="pay-opt-card">
+      <div class="pay-opt-card-head">
+        <h2>Payroll input</h2>
+        <span class="pay-opt-badge good">Regime + sector aware</span>
+      </div>
+      <div class="pay-opt-body">
+        <form method="POST" action="/payroll/optimizer/run">
+          <input type="hidden" name="employee_id" value="<%= form.employee_id || '' %>">
+
+          <div class="pay-opt-section">Employee &amp; statutory profile</div>
+          <div class="pay-opt-field">
+            <label for="baseSalary">Base monthly salary (XAF)</label>
+            <input id="baseSalary" type="number" name="baseSalary" min="0" step="1000" value="<%= form.baseSalary %>">
+            <small>Sectoral SMIG and professional caps are applied automatically.</small>
+          </div>
+          <div class="pay-opt-row">
+            <div class="pay-opt-field">
+              <label for="sector">Activity sector</label>
+              <select id="sector" name="sector">
+                <% Object.keys(sectors).forEach(function (key) { %>
+                <option value="<%= key %>" <%= form.sector === key ? 'selected' : '' %>><%= sectors[key].label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="pay-opt-field">
+              <label for="regime">CNPS regime</label>
+              <select id="regime" name="regime">
+                <% Object.keys(regimes).forEach(function (key) { %>
+                <option value="<%= key %>" <%= String(form.regime) === String(key) ? 'selected' : '' %>><%= regimes[key].label %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+          <div class="pay-opt-field">
+            <label for="risk">Occupational risk</label>
+            <select id="risk" name="risk">
+              <% Object.keys(risks).forEach(function (key) { %>
+              <option value="<%= key %>" <%= form.risk === key ? 'selected' : '' %>><%= risks[key].label %></option>
+              <% }); %>
+            </select>
+            <small>Risk contributions use the CNPS contributory base and the selected branch rate.</small>
+          </div>
+
+          <div class="pay-opt-section">Cash allowances</div>
+          <div class="pay-opt-row">
+            <% _allowanceFields.forEach(function (key, idx) { %>
+            <div class="pay-opt-field">
+              <label for="<%= key %>"><%= _labels[key] %></label>
+              <input id="<%= key %>" type="number" name="<%= key %>" min="0" step="<%= ['meal','dirtiness','clothing','tools'].indexOf(key) !== -1 ? '100' : '1000' %>" value="<%= form[key] || 0 %>">
+            </div>
+            <% }); %>
+          </div>
+
+          <div class="pay-opt-actions">
+            <button type="submit" name="action" value="calculate" class="btn hms-btn-secondary">
+              <i class="fa fa-calculator mr-1"></i> Calculate payroll
+            </button>
+            <button type="submit" name="action" value="optimize" class="btn hms-btn-primary">
+              <i class="fa fa-magic mr-1"></i> Optimize structure
+            </button>
+          </div>
+          <p class="pay-opt-note" style="margin-top:10px;">The optimizer reallocates the same total gross cash into capped exempt allowances. It does not create or edit payroll records.</p>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div>
+    <% if (error) { %>
+    <div class="alert alert-danger"><%= error %></div>
+    <% } %>
+
+    <% if (!result) { %>
+    <section class="pay-opt-card">
+      <div class="pay-opt-body" style="text-align:center;padding:42px 20px;">
+        <i class="fa fa-magic" style="font-size:2rem;color:#7c3aed;"></i>
+        <h2 style="font-size:1.05rem;margin:12px 0 6px;">Start with a payroll scenario</h2>
+        <p class="pay-opt-note" style="max-width:460px;margin:0 auto;">Enter a base salary and allowances, then calculate payroll or generate an optimized structure. The result shows employee deductions, employer contributions, net pay and the full employer cost.</p>
+      </div>
+    </section>
+    <% } else { %>
+
+    <% if (alerts.length) { %>
+    <section class="pay-opt-card">
+      <div class="pay-opt-card-head"><h2>Compliance checks</h2></div>
+      <div class="pay-opt-body">
+        <% alerts.forEach(function (a) { %>
+        <div class="pay-opt-alert <%= a.severity %>">
+          <strong><%= a.title %></strong>
+          <span><%= a.message %></span>
+        </div>
+        <% }); %>
+      </div>
+    </section>
+    <% } %>
+
+    <% if (proposal) { %>
+    <section class="pay-opt-card">
+      <div class="pay-opt-card-head">
+        <h2>Optimization proposal</h2>
+        <span class="pay-opt-badge good">Same gross cash: <%= _fmt(proposal.totalGross) %> XAF</span>
+      </div>
+      <div class="pay-opt-body">
+        <div class="pay-opt-cards">
+          <div class="pay-opt-kpi good">
+            <div class="lbl">Net pay increase</div>
+            <div class="val"><%= proposal.savings.netPay >= 0 ? '+' : '' %><%= _fmt(proposal.savings.netPay) %></div>
+            <div class="sub">XAF / month</div>
+          </div>
+          <div class="pay-opt-kpi">
+            <div class="lbl">Employer saving</div>
+            <div class="val"><%= _fmt(proposal.savings.employerCost) %></div>
+            <div class="sub">XAF / month</div>
+          </div>
+          <div class="pay-opt-kpi">
+            <div class="lbl">Employee deduction change</div>
+            <div class="val"><%= _fmt(proposal.savings.employeeDeductions) %></div>
+            <div class="sub">XAF / month</div>
+          </div>
+          <div class="pay-opt-kpi">
+            <div class="lbl">Total burden saving</div>
+            <div class="val"><%= _fmt(proposal.savings.totalBurden) %></div>
+            <div class="sub">Employer + employee</div>
+          </div>
+        </div>
+
+        <div class="pay-table-wrap">
+          <table class="pay-opt-table">
+            <thead><tr><th>Proposed composition</th><th class="r">Amount (XAF)</th><th class="r">Legal ceiling</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Base salary</strong></td><td class="r"><strong><%= _fmt(proposal.allocBase) %></strong></td><td class="r">—</td></tr>
+              <% _allowanceFields.forEach(function (key) { %>
+              <% if (Number(proposal.allocation[key]) > 0) { %>
+              <tr>
+                <td><%= _labels[key] %></td>
+                <td class="r"><%= _fmt(proposal.allocation[key]) %></td>
+                <td class="r"><%= proposal.after.caps[key] != null ? _fmt(proposal.after.caps[key]) : '—' %></td>
+              </tr>
+              <% } %>
+              <% }); %>
+              <tr class="total"><td>Total gross cash</td><td class="r"><%= _fmt(proposal.after.grossCash) %></td><td class="r"></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <% if (proposalAlerts.length) { %>
+        <div style="margin-top:14px;">
+          <% proposalAlerts.forEach(function (a) { %>
+          <div class="pay-opt-alert <%= a.severity %>">
+            <strong><%= a.title %></strong>
+            <span><%= a.message %></span>
+          </div>
+          <% }); %>
+        </div>
+        <% } %>
+        <p class="pay-opt-note" style="margin-top:10px;">This is a composition proposal only. Review it with management and the employees' representative before changing a pay profile.</p>
+      </div>
+    </section>
+    <% } %>
+
+    <section class="pay-opt-card">
+      <div class="pay-opt-card-head">
+        <h2>Payroll result</h2>
+        <span class="pay-opt-badge"><%= result.profile.sectorLabel %> · <%= result.profile.regimeLabel %></span>
+      </div>
+      <div class="pay-opt-body">
+        <div class="pay-opt-cards">
+          <div class="pay-opt-kpi">
+            <div class="lbl">Gross cash</div>
+            <div class="val"><%= _fmt(result.grossCash) %></div>
+            <div class="sub">Salary + allowances</div>
+          </div>
+          <div class="pay-opt-kpi good">
+            <div class="lbl">Net pay</div>
+            <div class="val"><%= _fmt(result.netPay) %></div>
+            <div class="sub">After employee deductions</div>
+          </div>
+          <div class="pay-opt-kpi">
+            <div class="lbl">Employee deductions</div>
+            <div class="val"><%= _fmt(result.employeeDeductions) %></div>
+            <div class="sub">CNPS + CFC + IRPP + local</div>
+          </div>
+          <div class="pay-opt-kpi cost">
+            <div class="lbl">Total employer cost</div>
+            <div class="val"><%= _fmt(result.totalEmployerCost) %></div>
+            <div class="sub">Gross + employer contributions</div>
+          </div>
+        </div>
+
+        <% if (proposal) { %>
+        <div class="pay-table-wrap" style="margin-bottom:18px;">
+          <table class="pay-opt-table">
+            <thead><tr><th>Measure</th><th class="r">Current</th><th class="r">Optimized</th><th class="r">Change</th></tr></thead>
+            <tbody>
+              <tr><td>Gross taxable</td><td class="r"><%= _fmt(result.grossTaxable) %></td><td class="r"><%= _fmt(proposal.after.grossTaxable) %></td><td class="r"><%= _fmt(proposal.after.grossTaxable - result.grossTaxable) %></td></tr>
+              <tr><td>Employee deductions</td><td class="r"><%= _fmt(result.employeeDeductions) %></td><td class="r"><%= _fmt(proposal.after.employeeDeductions) %></td><td class="r"><%= _fmt(proposal.after.employeeDeductions - result.employeeDeductions) %></td></tr>
+              <tr><td>Net pay</td><td class="r"><%= _fmt(result.netPay) %></td><td class="r"><%= _fmt(proposal.after.netPay) %></td><td class="r"><%= _fmt(proposal.after.netPay - result.netPay) %></td></tr>
+              <tr><td>Employer contributions</td><td class="r"><%= _fmt(result.employerContributions) %></td><td class="r"><%= _fmt(proposal.after.employerContributions) %></td><td class="r"><%= _fmt(proposal.after.employerContributions - result.employerContributions) %></td></tr>
+              <tr class="total"><td>Total employer cost</td><td class="r"><%= _fmt(result.totalEmployerCost) %></td><td class="r"><%= _fmt(proposal.after.totalEmployerCost) %></td><td class="r"><%= _fmt(proposal.after.totalEmployerCost - result.totalEmployerCost) %></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <% } %>
+
+        <div class="pay-opt-row">
+          <div>
+            <div class="pay-opt-section">Employee deductions</div>
+            <table class="pay-opt-table">
+              <tbody>
+                <tr><td>CNPS pension (<%= (result.rates.pensionEmployeeRate * 100).toFixed(2) %>% of <%= _fmt(result.cnpsBase) %>)</td><td class="r"><%= _fmt(result.pensionEmployee) %></td></tr>
+                <tr><td>CFC — Crédit Foncier</td><td class="r"><%= _fmt(result.cfcEmployee) %></td></tr>
+                <tr><td>IRPP</td><td class="r"><%= _fmt(result.irpp) %></td></tr>
+                <tr><td>Council tax (TCL)</td><td class="r"><%= _fmt(result.councilTax) %></td></tr>
+                <tr><td>Audiovisual royalty (RAV)</td><td class="r"><%= _fmt(result.rav) %></td></tr>
+                <tr class="total"><td>Total</td><td class="r"><%= _fmt(result.employeeDeductions) %></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="pay-opt-section">Employer contributions</div>
+            <table class="pay-opt-table">
+              <tbody>
+                <tr><td>CNPS pension (4.2%)</td><td class="r"><%= _fmt(result.pensionEmployer) %></td></tr>
+                <tr><td>Family allowances (<%= (result.rates.familyRate * 100).toFixed(2) %>%)</td><td class="r"><%= _fmt(result.familyEmployer) %></td></tr>
+                <tr><td>Occupational risks (<%= (result.rates.riskRate * 100).toFixed(2) %>%)</td><td class="r"><%= _fmt(result.riskEmployer) %></td></tr>
+                <tr><td>CFC employer</td><td class="r"><%= _fmt(result.cfcEmployer) %></td></tr>
+                <tr><td>FNE employer</td><td class="r"><%= _fmt(result.fneEmployer) %></td></tr>
+                <tr class="total"><td>Total</td><td class="r"><%= _fmt(result.employerContributions) %></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="pay-opt-section">IRPP calculation trace</div>
+        <div class="pay-opt-trace">Gross taxable: <%= _fmt(result.grossTaxable) %> XAF
+CNPS contributory base: <%= _fmt(result.cnpsBaseRaw) %><%= result.cnpsCapped ? ' → capped at ' + _fmt(result.cnpsBase) : '' %>
+Less employee pension: <%= _fmt(result.pensionEmployee) %>
+Less 30% professional expenses: <%= _fmt(result.profDeduction) %><%= result.profDeductionCapped ? ' (capped)' : '' %>
+Net taxable monthly: <%= _fmt(result.netMonthly) %>
+Annual net taxable before abatement: <%= _fmt(result.annualNet) %>
+Rounded annual base: <%= _fmt(result.annualRounded) %>
+Annual IRPP: <%= _fmt(result.annualTax) %>
+Monthly IRPP: <strong><%= _fmt(result.irpp) %></strong></div>
+        <p class="pay-opt-note" style="margin-top:10px;">Sectoral SMIG: <%= _fmt(result.profile.smig) %> XAF/month. Employer family rate: <%= (result.rates.familyRate * 100).toFixed(2) %>%. Risk branch: <%= result.profile.riskLabel %>.</p>
+      </div>
+    </section>
+    <% } %>
+  </div>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

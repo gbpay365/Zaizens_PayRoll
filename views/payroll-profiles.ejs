@@ -218,8 +218,13 @@
               </div>
               <div class="d-flex flex-wrap" style="gap:24px;">
                 <div>
-                  <div class="text-muted small text-uppercase"><%= _t('profiles.monthly_gross_cost', { ns: 'payroll', defaultValue: 'Monthly gross cost' }) %></div>
-                  <div class="font-weight-bold" style="font-size:1.05rem;"><%= Number(totals.gross || 0).toLocaleString('fr-FR') %> XAF</div>
+                  <div class="text-muted small text-uppercase"><%= _t('profiles.total_monthly_cost', { ns: 'payroll', defaultValue: 'Total monthly cost' }) %></div>
+                  <div class="font-weight-bold" style="font-size:1.05rem;"><%= Number(totals.cost || 0).toLocaleString('fr-FR') %> XAF</div>
+                  <div class="text-muted" style="font-size:.72rem;line-height:1.35;">
+                    <%= _t('profiles.gross', { ns: 'payroll', defaultValue: 'Gross' }) %> <%= Number(totals.gross || 0).toLocaleString('fr-FR') %>
+                    + <%= _t('profiles.employer_cnps', { ns: 'payroll', defaultValue: 'Employer CNPS' }) %> <%= Number(totals.employerCnps || 0).toLocaleString('fr-FR') %>
+                    + <%= _t('profiles.fne_employer', { ns: 'payroll', defaultValue: 'FNE' }) %> <%= Number(totals.employerFne || 0).toLocaleString('fr-FR') %>
+                  </div>
                 </div>
                 <div>
                   <div class="text-muted small text-uppercase"><%= _t('profiles.expected_net', { ns: 'payroll', defaultValue: 'Expected net' }) %></div>

@@ -101,7 +101,11 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
     const perms = Array.isArray(req.res && req.res.locals && req.res.locals.userPerms)
       ? req.res.locals.userPerms
       : [];
-    const canSeeAll = admin || perms.includes('*') || perms.includes('payroll.write');
+    const canSeeAll =
+      admin ||
+      perms.includes('*') ||
+      perms.includes('payroll.read') ||
+      perms.includes('payroll.write');
     const [rows] = await pool
       .query(
         `SELECT id, first_name, last_name, employee_id

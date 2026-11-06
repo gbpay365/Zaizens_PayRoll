@@ -86,6 +86,10 @@
     var d = new Date(v);
     return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   };
+  var signed = function (n) {
+    var v = Number(n) || 0;
+    return v > 0 ? '+' + fmt(v) : fmt(v);
+  };
 %>
 
 <div class="toolbar no-print">
@@ -193,6 +197,69 @@
       <tr class="total"><td>Total gross cash</td><td class="num"><%= fmt(result.grossCash) %></td><td class="num"></td></tr>
     </tbody>
   </table>
+
+  <h2>Optimization comparison</h2>
+  <% if (!proposal) { %>
+  <div class="empty">
+    Optimization is unavailable while this scenario has <%= evaluation.blocking.length %> unresolved statutory exception(s).
+    Correct the amounts or record the permitted waiver(s), then generate the report again.
+  </div>
+  <% } else { %>
+  <% if (proposalEvaluation && proposalEvaluation.hasBlocking) { %>
+  <div class="empty" style="color:#991b1b;">The optimizer proposal still contains a blocking exception and is shown for review only.</div>
+  <% } %>
+  <div class="summary-grid">
+    <div class="summary-card good"><div class="label">Net pay change</div><div class="value"><%= signed(proposal.savings.netPay) %></div></div>
+    <div class="summary-card"><div class="label">Employee deduction change</div><div class="value"><%= signed(proposal.savings.employeeDeductions) %></div></div>
+    <div class="summary-card"><div class="label">Employer cost change</div><div class="value"><%= signed(-proposal.savings.employerCost) %></div></div>
+    <div class="summary-card"><div class="label">Total burden saving</div><div class="value"><%= fmt(proposal.savings.totalBurden) %></div></div>
+  </div>
+  <div class="small" style="margin:4px 0 8px;">
+    Optimization focus: <strong><%= modeLabels[form.mode] || modeLabels.both %></strong>.
+    The proposal keeps total gross cash unchanged at <strong><%= fmt(proposal.totalGross) %> XAF</strong> and reallocates it within the legal ceilings.
+  </div>
+  <table>
+    <thead><tr><th>Proposed composition</th><th class="num">Current (XAF)</th><th class="num">Optimized (XAF)</th><th class="num">Change</th><th class="num">Legal ceiling</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Base salary</strong></td>
+        <td class="num"><%= fmt(form.baseSalary) %></td>
+        <td class="num"><%= fmt(proposal.allocBase) %></td>
+        <td class="num"><%= signed(proposal.allocBase - form.baseSalary) %></td>
+        <td class="num"><%= fmt(proposal.profile.smig) %> minimum</td>
+      </tr>
+      <% allowanceKeys.forEach(function (key) { %>
+        <% var currentAmount = Number(result.allowances[key]) || 0; %>
+        <% var optimizedAmount = Number(proposal.allocation[key]) || 0; %>
+        <% if (currentAmount || optimizedAmount) { %>
+        <tr>
+          <td><%= labels[key] %></td>
+          <td class="num"><%= fmt(currentAmount) %></td>
+          <td class="num"><%= fmt(optimizedAmount) %></td>
+          <td class="num"><%= signed(optimizedAmount - currentAmount) %></td>
+          <td class="num">
+            <% if (key === 'transport' || key === 'representation') { %>400 000 combined<% } else if (key === 'other') { %>Fully taxable<% } else { %><%= fmt(proposal.after.caps[key]) %><% } %>
+          </td>
+        </tr>
+        <% } %>
+      <% }); %>
+      <tr class="total"><td>Total gross cash</td><td class="num"><%= fmt(result.grossCash) %></td><td class="num"><%= fmt(proposal.after.grossCash) %></td><td class="num"><%= signed(proposal.after.grossCash - result.grossCash) %></td><td class="num"></td></tr>
+    </tbody>
+  </table>
+
+  <table>
+    <thead><tr><th>Payroll impact</th><th class="num">Current (XAF)</th><th class="num">Optimized (XAF)</th><th class="num">Change</th></tr></thead>
+    <tbody>
+      <tr><td>Gross taxable</td><td class="num"><%= fmt(result.grossTaxable) %></td><td class="num"><%= fmt(proposal.after.grossTaxable) %></td><td class="num"><%= signed(proposal.after.grossTaxable - result.grossTaxable) %></td></tr>
+      <tr><td>CNPS contributory base</td><td class="num"><%= fmt(result.cnpsBase) %></td><td class="num"><%= fmt(proposal.after.cnpsBase) %></td><td class="num"><%= signed(proposal.after.cnpsBase - result.cnpsBase) %></td></tr>
+      <tr><td>Employee deductions</td><td class="num"><%= fmt(result.employeeDeductions) %></td><td class="num"><%= fmt(proposal.after.employeeDeductions) %></td><td class="num"><%= signed(proposal.after.employeeDeductions - result.employeeDeductions) %></td></tr>
+      <tr><td><strong>Net pay</strong></td><td class="num"><strong><%= fmt(result.netPay) %></strong></td><td class="num"><strong><%= fmt(proposal.after.netPay) %></strong></td><td class="num"><strong><%= signed(proposal.after.netPay - result.netPay) %></strong></td></tr>
+      <tr><td>Employer contributions</td><td class="num"><%= fmt(result.employerContributions) %></td><td class="num"><%= fmt(proposal.after.employerContributions) %></td><td class="num"><%= signed(proposal.after.employerContributions - result.employerContributions) %></td></tr>
+      <tr class="total"><td>Total employer cost</td><td class="num"><%= fmt(result.totalEmployerCost) %></td><td class="num"><%= fmt(proposal.after.totalEmployerCost) %></td><td class="num"><%= signed(proposal.after.totalEmployerCost - result.totalEmployerCost) %></td></tr>
+    </tbody>
+  </table>
+  <div class="small" style="margin-top:6px;color:#64748b;">The proposal is advisory and has not been applied to the employee's pay profile.</div>
+  <% } %>
 
   <h2>Payroll calculation</h2>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">

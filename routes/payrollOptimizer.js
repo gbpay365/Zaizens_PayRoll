@@ -380,7 +380,7 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
         });
       }
       const fid = facilityId(req);
-      const model = await buildModel(req, form, settings, { optimize: false, revokeStale: false });
+      const model = await buildModel(req, form, settings, { optimize: true, revokeStale: false });
       const waiverHistory = await loadWaiverHistory(fid, waiverEmployeeId(form), 200);
       res.render('payroll-optimizer-report', {
         title: `Optimizer Compliance Report — ${employee.name}`,
@@ -389,6 +389,8 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
         settings,
         result: model.result,
         evaluation: model.evaluation,
+        proposal: model.proposal,
+        proposalEvaluation: model.proposalEvaluation,
         waiverHistory,
         waiverReasons: optimizer.WAIVER_REASONS,
         reportDate: new Date().toLocaleString('fr-FR', {

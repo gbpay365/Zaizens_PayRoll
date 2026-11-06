@@ -12,6 +12,14 @@ if (typeof searchQ === 'string' && searchQ) _exportQs.push('q=' + encodeURICompo
 if (_runFrom) _exportQs.push('from=' + encodeURIComponent(_runFrom));
 if (_runTo) _exportQs.push('to=' + encodeURIComponent(_runTo));
 var _exportHref = '/payroll/monthly/export.csv' + (_exportQs.length ? '?' + _exportQs.join('&') : '');
+var _exportPeriod = _runFrom && _runTo
+  ? _runFrom + ' → ' + _runTo
+  : _runFrom
+    ? 'from ' + _runFrom
+    : _runTo
+      ? 'to ' + _runTo
+      : _t('monthly.all_periods', { ns: 'payroll', defaultValue: 'all periods' });
+var _exportLabel = _t('monthly.export_csv', { ns: 'payroll', defaultValue: 'Export CSV' }) + ' · ' + _exportPeriod;
 var _clearHref = '/payroll/monthly' + (typeof searchQ === 'string' && searchQ ? '?q=' + encodeURIComponent(searchQ) : '');
 %>
 
@@ -73,8 +81,8 @@ var _clearHref = '/payroll/monthly' + (typeof searchQ === 'string' && searchQ ? 
         <a href="<%= _clearHref %>" class="btn btn-sm hms-btn-secondary"><%= _t('monthly.clear_filter', { ns: 'payroll', defaultValue: 'Clear' }) %></a>
         <% } %>
       </form>
-      <a class="btn btn-sm hms-btn-secondary no-print" href="<%= _exportHref %>">
-        <i class="fa fa-download mr-1"></i><%= _t('monthly.export_csv', { ns: 'payroll', defaultValue: 'Export CSV' }) %>
+      <a class="btn btn-sm hms-btn-secondary no-print" href="<%= _exportHref %>" title="<%= _t('monthly.export_csv', { ns: 'payroll', defaultValue: 'Export CSV' }) %> — <%= _exportPeriod %>">
+        <i class="fa fa-download mr-1"></i><%= _exportLabel %>
       </a>
     </div>
   </div>

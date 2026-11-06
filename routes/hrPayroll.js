@@ -407,10 +407,11 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     );
    }
    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+   const rangeTag = `${range.from ? range.from.value : 'all'}_to_${range.to ? range.to.value : 'all'}`;
    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
    res.setHeader(
     'Content-Disposition',
-    `attachment; filename="payroll_employer_costs_${fid}_${stamp}.csv"`
+    `attachment; filename="payroll_employer_costs_${fid}_${rangeTag}_${stamp}.csv"`
    );
    res.send('\uFEFF' + lines.join('\r\n'));
   } catch (err) {

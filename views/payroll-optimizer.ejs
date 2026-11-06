@@ -216,6 +216,11 @@
             <button type="submit" data-opt-submit data-opt-action="optimize" name="action" value="optimize" class="btn hms-btn-primary">
               <i class="fa fa-magic mr-1"></i> Optimize structure
             </button>
+            <% if (form.employee_id) { %>
+            <button type="submit" class="btn hms-btn-secondary" formaction="/payroll/optimizer/report" formmethod="get" formtarget="_blank" name="action" value="report">
+              <i class="fa fa-print mr-1"></i> Print compliance report
+            </button>
+            <% } %>
           </div>
           <p class="pay-opt-note" style="margin-top:10px;">The optimizer reallocates the same total gross cash into legally capped allowances. It does not create or edit payroll records.</p>
         </form>

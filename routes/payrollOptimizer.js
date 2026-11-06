@@ -214,7 +214,8 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
     }
   }
 
-  async function loadWaiverHistory(fid, employeeId) {
+  async function loadWaiverHistory(fid, employeeId, limit = 12) {
+    const cappedLimit = Math.min(Math.max(parseInt(limit, 10) || 12, 1), 200);
     try {
       const [rows] = await pool.query(
         `SELECT id, violation_key, violation_code, amount, max_amount, reason,
@@ -222,7 +223,7 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
            FROM tbl_hms_payroll_optimizer_waiver
           WHERE facility_id = ? AND employee_id = ?
           ORDER BY id DESC
-          LIMIT 12`,
+          LIMIT ${cappedLimit}`,
         [fid, employeeId]
       );
       return rows || [];
@@ -260,7 +261,9 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
     const result = optimizer.computePayroll(input);
     const waivers = await loadWaivers(fid, employeeId);
     const evaluation = optimizer.validatePayroll(input, result, waivers.map);
-    await revokeStaleWaivers(waivers.rows, evaluation);
+    if (options.revokeStale !== false) {
+      await revokeStaleWaivers(waivers.rows, evaluation);
+    }
 
     let proposal = null;
     let proposalEvaluation = null;
@@ -356,6 +359,48 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
       render(req, res, { form, settings, employee, employees });
     } catch (err) {
       console.error('PAYROLL OPTIMIZER GET:', err.message);
+      res.status(500).render('error', {
+        title: 'Error',
+        message: err.message,
+        status: 500,
+      });
+    }
+  });
+
+  app.get('/payroll/optimizer/report', requireAuth, requirePayrollAccess, async (req, res) => {
+    try {
+      const settings = await loadSettings(facilityId(req));
+      const form = parseForm(req.query);
+      const employee = await loadEmployeeForm(req, form.employee_id);
+      if (!employee) {
+        return res.status(400).render('error', {
+          title: 'Select an employee',
+          message: 'Choose an employee before printing an optimizer compliance report.',
+          status: 400,
+        });
+      }
+      const fid = facilityId(req);
+      const model = await buildModel(req, form, settings, { optimize: false, revokeStale: false });
+      const waiverHistory = await loadWaiverHistory(fid, waiverEmployeeId(form), 200);
+      res.render('payroll-optimizer-report', {
+        title: `Optimizer Compliance Report — ${employee.name}`,
+        employee,
+        form,
+        settings,
+        result: model.result,
+        evaluation: model.evaluation,
+        waiverHistory,
+        waiverReasons: optimizer.WAIVER_REASONS,
+        reportDate: new Date().toLocaleString('fr-FR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+      });
+    } catch (err) {
+      console.error('PAYROLL OPTIMIZER REPORT:', err.message);
       res.status(500).render('error', {
         title: 'Error',
         message: err.message,

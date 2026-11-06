@@ -8,6 +8,7 @@ const DEFAULT_FORM = {
   sector: 'general',
   regime: '1',
   risk: 'medium',
+  mode: 'both',
   transport: 30000,
   representation: 0,
   housing: 0,
@@ -29,6 +30,11 @@ function number(value) {
   return Number.isFinite(n) ? Math.max(0, n) : 0;
 }
 
+function parseMode(value) {
+  const mode = clean(value, 20).toLowerCase();
+  return ['employee', 'employer', 'both'].indexOf(mode) !== -1 ? mode : DEFAULT_FORM.mode;
+}
+
 function parseForm(body) {
   const raw = body || {};
   return {
@@ -37,6 +43,7 @@ function parseForm(body) {
     sector: clean(raw.sector, 40).toLowerCase() || DEFAULT_FORM.sector,
     regime: clean(raw.regime, 4) || DEFAULT_FORM.regime,
     risk: clean(raw.risk, 12).toLowerCase() || DEFAULT_FORM.risk,
+    mode: parseMode(raw.mode),
     transport: number(raw.transport),
     representation: number(raw.representation),
     housing: number(raw.housing),
@@ -78,9 +85,18 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
     return parseInt(req.session.user && req.session.user.id, 10) || 0;
   }
 
+  function sessionEmpName(req) {
+    const user = (req.session && req.session.user) || {};
+    return clean(user.name || user.username || user.email || 'Payroll user', 120);
+  }
+
   function isPayrollAdmin(req) {
     const role = String((req.session.user && req.session.user.role) || '');
     return role === '1' || role === '99';
+  }
+
+  function waiverEmployeeId(form) {
+    return parseInt(form && form.employee_id, 10) || 0;
   }
 
   async function loadSettings(fid) {
@@ -173,16 +189,137 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
     };
   }
 
+  async function loadWaivers(fid, employeeId) {
+    const empty = { rows: [], map: {} };
+    try {
+      const [rows] = await pool.query(
+        `SELECT id, facility_id, employee_id, violation_key, violation_code,
+                amount, max_amount, reason, note, rule_text, created_by,
+                created_by_name, created_at, revoked_at
+           FROM tbl_hms_payroll_optimizer_waiver
+          WHERE facility_id = ? AND employee_id = ? AND revoked_at IS NULL
+          ORDER BY id DESC
+          LIMIT 60`,
+        [fid, employeeId]
+      );
+      const activeRows = rows || [];
+      const map = {};
+      for (const row of activeRows) {
+        if (!map[row.violation_key]) map[row.violation_key] = row;
+      }
+      return { rows: activeRows, map };
+    } catch (err) {
+      // The optimizer remains usable while the waiver table is being created.
+      return empty;
+    }
+  }
+
+  async function loadWaiverHistory(fid, employeeId) {
+    try {
+      const [rows] = await pool.query(
+        `SELECT id, violation_key, violation_code, amount, max_amount, reason,
+                note, created_by_name, created_at, revoked_at, revoked_reason
+           FROM tbl_hms_payroll_optimizer_waiver
+          WHERE facility_id = ? AND employee_id = ?
+          ORDER BY id DESC
+          LIMIT 12`,
+        [fid, employeeId]
+      );
+      return rows || [];
+    } catch (err) {
+      return [];
+    }
+  }
+
+  async function revokeStaleWaivers(rows, evaluation) {
+    const applied = new Set(
+      (evaluation && evaluation.appliedWaiverIds ? evaluation.appliedWaiverIds : []).map((id) =>
+        Number(id)
+      )
+    );
+    const staleIds = (rows || [])
+      .filter((row) => !applied.has(Number(row.id)))
+      .map((row) => Number(row.id))
+      .filter((id) => id > 0);
+    if (!staleIds.length) return;
+    await pool
+      .query(
+        `UPDATE tbl_hms_payroll_optimizer_waiver
+            SET revoked_at = NOW(),
+                revoked_reason = 'Auto-revoked: amount or ceiling changed'
+          WHERE id IN (?) AND revoked_at IS NULL`,
+        [staleIds]
+      )
+      .catch(() => {});
+  }
+
+  async function buildModel(req, form, settings, options = {}) {
+    const fid = facilityId(req);
+    const employeeId = waiverEmployeeId(form);
+    const input = withSettings(form, settings);
+    const result = optimizer.computePayroll(input);
+    const waivers = await loadWaivers(fid, employeeId);
+    const evaluation = optimizer.validatePayroll(input, result, waivers.map);
+    await revokeStaleWaivers(waivers.rows, evaluation);
+
+    let proposal = null;
+    let proposalEvaluation = null;
+    if (options.optimize && !evaluation.hasBlocking) {
+      proposal = optimizer.optimizePayroll(input);
+      proposalEvaluation = optimizer.validatePayroll(
+        {
+          ...input,
+          baseSalary: proposal.allocBase,
+          allowances: proposal.allocation,
+          profile: proposal.profile,
+        },
+        proposal.after,
+        {}
+      );
+    }
+
+    return {
+      input,
+      result,
+      evaluation,
+      proposal,
+      proposalEvaluation,
+      waiverRows: waivers.rows,
+      waiverHistory: await loadWaiverHistory(fid, employeeId),
+    };
+  }
+
+  function resultLocals(model, options = {}) {
+    return {
+      result: model.result,
+      evaluation: model.evaluation,
+      proposal: model.proposal,
+      proposalEvaluation: model.proposalEvaluation,
+      waiverRows: model.waiverRows || [],
+      waiverHistory: model.waiverHistory || [],
+      waiverReasons: optimizer.WAIVER_REASONS,
+      mode: options.mode || DEFAULT_FORM.mode,
+      notice: options.notice || null,
+    };
+  }
+
+  function renderResults(res, model, options = {}) {
+    return new Promise((resolve, reject) => {
+      res.render('partials/payroll-optimizer-results', resultLocals(model, options), (err, html) => {
+        if (err) return reject(err);
+        resolve(html);
+      });
+    });
+  }
+
   function render(req, res, options = {}) {
     const form = options.form || DEFAULT_FORM;
     const settings = options.settings || {};
     const employee = options.employee || null;
-    const result = options.result || null;
-    const proposal = options.proposal || null;
-    const alerts = result ? optimizer.alertsFor(result, { baseSalary: form.baseSalary }) : [];
-    const proposalAlerts = proposal
-      ? optimizer.alertsFor(proposal.after, { baseSalary: proposal.allocBase })
-      : [];
+    const model = options.model || null;
+    const preview = model
+      ? model.result
+      : optimizer.computePayroll(withSettings(form, settings));
     res.render('payroll-optimizer', {
       title: 'Payroll Optimizer — ZAIZENS PAY',
       payNavActive: 'optimizer',
@@ -190,10 +327,17 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
       settings,
       employee,
       employees: options.employees || [],
-      result,
-      proposal,
-      alerts,
-      proposalAlerts,
+      result: model ? model.result : null,
+      evaluation: model ? model.evaluation : null,
+      proposal: model ? model.proposal : null,
+      proposalEvaluation: model ? model.proposalEvaluation : null,
+      waiverRows: model ? model.waiverRows : [],
+      waiverHistory: model ? model.waiverHistory : [],
+      waiverReasons: optimizer.WAIVER_REASONS,
+      caps: preview.caps,
+      profile: preview.profile,
+      mode: form.mode || DEFAULT_FORM.mode,
+      notice: options.notice || null,
       sectors: optimizer.SECTOR_PROFILES,
       regimes: optimizer.REGIME_PROFILES,
       risks: optimizer.RISK_PROFILES,
@@ -223,14 +367,28 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
   app.post('/payroll/optimizer/run', requireAuth, requirePayrollAccess, async (req, res) => {
     try {
       const settings = await loadSettings(facilityId(req));
-      const form = parseForm(req.body);
+      let form = parseForm(req.body);
       const employee = await loadEmployeeForm(req, form.employee_id);
       const employees = await loadEmployees(req);
       const action = clean((req.body || {}).action, 20) || 'calculate';
-      const input = withSettings(form, settings);
-      const result = optimizer.computePayroll(input);
-      const proposal = action === 'optimize' ? optimizer.optimizePayroll(input) : null;
-      render(req, res, { form, settings, employee, employees, result, proposal });
+
+      let model = await buildModel(req, form, settings, {
+        optimize: action === 'optimize' || action === 'apply',
+      });
+      let notice = null;
+
+      if (action === 'apply' && model.proposal && !model.evaluation.hasBlocking) {
+        const proposal = model.proposal;
+        form = {
+          ...form,
+          baseSalary: proposal.allocBase,
+          ...proposal.allocation,
+        };
+        notice = `The proposed structure was loaded into the form. Nothing was saved to payroll records.`;
+        model = await buildModel(req, form, settings, { optimize: false });
+      }
+
+      render(req, res, { form, settings, employee, employees, model, notice });
     } catch (err) {
       console.error('PAYROLL OPTIMIZER POST:', err.message);
       res.status(500).render('error', {
@@ -238,6 +396,147 @@ module.exports = function registerPayrollOptimizerRoutes(app, pool, requireAuth,
         message: err.message,
         status: 500,
       });
+    }
+  });
+
+  app.post('/payroll/optimizer/live', requireAuth, requirePayrollAccess, async (req, res) => {
+    try {
+      const settings = await loadSettings(facilityId(req));
+      const form = parseForm(req.body);
+      const action = clean((req.body || {}).action, 20) || 'calculate';
+      const model = await buildModel(req, form, settings, {
+        optimize: action === 'optimize',
+      });
+      const html = await renderResults(res, model, { mode: form.mode });
+      res.json({
+        ok: true,
+        html,
+        blocked: model.evaluation.hasBlocking,
+        fieldErrors: model.evaluation.fieldErrors,
+        caps: model.result.caps,
+        profile: model.result.profile,
+        hasProposal: Boolean(model.proposal),
+      });
+    } catch (err) {
+      console.error('PAYROLL OPTIMIZER LIVE:', err.message);
+      res.status(500).json({ ok: false, error: 'Could not recalculate the payroll scenario.' });
+    }
+  });
+
+  app.post('/payroll/optimizer/waive', requireAuth, requirePayrollAccess, async (req, res) => {
+    try {
+      const settings = await loadSettings(facilityId(req));
+      let form = parseForm(req.body);
+      const key = clean((req.body || {}).violation_key, 40);
+      const reason = clean((req.body || {}).waiver_reason, 24).toLowerCase();
+      const note = clean((req.body || {}).waiver_note, 500);
+      if (!key || !optimizer.WAIVER_REASONS[reason]) {
+        return res.status(400).json({ ok: false, error: 'Choose a valid waiver reason.' });
+      }
+      if (reason === 'other' && !note) {
+        return res.status(400).json({ ok: false, error: 'A note is required for an “Other” waiver.' });
+      }
+
+      const fid = facilityId(req);
+      const employeeId = waiverEmployeeId(form);
+      if (employeeId > 0 && !(await loadEmployeeForm(req, employeeId))) {
+        return res.status(400).json({ ok: false, error: 'The selected employee is not available in this facility.' });
+      }
+      const input = withSettings(form, settings);
+      const result = optimizer.computePayroll(input);
+      const active = await loadWaivers(fid, employeeId);
+      const evaluation = optimizer.validatePayroll(input, result, active.map);
+      const violation = evaluation.violations.find(
+        (v) => v.key === key && v.blocking && !v.waived
+      );
+      if (!violation) {
+        return res.status(400).json({
+          ok: false,
+          error: 'This exception is no longer active. Recalculate and try again.',
+        });
+      }
+      if (!violation.waivable) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Critical statutory breaches cannot be waived. Correct the amount to continue.',
+        });
+      }
+
+      const uid = sessionEmpId(req);
+      const actor = sessionEmpName(req);
+      await pool.query(
+        `UPDATE tbl_hms_payroll_optimizer_waiver
+            SET revoked_at = NOW(), revoked_by = ?,
+                revoked_reason = 'Superseded by a new waiver'
+          WHERE facility_id = ? AND employee_id = ? AND violation_key = ?
+            AND revoked_at IS NULL`,
+        [uid, fid, employeeId, key]
+      );
+      await pool.query(
+        `INSERT INTO tbl_hms_payroll_optimizer_waiver
+           (facility_id, employee_id, violation_key, violation_code, amount,
+            max_amount, reason, note, rule_text, created_by, created_by_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          fid,
+          employeeId,
+          key,
+          violation.code,
+          violation.amount,
+          violation.max,
+          reason,
+          note,
+          clean(violation.rule, 500),
+          uid,
+          actor,
+        ]
+      );
+
+      const model = await buildModel(req, form, settings, { optimize: false });
+      const html = await renderResults(res, model, { mode: form.mode });
+      res.json({
+        ok: true,
+        html,
+        blocked: model.evaluation.hasBlocking,
+        fieldErrors: model.evaluation.fieldErrors,
+        caps: model.result.caps,
+        profile: model.result.profile,
+      });
+    } catch (err) {
+      console.error('PAYROLL OPTIMIZER WAIVE:', err.message);
+      res.status(500).json({ ok: false, error: 'Could not record the waiver.' });
+    }
+  });
+
+  app.post('/payroll/optimizer/revoke', requireAuth, requirePayrollAccess, async (req, res) => {
+    try {
+      const settings = await loadSettings(facilityId(req));
+      const form = parseForm(req.body);
+      const waiverId = parseInt((req.body || {}).waiver_id, 10) || 0;
+      const fid = facilityId(req);
+      if (!waiverId) {
+        return res.status(400).json({ ok: false, error: 'Missing waiver to revoke.' });
+      }
+      await pool.query(
+        `UPDATE tbl_hms_payroll_optimizer_waiver
+            SET revoked_at = NOW(), revoked_by = ?,
+                revoked_reason = 'Revoked by payroll user'
+          WHERE id = ? AND facility_id = ? AND revoked_at IS NULL`,
+        [sessionEmpId(req), waiverId, fid]
+      );
+      const model = await buildModel(req, form, settings, { optimize: false });
+      const html = await renderResults(res, model, { mode: form.mode });
+      res.json({
+        ok: true,
+        html,
+        blocked: model.evaluation.hasBlocking,
+        fieldErrors: model.evaluation.fieldErrors,
+        caps: model.result.caps,
+        profile: model.result.profile,
+      });
+    } catch (err) {
+      console.error('PAYROLL OPTIMIZER REVOKE:', err.message);
+      res.status(500).json({ ok: false, error: 'Could not revoke the waiver.' });
     }
   });
 };

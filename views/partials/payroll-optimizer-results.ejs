@@ -1,0 +1,309 @@
+<%
+  var _fmt = function (n) { return Number(n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); };
+  var _labels = {
+    transport: 'Transport',
+    representation: 'Representation',
+    housing: 'Housing',
+    electricity: 'Electricity',
+    water: 'Water',
+    meal: 'Meal',
+    dirtiness: 'Dirtiness',
+    clothing: 'Work clothing',
+    tools: 'Tools',
+    other: 'Other allowances'
+  };
+  var _allowanceFields = ['transport', 'representation', 'housing', 'electricity', 'water', 'meal', 'dirtiness', 'clothing', 'tools', 'other'];
+  var _modeLabels = { employee: 'Employee net pay', employer: 'Employer cost', both: 'Employee + employer' };
+  var _modeLabel = _modeLabels[mode] || _modeLabels.both;
+  var _shortDate = function (value) {
+    if (!value) return '';
+    var d = new Date(value);
+    return isNaN(d.getTime()) ? String(value) : d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  };
+%>
+
+<% if (notice) { %>
+<div class="alert alert-success" style="margin-bottom:14px;"><%= notice %></div>
+<% } %>
+
+<% if (!result) { %>
+<section class="pay-opt-card">
+  <div class="pay-opt-body" style="text-align:center;padding:42px 20px;">
+    <i class="fa fa-magic" style="font-size:2rem;color:#7c3aed;"></i>
+    <h2 style="font-size:1.05rem;margin:12px 0 6px;">Start with a payroll scenario</h2>
+    <p class="pay-opt-note" style="max-width:460px;margin:0 auto;">Enter a base salary and allowances. The optimizer recalculates as you type, checks every statutory ceiling, and blocks continuation until breaches are corrected or formally waived.</p>
+  </div>
+</section>
+<% } else { %>
+
+<% if (evaluation && evaluation.hasBlocking) { %>
+<section class="pay-opt-card pay-opt-blocked">
+  <div class="pay-opt-card-head">
+    <h2><i class="fa fa-lock" style="color:#b91c1c;margin-right:6px;"></i>Continuation blocked</h2>
+    <span class="pay-opt-badge bad"><%= evaluation.blocking.length %> unresolved</span>
+  </div>
+  <div class="pay-opt-body">
+    <p class="pay-opt-note" style="margin-bottom:12px;color:#991b1b;">
+      Payroll results and optimization are locked. Correct each amount below, or record an approved waiver for a non-critical exception.
+      Critical breaches (below SMIG, negative net pay) cannot be waived.
+    </p>
+    <% evaluation.blocking.forEach(function (v) { %>
+    <div class="pay-opt-blocker" data-blocker-key="<%= v.key %>">
+      <div class="pay-opt-blocker-head">
+        <strong><%= v.title %></strong>
+        <span class="pay-opt-badge <%= v.severity === 'critical' ? 'bad' : 'warn' %>"><%= v.severity === 'critical' ? 'Critical — not waivable' : 'Waiver available' %></span>
+      </div>
+      <p><%= v.message %></p>
+      <p class="pay-opt-rule"><strong>Rule:</strong> <%= v.rule %></p>
+      <% if (v.waivable) { %>
+      <details class="pay-opt-waiver">
+        <summary>Record a formal waiver for this exception</summary>
+        <div class="pay-opt-waiver-grid">
+          <div class="pay-opt-field">
+            <label>Waiver reason</label>
+            <select data-waiver-reason>
+              <% Object.keys(waiverReasons).forEach(function (reason) { %>
+              <option value="<%= reason %>"><%= waiverReasons[reason] %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="pay-opt-field">
+            <label>Justification note <%= v.code === 'PROF_CAP_BREACH' ? '' : '' %></label>
+            <textarea data-waiver-note maxlength="500" rows="2" placeholder="Reference the agreement, approval or documented reason"></textarea>
+          </div>
+        </div>
+        <div class="pay-opt-waiver-error" data-waiver-error></div>
+        <button type="button" class="btn btn-sm hms-btn-primary" data-waive-key="<%= v.key %>">
+          <i class="fa fa-check mr-1"></i> Save waiver and continue
+        </button>
+      </details>
+      <% } else { %>
+      <p class="pay-opt-note" style="margin:8px 0 0;color:#991b1b;"><strong>This critical breach cannot be waived by default.</strong> Increase the base salary to at least <%= _fmt(v.max) %> XAF.</p>
+      <% } %>
+    </div>
+    <% }); %>
+  </div>
+</section>
+<% } %>
+
+<% if (evaluation && evaluation.alerts && evaluation.alerts.length) { %>
+<section class="pay-opt-card">
+  <div class="pay-opt-card-head">
+    <h2>Compliance checks</h2>
+    <span class="pay-opt-badge <%= evaluation.hasBlocking ? 'bad' : (evaluation.waivedCount ? 'warn' : 'good') %>">
+      <%= evaluation.hasBlocking ? 'Action required' : (evaluation.waivedCount ? evaluation.waivedCount + ' waived' : 'All clear') %>
+    </span>
+  </div>
+  <div class="pay-opt-body">
+    <% evaluation.alerts.forEach(function (a) { %>
+    <div class="pay-opt-alert <%= a.severity %>">
+      <strong><%= a.title %></strong>
+      <span><%= a.message %></span>
+      <% if (a.rule) { %><div class="pay-opt-rule"><strong>Rule:</strong> <%= a.rule %></div><% } %>
+      <% if (a.waived && a.waiverId) { %>
+      <div class="pay-opt-waiver-actions">
+        <span class="pay-opt-note">Reason: <strong><%= waiverReasons[a.waiverReason] || a.waiverReason %></strong><%= a.waiverNote ? ' — ' + a.waiverNote : '' %></span>
+        <button type="button" class="btn btn-sm hms-btn-secondary" data-revoke-id="<%= a.waiverId %>">
+          <i class="fa fa-undo mr-1"></i> Revoke waiver
+        </button>
+      </div>
+      <% } %>
+    </div>
+    <% }); %>
+  </div>
+</section>
+<% } %>
+
+<% if (waiverHistory && waiverHistory.length) { %>
+<section class="pay-opt-card">
+  <div class="pay-opt-card-head"><h2>Waiver audit trail</h2><span class="pay-opt-badge">Last <%= waiverHistory.length %></span></div>
+  <div class="pay-opt-body" style="padding:0;">
+    <div class="pay-table-wrap">
+      <table class="pay-opt-table">
+        <thead><tr><th>Exception</th><th class="r">Amount / ceiling</th><th>Reason and note</th><th>Recorded</th><th>Status</th></tr></thead>
+        <tbody>
+          <% waiverHistory.forEach(function (w) { %>
+          <tr>
+            <td><strong><%= w.violation_key.replace(/_/g, ' ') %></strong><br><small><%= w.violation_code %></small></td>
+            <td class="r"><%= _fmt(w.amount) %><br><small>max <%= _fmt(w.max_amount) %></small></td>
+            <td><%= waiverReasons[w.reason] || w.reason %><%= w.note ? ' — ' + w.note : '' %></td>
+            <td><%= _shortDate(w.created_at) %><br><small><%= w.created_by_name || 'Payroll user' %></small></td>
+            <td>
+              <% if (w.revoked_at) { %>
+              <span class="pay-opt-badge bad">Revoked</span>
+              <div class="pay-opt-note"><%= _shortDate(w.revoked_at) %><%= w.revoked_reason ? ' — ' + w.revoked_reason : '' %></div>
+              <% } else { %>
+              <span class="pay-opt-badge good">Active</span>
+              <% } %>
+            </td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<% if (proposal) { %>
+<section class="pay-opt-card">
+  <div class="pay-opt-card-head">
+    <h2>Optimization proposal</h2>
+    <span class="pay-opt-badge good"><%= _modeLabel %> · same gross <%= _fmt(proposal.totalGross) %> XAF</span>
+  </div>
+  <div class="pay-opt-body">
+    <% if (proposalEvaluation && proposalEvaluation.hasBlocking) { %>
+    <div class="alert alert-warning">This proposal still contains a blocking breach and cannot be applied. Review the highlighted limits.</div>
+    <% } %>
+    <div class="pay-opt-cards">
+      <div class="pay-opt-kpi good">
+        <div class="lbl">Net pay increase</div>
+        <div class="val"><%= proposal.savings.netPay >= 0 ? '+' : '' %><%= _fmt(proposal.savings.netPay) %></div>
+        <div class="sub">XAF / month</div>
+      </div>
+      <div class="pay-opt-kpi">
+        <div class="lbl">Employer saving</div>
+        <div class="val"><%= _fmt(proposal.savings.employerCost) %></div>
+        <div class="sub">XAF / month</div>
+      </div>
+      <div class="pay-opt-kpi">
+        <div class="lbl">Employee deduction change</div>
+        <div class="val"><%= _fmt(proposal.savings.employeeDeductions) %></div>
+        <div class="sub">XAF / month</div>
+      </div>
+      <div class="pay-opt-kpi">
+        <div class="lbl">Total burden saving</div>
+        <div class="val"><%= _fmt(proposal.savings.totalBurden) %></div>
+        <div class="sub">Employer + employee</div>
+      </div>
+    </div>
+
+    <div class="pay-table-wrap">
+      <table class="pay-opt-table">
+        <thead><tr><th>Proposed composition</th><th class="r">Amount (XAF)</th><th class="r">Legal ceiling</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Base salary</strong></td><td class="r"><strong><%= _fmt(proposal.allocBase) %></strong></td><td class="r"><%= _fmt(proposal.profile.smig) %> min</td></tr>
+          <% _allowanceFields.forEach(function (key) { %>
+          <% if (Number(proposal.allocation[key]) > 0) { %>
+          <tr>
+            <td><%= _labels[key] %></td>
+            <td class="r"><%= _fmt(proposal.allocation[key]) %></td>
+            <td class="r"><%= proposal.after.caps[key] != null ? _fmt(proposal.after.caps[key]) : '—' %></td>
+          </tr>
+          <% } %>
+          <% }); %>
+          <tr class="total"><td>Total gross cash</td><td class="r"><%= _fmt(proposal.after.grossCash) %></td><td class="r"></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <% if (proposalEvaluation && proposalEvaluation.alerts && proposalEvaluation.alerts.length) { %>
+    <div style="margin-top:14px;">
+      <% proposalEvaluation.alerts.forEach(function (a) { %>
+      <div class="pay-opt-alert <%= a.severity %>">
+        <strong><%= a.title %></strong>
+        <span><%= a.message %></span>
+      </div>
+      <% }); %>
+    </div>
+    <% } %>
+
+    <div class="pay-opt-actions">
+      <button type="submit" form="pay-opt-form" name="action" value="apply" class="btn hms-btn-primary" <%= (proposalEvaluation && proposalEvaluation.hasBlocking) ? 'disabled' : '' %>>
+        <i class="fa fa-check mr-1"></i> Apply this structure to the form
+      </button>
+    </div>
+    <p class="pay-opt-note" style="margin-top:10px;">Applying only fills this optimizer form. It does not create or edit payroll records or a posted payroll run.</p>
+  </div>
+</section>
+<% } %>
+
+<% if (!evaluation || !evaluation.hasBlocking) { %>
+<section class="pay-opt-card">
+  <div class="pay-opt-card-head">
+    <h2>Payroll result</h2>
+    <span class="pay-opt-badge"><%= result.profile.sectorLabel %> · <%= result.profile.regimeLabel %></span>
+  </div>
+  <div class="pay-opt-body">
+    <div class="pay-opt-cards">
+      <div class="pay-opt-kpi">
+        <div class="lbl">Gross cash</div>
+        <div class="val"><%= _fmt(result.grossCash) %></div>
+        <div class="sub">Salary + allowances</div>
+      </div>
+      <div class="pay-opt-kpi good">
+        <div class="lbl">Net pay</div>
+        <div class="val"><%= _fmt(result.netPay) %></div>
+        <div class="sub">After employee deductions</div>
+      </div>
+      <div class="pay-opt-kpi">
+        <div class="lbl">Employee deductions</div>
+        <div class="val"><%= _fmt(result.employeeDeductions) %></div>
+        <div class="sub">CNPS + CFC + IRPP + local</div>
+      </div>
+      <div class="pay-opt-kpi cost">
+        <div class="lbl">Total employer cost</div>
+        <div class="val"><%= _fmt(result.totalEmployerCost) %></div>
+        <div class="sub">Gross + employer contributions</div>
+      </div>
+    </div>
+
+    <% if (proposal) { %>
+    <div class="pay-table-wrap" style="margin-bottom:18px;">
+      <table class="pay-opt-table">
+        <thead><tr><th>Measure</th><th class="r">Current</th><th class="r">Optimized</th><th class="r">Change</th></tr></thead>
+        <tbody>
+          <tr><td>Gross taxable</td><td class="r"><%= _fmt(result.grossTaxable) %></td><td class="r"><%= _fmt(proposal.after.grossTaxable) %></td><td class="r"><%= _fmt(proposal.after.grossTaxable - result.grossTaxable) %></td></tr>
+          <tr><td>Employee deductions</td><td class="r"><%= _fmt(result.employeeDeductions) %></td><td class="r"><%= _fmt(proposal.after.employeeDeductions) %></td><td class="r"><%= _fmt(proposal.after.employeeDeductions - result.employeeDeductions) %></td></tr>
+          <tr><td>Net pay</td><td class="r"><%= _fmt(result.netPay) %></td><td class="r"><%= _fmt(proposal.after.netPay) %></td><td class="r"><%= _fmt(proposal.after.netPay - result.netPay) %></td></tr>
+          <tr><td>Employer contributions</td><td class="r"><%= _fmt(result.employerContributions) %></td><td class="r"><%= _fmt(proposal.after.employerContributions) %></td><td class="r"><%= _fmt(proposal.after.employerContributions - result.employerContributions) %></td></tr>
+          <tr class="total"><td>Total employer cost</td><td class="r"><%= _fmt(result.totalEmployerCost) %></td><td class="r"><%= _fmt(proposal.after.totalEmployerCost) %></td><td class="r"><%= _fmt(proposal.after.totalEmployerCost - result.totalEmployerCost) %></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <% } %>
+
+    <div class="pay-opt-row">
+      <div>
+        <div class="pay-opt-section">Employee deductions</div>
+        <table class="pay-opt-table">
+          <tbody>
+            <tr><td>CNPS pension (<%= (result.rates.pensionEmployeeRate * 100).toFixed(2) %>% of <%= _fmt(result.cnpsBase) %>)</td><td class="r"><%= _fmt(result.pensionEmployee) %></td></tr>
+            <tr><td>CFC — Crédit Foncier</td><td class="r"><%= _fmt(result.cfcEmployee) %></td></tr>
+            <tr><td>IRPP</td><td class="r"><%= _fmt(result.irpp) %></td></tr>
+            <tr><td>Council tax (TCL)</td><td class="r"><%= _fmt(result.councilTax) %></td></tr>
+            <tr><td>Audiovisual royalty (RAV)</td><td class="r"><%= _fmt(result.rav) %></td></tr>
+            <tr class="total"><td>Total</td><td class="r"><%= _fmt(result.employeeDeductions) %></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <div class="pay-opt-section">Employer contributions</div>
+        <table class="pay-opt-table">
+          <tbody>
+            <tr><td>CNPS pension (4.2%)</td><td class="r"><%= _fmt(result.pensionEmployer) %></td></tr>
+            <tr><td>Family allowances (<%= (result.rates.familyRate * 100).toFixed(2) %>%)</td><td class="r"><%= _fmt(result.familyEmployer) %></td></tr>
+            <tr><td>Occupational risks (<%= (result.rates.riskRate * 100).toFixed(2) %>%)</td><td class="r"><%= _fmt(result.riskEmployer) %></td></tr>
+            <tr><td>CFC employer</td><td class="r"><%= _fmt(result.cfcEmployer) %></td></tr>
+            <tr><td>FNE employer</td><td class="r"><%= _fmt(result.fneEmployer) %></td></tr>
+            <tr class="total"><td>Total</td><td class="r"><%= _fmt(result.employerContributions) %></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="pay-opt-section">IRPP calculation trace</div>
+    <div class="pay-opt-trace">Gross taxable: <%= _fmt(result.grossTaxable) %> XAF
+CNPS contributory base: <%= _fmt(result.cnpsBaseRaw) %><%= result.cnpsCapped ? ' → capped at ' + _fmt(result.cnpsBase) : '' %>
+Less employee pension: <%= _fmt(result.pensionEmployee) %>
+Less 30% professional expenses: <%= _fmt(result.profDeduction) %><%= result.profDeductionCapped ? ' (capped)' : '' %>
+Net taxable monthly: <%= _fmt(result.netMonthly) %>
+Annual net taxable before abatement: <%= _fmt(result.annualNet) %>
+Rounded annual base: <%= _fmt(result.annualRounded) %>
+Annual IRPP: <%= _fmt(result.annualTax) %>
+Monthly IRPP: <strong><%= _fmt(result.irpp) %></strong></div>
+    <p class="pay-opt-note" style="margin-top:10px;">Sectoral SMIG: <%= _fmt(result.profile.smig) %> XAF/month. Employer family rate: <%= (result.rates.familyRate * 100).toFixed(2) %>%. Risk branch: <%= result.profile.riskLabel %>.</p>
+  </div>
+</section>
+<% } %>
+<% } %>

@@ -15,8 +15,14 @@
     other: 'Other allowances'
   };
   var _allowanceFields = ['transport', 'representation', 'housing', 'electricity', 'water', 'meal', 'dirtiness', 'clothing', 'tools', 'other'];
-  var _before = result || null;
-  var _after = proposal ? proposal.after : null;
+  var _fieldErrors = (evaluation && evaluation.fieldErrors) || {};
+  var _fieldClass = function (key) { return _fieldErrors[key] && _fieldErrors[key].length ? ' invalid' : ''; };
+  var _fieldMessage = function (key) {
+    if (!_fieldErrors[key] || !_fieldErrors[key].length) return '';
+    return _fieldErrors[key][0];
+  };
+  var _caps = caps || {};
+  var _profile = (typeof profile !== 'undefined' && profile) ? profile : null;
 %>
 
 <style>
@@ -29,11 +35,17 @@
   .pay-opt-section { font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #64748b; margin: 18px 0 8px; border-bottom: 1px dashed var(--pay-border); padding-bottom: 5px; }
   .pay-opt-section:first-child { margin-top: 0; }
   .pay-opt-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 640px) { .pay-opt-row { grid-template-columns: 1fr; } }
   .pay-opt-field { margin-bottom: 11px; }
   .pay-opt-field label { display: block; font-size: .7rem; font-weight: 700; color: #334155; margin-bottom: 4px; }
-  .pay-opt-field input, .pay-opt-field select { width: 100%; padding: 8px 10px; border: 1px solid var(--pay-border); border-radius: 8px; font-size: .82rem; background: #fff; color: #0f172a; font-variant-numeric: tabular-nums; }
-  .pay-opt-field input:focus, .pay-opt-field select:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.12); }
+  .pay-opt-field input, .pay-opt-field select, .pay-opt-field textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--pay-border); border-radius: 8px; font-size: .82rem; background: #fff; color: #0f172a; font-variant-numeric: tabular-nums; }
+  .pay-opt-field textarea { resize: vertical; font-family: inherit; }
+  .pay-opt-field input:focus, .pay-opt-field select:focus, .pay-opt-field textarea:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.12); }
   .pay-opt-field small { display: block; margin-top: 3px; font-size: .66rem; color: #64748b; }
+  .pay-opt-field.invalid input, .pay-opt-field.invalid select { border-color: #dc2626; background: #fff7f7; }
+  .pay-opt-field.invalid label { color: #991b1b; }
+  .pay-opt-field-msg { display: block; margin-top: 4px; font-size: .66rem; line-height: 1.4; color: #b91c1c; font-weight: 600; }
+  .pay-opt-limit { display: block; margin-top: 3px; font-size: .64rem; color: #64748b; }
   .pay-opt-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
   .pay-opt-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
   @media (max-width: 900px) { .pay-opt-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -58,21 +70,39 @@
   .pay-opt-alert.critical { border-left-color: #b91c1c; }
   .pay-opt-alert.high { border-left-color: #c2410c; }
   .pay-opt-alert.info { border-left-color: #2563eb; }
+  .pay-opt-alert.ok { border-left-color: #15803d; background: #f7fdf9; }
+  .pay-opt-alert.waived { border-left-color: #d97706; background: #fffbeb; }
   .pay-opt-alert strong { display: block; font-size: .8rem; color: #0f172a; margin-bottom: 2px; }
   .pay-opt-alert span { font-size: .75rem; color: #475569; }
+  .pay-opt-rule { margin: 5px 0 0; font-size: .68rem; color: #64748b; line-height: 1.45; }
+  .pay-opt-blocked { border-color: #fecaca; box-shadow: 0 0 0 1px #fee2e2 inset; }
+  .pay-opt-blocker { border: 1px solid #fecaca; background: #fffafa; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+  .pay-opt-blocker-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 4px; }
+  .pay-opt-blocker-head strong { font-size: .84rem; color: #7f1d1d; }
+  .pay-opt-blocker p { margin: 3px 0; font-size: .76rem; color: #475569; line-height: 1.5; }
+  .pay-opt-waiver { margin-top: 10px; border-top: 1px dashed #fca5a5; padding-top: 9px; }
+  .pay-opt-waiver summary { cursor: pointer; font-size: .74rem; font-weight: 800; color: #92400e; }
+  .pay-opt-waiver-grid { display: grid; grid-template-columns: minmax(160px, .8fr) minmax(0, 1.2fr); gap: 10px; margin-top: 9px; }
+  @media (max-width: 640px) { .pay-opt-waiver-grid { grid-template-columns: 1fr; } }
+  .pay-opt-waiver-error { display: none; margin: 4px 0 7px; font-size: .7rem; color: #b91c1c; font-weight: 700; }
+  .pay-opt-waiver-error.show { display: block; }
+  .pay-opt-waiver-actions { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
   .pay-opt-trace { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .73rem; line-height: 1.75; white-space: pre-wrap; background: #f8fafc; border: 1px solid var(--pay-border); border-radius: 8px; padding: 12px 14px; color: #334155; }
   .pay-opt-delta { font-size: .68rem; font-weight: 700; margin-left: 5px; }
   .pay-opt-delta.up { color: #15803d; }
   .pay-opt-delta.down { color: #b91c1c; }
   .pay-opt-employee-bar { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
   .pay-opt-employee-bar select { max-width: 340px; }
+  .pay-opt-live-error { display: none; margin-bottom: 12px; padding: 10px 13px; border-radius: 8px; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; font-size: .76rem; }
+  .pay-opt-live-error.show { display: block; }
+  .pay-opt-live-busy { opacity: .55; pointer-events: none; }
 </style>
 
 <div class="pay-hero">
   <div>
     <p class="sage-eyebrow">Payroll &middot; Optimizer</p>
     <h1>Payroll Optimizer</h1>
-    <p>Model a legally compliant pay structure by CNPS regime and activity sector. Compare employee net pay, employer cost and total burden before changing a profile.</p>
+    <p>Model a legally compliant pay structure by CNPS regime and activity sector. Allowances, tax and ceilings update as you type; any statutory breach blocks continuation until it is corrected or formally waived.</p>
   </div>
 </div>
 
@@ -114,14 +144,15 @@
         <span class="pay-opt-badge good">Regime + sector aware</span>
       </div>
       <div class="pay-opt-body">
-        <form method="POST" action="/payroll/optimizer/run">
+        <form id="pay-opt-form" method="POST" action="/payroll/optimizer/run">
           <input type="hidden" name="employee_id" value="<%= form.employee_id || '' %>">
 
           <div class="pay-opt-section">Employee &amp; statutory profile</div>
-          <div class="pay-opt-field">
+          <div class="pay-opt-field<%= _fieldClass('baseSalary') %>" data-field="baseSalary">
             <label for="baseSalary">Base monthly salary (XAF)</label>
             <input id="baseSalary" type="number" name="baseSalary" min="0" step="1000" value="<%= form.baseSalary %>">
-            <small>Sectoral SMIG and professional caps are applied automatically.</small>
+            <small class="pay-opt-limit" data-limit-for="baseSalary">Sectoral minimum: <%= _fmt(_profile ? _profile.smig : form.baseSalary) %> XAF</small>
+            <% if (_fieldMessage('baseSalary')) { %><span class="pay-opt-field-msg"><%= _fieldMessage('baseSalary') %></span><% } %>
           </div>
           <div class="pay-opt-row">
             <div class="pay-opt-field">
@@ -141,35 +172,52 @@
               </select>
             </div>
           </div>
-          <div class="pay-opt-field">
-            <label for="risk">Occupational risk</label>
-            <select id="risk" name="risk">
-              <% Object.keys(risks).forEach(function (key) { %>
-              <option value="<%= key %>" <%= form.risk === key ? 'selected' : '' %>><%= risks[key].label %></option>
-              <% }); %>
-            </select>
-            <small>Risk contributions use the CNPS contributory base and the selected branch rate.</small>
+          <div class="pay-opt-row">
+            <div class="pay-opt-field">
+              <label for="risk">Occupational risk</label>
+              <select id="risk" name="risk">
+                <% Object.keys(risks).forEach(function (key) { %>
+                <option value="<%= key %>" <%= form.risk === key ? 'selected' : '' %>><%= risks[key].label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="pay-opt-field">
+              <label for="mode">Optimization focus</label>
+              <select id="mode" name="mode">
+                <option value="both" <%= form.mode === 'both' ? 'selected' : '' %>>Employee + employer</option>
+                <option value="employee" <%= form.mode === 'employee' ? 'selected' : '' %>>Employee net pay</option>
+                <option value="employer" <%= form.mode === 'employer' ? 'selected' : '' %>>Employer cost</option>
+              </select>
+            </div>
           </div>
 
           <div class="pay-opt-section">Cash allowances</div>
           <div class="pay-opt-row">
-            <% _allowanceFields.forEach(function (key, idx) { %>
-            <div class="pay-opt-field">
+            <% _allowanceFields.forEach(function (key) { %>
+            <div class="pay-opt-field<%= _fieldClass(key) %>" data-field="<%= key %>">
               <label for="<%= key %>"><%= _labels[key] %></label>
               <input id="<%= key %>" type="number" name="<%= key %>" min="0" step="<%= ['meal','dirtiness','clothing','tools'].indexOf(key) !== -1 ? '100' : '1000' %>" value="<%= form[key] || 0 %>">
+              <% if (key === 'other') { %>
+              <small class="pay-opt-limit" data-limit-for="other">Fully taxable; no statutory exempt ceiling</small>
+              <% } else if (key === 'transport' || key === 'representation') { %>
+              <small class="pay-opt-limit" data-limit-for="<%= key %>">Combined transport + representation max: <%= _fmt(_caps.profCap != null ? _caps.profCap : 400000) %> XAF</small>
+              <% } else { %>
+              <small class="pay-opt-limit" data-limit-for="<%= key %>">Max: <%= _fmt(_caps[key] || 0) %> XAF</small>
+              <% } %>
+              <% if (_fieldMessage(key)) { %><span class="pay-opt-field-msg"><%= _fieldMessage(key) %></span><% } %>
             </div>
             <% }); %>
           </div>
 
           <div class="pay-opt-actions">
-            <button type="submit" name="action" value="calculate" class="btn hms-btn-secondary">
+            <button type="submit" data-opt-submit data-opt-action="calculate" name="action" value="calculate" class="btn hms-btn-secondary">
               <i class="fa fa-calculator mr-1"></i> Calculate payroll
             </button>
-            <button type="submit" name="action" value="optimize" class="btn hms-btn-primary">
+            <button type="submit" data-opt-submit data-opt-action="optimize" name="action" value="optimize" class="btn hms-btn-primary">
               <i class="fa fa-magic mr-1"></i> Optimize structure
             </button>
           </div>
-          <p class="pay-opt-note" style="margin-top:10px;">The optimizer reallocates the same total gross cash into capped exempt allowances. It does not create or edit payroll records.</p>
+          <p class="pay-opt-note" style="margin-top:10px;">The optimizer reallocates the same total gross cash into legally capped allowances. It does not create or edit payroll records.</p>
         </form>
       </div>
     </section>
@@ -179,182 +227,238 @@
     <% if (error) { %>
     <div class="alert alert-danger"><%= error %></div>
     <% } %>
-
-    <% if (!result) { %>
-    <section class="pay-opt-card">
-      <div class="pay-opt-body" style="text-align:center;padding:42px 20px;">
-        <i class="fa fa-magic" style="font-size:2rem;color:#7c3aed;"></i>
-        <h2 style="font-size:1.05rem;margin:12px 0 6px;">Start with a payroll scenario</h2>
-        <p class="pay-opt-note" style="max-width:460px;margin:0 auto;">Enter a base salary and allowances, then calculate payroll or generate an optimized structure. The result shows employee deductions, employer contributions, net pay and the full employer cost.</p>
-      </div>
-    </section>
-    <% } else { %>
-
-    <% if (alerts.length) { %>
-    <section class="pay-opt-card">
-      <div class="pay-opt-card-head"><h2>Compliance checks</h2></div>
-      <div class="pay-opt-body">
-        <% alerts.forEach(function (a) { %>
-        <div class="pay-opt-alert <%= a.severity %>">
-          <strong><%= a.title %></strong>
-          <span><%= a.message %></span>
-        </div>
-        <% }); %>
-      </div>
-    </section>
-    <% } %>
-
-    <% if (proposal) { %>
-    <section class="pay-opt-card">
-      <div class="pay-opt-card-head">
-        <h2>Optimization proposal</h2>
-        <span class="pay-opt-badge good">Same gross cash: <%= _fmt(proposal.totalGross) %> XAF</span>
-      </div>
-      <div class="pay-opt-body">
-        <div class="pay-opt-cards">
-          <div class="pay-opt-kpi good">
-            <div class="lbl">Net pay increase</div>
-            <div class="val"><%= proposal.savings.netPay >= 0 ? '+' : '' %><%= _fmt(proposal.savings.netPay) %></div>
-            <div class="sub">XAF / month</div>
-          </div>
-          <div class="pay-opt-kpi">
-            <div class="lbl">Employer saving</div>
-            <div class="val"><%= _fmt(proposal.savings.employerCost) %></div>
-            <div class="sub">XAF / month</div>
-          </div>
-          <div class="pay-opt-kpi">
-            <div class="lbl">Employee deduction change</div>
-            <div class="val"><%= _fmt(proposal.savings.employeeDeductions) %></div>
-            <div class="sub">XAF / month</div>
-          </div>
-          <div class="pay-opt-kpi">
-            <div class="lbl">Total burden saving</div>
-            <div class="val"><%= _fmt(proposal.savings.totalBurden) %></div>
-            <div class="sub">Employer + employee</div>
-          </div>
-        </div>
-
-        <div class="pay-table-wrap">
-          <table class="pay-opt-table">
-            <thead><tr><th>Proposed composition</th><th class="r">Amount (XAF)</th><th class="r">Legal ceiling</th></tr></thead>
-            <tbody>
-              <tr><td><strong>Base salary</strong></td><td class="r"><strong><%= _fmt(proposal.allocBase) %></strong></td><td class="r">—</td></tr>
-              <% _allowanceFields.forEach(function (key) { %>
-              <% if (Number(proposal.allocation[key]) > 0) { %>
-              <tr>
-                <td><%= _labels[key] %></td>
-                <td class="r"><%= _fmt(proposal.allocation[key]) %></td>
-                <td class="r"><%= proposal.after.caps[key] != null ? _fmt(proposal.after.caps[key]) : '—' %></td>
-              </tr>
-              <% } %>
-              <% }); %>
-              <tr class="total"><td>Total gross cash</td><td class="r"><%= _fmt(proposal.after.grossCash) %></td><td class="r"></td></tr>
-            </tbody>
-          </table>
-        </div>
-        <% if (proposalAlerts.length) { %>
-        <div style="margin-top:14px;">
-          <% proposalAlerts.forEach(function (a) { %>
-          <div class="pay-opt-alert <%= a.severity %>">
-            <strong><%= a.title %></strong>
-            <span><%= a.message %></span>
-          </div>
-          <% }); %>
-        </div>
-        <% } %>
-        <p class="pay-opt-note" style="margin-top:10px;">This is a composition proposal only. Review it with management and the employees' representative before changing a pay profile.</p>
-      </div>
-    </section>
-    <% } %>
-
-    <section class="pay-opt-card">
-      <div class="pay-opt-card-head">
-        <h2>Payroll result</h2>
-        <span class="pay-opt-badge"><%= result.profile.sectorLabel %> · <%= result.profile.regimeLabel %></span>
-      </div>
-      <div class="pay-opt-body">
-        <div class="pay-opt-cards">
-          <div class="pay-opt-kpi">
-            <div class="lbl">Gross cash</div>
-            <div class="val"><%= _fmt(result.grossCash) %></div>
-            <div class="sub">Salary + allowances</div>
-          </div>
-          <div class="pay-opt-kpi good">
-            <div class="lbl">Net pay</div>
-            <div class="val"><%= _fmt(result.netPay) %></div>
-            <div class="sub">After employee deductions</div>
-          </div>
-          <div class="pay-opt-kpi">
-            <div class="lbl">Employee deductions</div>
-            <div class="val"><%= _fmt(result.employeeDeductions) %></div>
-            <div class="sub">CNPS + CFC + IRPP + local</div>
-          </div>
-          <div class="pay-opt-kpi cost">
-            <div class="lbl">Total employer cost</div>
-            <div class="val"><%= _fmt(result.totalEmployerCost) %></div>
-            <div class="sub">Gross + employer contributions</div>
-          </div>
-        </div>
-
-        <% if (proposal) { %>
-        <div class="pay-table-wrap" style="margin-bottom:18px;">
-          <table class="pay-opt-table">
-            <thead><tr><th>Measure</th><th class="r">Current</th><th class="r">Optimized</th><th class="r">Change</th></tr></thead>
-            <tbody>
-              <tr><td>Gross taxable</td><td class="r"><%= _fmt(result.grossTaxable) %></td><td class="r"><%= _fmt(proposal.after.grossTaxable) %></td><td class="r"><%= _fmt(proposal.after.grossTaxable - result.grossTaxable) %></td></tr>
-              <tr><td>Employee deductions</td><td class="r"><%= _fmt(result.employeeDeductions) %></td><td class="r"><%= _fmt(proposal.after.employeeDeductions) %></td><td class="r"><%= _fmt(proposal.after.employeeDeductions - result.employeeDeductions) %></td></tr>
-              <tr><td>Net pay</td><td class="r"><%= _fmt(result.netPay) %></td><td class="r"><%= _fmt(proposal.after.netPay) %></td><td class="r"><%= _fmt(proposal.after.netPay - result.netPay) %></td></tr>
-              <tr><td>Employer contributions</td><td class="r"><%= _fmt(result.employerContributions) %></td><td class="r"><%= _fmt(proposal.after.employerContributions) %></td><td class="r"><%= _fmt(proposal.after.employerContributions - result.employerContributions) %></td></tr>
-              <tr class="total"><td>Total employer cost</td><td class="r"><%= _fmt(result.totalEmployerCost) %></td><td class="r"><%= _fmt(proposal.after.totalEmployerCost) %></td><td class="r"><%= _fmt(proposal.after.totalEmployerCost - result.totalEmployerCost) %></td></tr>
-            </tbody>
-          </table>
-        </div>
-        <% } %>
-
-        <div class="pay-opt-row">
-          <div>
-            <div class="pay-opt-section">Employee deductions</div>
-            <table class="pay-opt-table">
-              <tbody>
-                <tr><td>CNPS pension (<%= (result.rates.pensionEmployeeRate * 100).toFixed(2) %>% of <%= _fmt(result.cnpsBase) %>)</td><td class="r"><%= _fmt(result.pensionEmployee) %></td></tr>
-                <tr><td>CFC — Crédit Foncier</td><td class="r"><%= _fmt(result.cfcEmployee) %></td></tr>
-                <tr><td>IRPP</td><td class="r"><%= _fmt(result.irpp) %></td></tr>
-                <tr><td>Council tax (TCL)</td><td class="r"><%= _fmt(result.councilTax) %></td></tr>
-                <tr><td>Audiovisual royalty (RAV)</td><td class="r"><%= _fmt(result.rav) %></td></tr>
-                <tr class="total"><td>Total</td><td class="r"><%= _fmt(result.employeeDeductions) %></td></tr>
-              </tbody>
-            </table>
-          </div>
-          <div>
-            <div class="pay-opt-section">Employer contributions</div>
-            <table class="pay-opt-table">
-              <tbody>
-                <tr><td>CNPS pension (4.2%)</td><td class="r"><%= _fmt(result.pensionEmployer) %></td></tr>
-                <tr><td>Family allowances (<%= (result.rates.familyRate * 100).toFixed(2) %>%)</td><td class="r"><%= _fmt(result.familyEmployer) %></td></tr>
-                <tr><td>Occupational risks (<%= (result.rates.riskRate * 100).toFixed(2) %>%)</td><td class="r"><%= _fmt(result.riskEmployer) %></td></tr>
-                <tr><td>CFC employer</td><td class="r"><%= _fmt(result.cfcEmployer) %></td></tr>
-                <tr><td>FNE employer</td><td class="r"><%= _fmt(result.fneEmployer) %></td></tr>
-                <tr class="total"><td>Total</td><td class="r"><%= _fmt(result.employerContributions) %></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="pay-opt-section">IRPP calculation trace</div>
-        <div class="pay-opt-trace">Gross taxable: <%= _fmt(result.grossTaxable) %> XAF
-CNPS contributory base: <%= _fmt(result.cnpsBaseRaw) %><%= result.cnpsCapped ? ' → capped at ' + _fmt(result.cnpsBase) : '' %>
-Less employee pension: <%= _fmt(result.pensionEmployee) %>
-Less 30% professional expenses: <%= _fmt(result.profDeduction) %><%= result.profDeductionCapped ? ' (capped)' : '' %>
-Net taxable monthly: <%= _fmt(result.netMonthly) %>
-Annual net taxable before abatement: <%= _fmt(result.annualNet) %>
-Rounded annual base: <%= _fmt(result.annualRounded) %>
-Annual IRPP: <%= _fmt(result.annualTax) %>
-Monthly IRPP: <strong><%= _fmt(result.irpp) %></strong></div>
-        <p class="pay-opt-note" style="margin-top:10px;">Sectoral SMIG: <%= _fmt(result.profile.smig) %> XAF/month. Employer family rate: <%= (result.rates.familyRate * 100).toFixed(2) %>%. Risk branch: <%= result.profile.riskLabel %>.</p>
-      </div>
-    </section>
-    <% } %>
+    <div id="pay-opt-live-error" class="pay-opt-live-error"></div>
+    <div id="pay-opt-results" data-smig="<%= _profile ? _profile.smig : '' %>">
+      <%- include('partials/payroll-optimizer-results') %>
+    </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var form = document.getElementById('pay-opt-form');
+  var results = document.getElementById('pay-opt-results');
+  var liveError = document.getElementById('pay-opt-live-error');
+  if (!form || !results) return;
+
+  var timer = null;
+  var controller = null;
+  var seq = 0;
+
+  function fmt(n) {
+    return Math.round(Number(n) || 0).toLocaleString('fr-FR');
+  }
+
+  function showError(message) {
+    if (!liveError) return;
+    liveError.textContent = message || '';
+    liveError.classList.toggle('show', Boolean(message));
+  }
+
+  function fieldInputs() {
+    return form.querySelectorAll('input[name], select[name], textarea[name]');
+  }
+
+  function setBusy(busy) {
+    results.classList.toggle('pay-opt-live-busy', Boolean(busy));
+  }
+
+  function setSubmitState(blocked) {
+    form.querySelectorAll('[data-opt-submit]').forEach(function (button) {
+      button.disabled = Boolean(blocked);
+      button.title = blocked ? 'Resolve or waive the blocking exceptions first.' : '';
+    });
+  }
+
+  function applyLimits(payload) {
+    var caps = payload.caps || {};
+    var smig = payload.profile && payload.profile.smig;
+    results.dataset.smig = smig || '';
+    document.querySelectorAll('[data-limit-for]').forEach(function (el) {
+      var key = el.getAttribute('data-limit-for');
+      if (key === 'baseSalary') {
+        el.textContent = 'Sectoral minimum: ' + fmt(smig) + ' XAF';
+        return;
+      }
+      if (key === 'other') return;
+      var limit = caps[key];
+      if ((key === 'transport' || key === 'representation') && caps.profCap != null) {
+        el.textContent = 'Combined transport + representation max: ' + fmt(caps.profCap) + ' XAF';
+        return;
+      }
+      if (key === 'transport' || key === 'representation') limit = 400000;
+      el.textContent = 'Max: ' + fmt(limit) + ' XAF';
+    });
+  }
+
+  function applyFieldErrors(fieldErrors) {
+    var errors = fieldErrors || {};
+    form.querySelectorAll('[data-field]').forEach(function (wrap) {
+      var key = wrap.getAttribute('data-field');
+      var messages = errors[key] || [];
+      wrap.classList.toggle('invalid', messages.length > 0);
+      var existing = wrap.querySelector('.pay-opt-field-msg');
+      if (existing) existing.remove();
+      if (messages.length) {
+        var message = document.createElement('span');
+        message.className = 'pay-opt-field-msg';
+        message.textContent = messages[0];
+        wrap.appendChild(message);
+      }
+    });
+  }
+
+  function applyPayload(payload) {
+    if (!payload || payload.ok === false) {
+      showError((payload && payload.error) || 'Could not recalculate the payroll scenario.');
+      return;
+    }
+    showError('');
+    if (payload.html) results.innerHTML = payload.html;
+    applyFieldErrors(payload.fieldErrors);
+    applyLimits(payload);
+    setSubmitState(payload.blocked);
+  }
+
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: body
+    }).then(function (response) {
+      return response.json().catch(function () {
+        return { ok: false, error: 'The server returned an invalid response.' };
+      });
+    });
+  }
+
+  function paramsFrom(formData) {
+    var params = new URLSearchParams();
+    formData.forEach(function (value, key) { params.append(key, value); });
+    return params;
+  }
+
+  function refresh(action) {
+    if (controller) controller.abort();
+    controller = new AbortController();
+    var mine = ++seq;
+    var fd = paramsFrom(new FormData(form));
+    fd.set('action', action || 'calculate');
+    setBusy(true);
+    fetch('/payroll/optimizer/live', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: fd,
+      signal: controller.signal
+    }).then(function (response) {
+      return response.json();
+    }).then(function (payload) {
+      if (mine !== seq) return;
+      applyPayload(payload);
+    }).catch(function (err) {
+      if (err && err.name === 'AbortError') return;
+      showError('Live recalculation failed. Check your connection and try again.');
+    }).finally(function () {
+      if (mine === seq) setBusy(false);
+    });
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(function () { refresh('calculate'); }, 320);
+  }
+
+  form.addEventListener('input', schedule);
+  form.addEventListener('change', schedule);
+  form.addEventListener('click', function (event) {
+    var button = event.target.closest('[data-opt-action]');
+    if (!button) return;
+    event.preventDefault();
+    refresh(button.getAttribute('data-opt-action'));
+  });
+  form.addEventListener('submit', function (event) {
+    var submitter = event.submitter;
+    if (submitter && submitter.getAttribute('data-opt-action')) {
+      event.preventDefault();
+      refresh(submitter.getAttribute('data-opt-action'));
+      return;
+    }
+    if (submitter && submitter.value === 'apply') return;
+  });
+
+  results.addEventListener('click', function (event) {
+    var waiveButton = event.target.closest('[data-waive-key]');
+    if (waiveButton) {
+      var key = waiveButton.getAttribute('data-waive-key');
+      var panel = waiveButton.closest('.pay-opt-waiver');
+      var reason = panel ? panel.querySelector('[data-waiver-reason]') : null;
+      var note = panel ? panel.querySelector('[data-waiver-note]') : null;
+      var errorBox = panel ? panel.querySelector('[data-waiver-error]') : null;
+      if (errorBox) {
+        errorBox.textContent = '';
+        errorBox.classList.remove('show');
+      }
+      if (reason && reason.value === 'other' && (!note || !note.value.trim())) {
+        if (errorBox) {
+          errorBox.textContent = 'A note is required when the waiver reason is “Other”.';
+          errorBox.classList.add('show');
+        }
+        return;
+      }
+      var fd = paramsFrom(new FormData(form));
+      fd.set('violation_key', key);
+      fd.set('waiver_reason', reason ? reason.value : '');
+      fd.set('waiver_note', note ? note.value : '');
+      waiveButton.disabled = true;
+      post('/payroll/optimizer/waive', fd).then(function (payload) {
+        if (!payload.ok) {
+          if (errorBox) {
+            errorBox.textContent = payload.error || 'Could not record the waiver.';
+            errorBox.classList.add('show');
+          } else {
+            showError(payload.error || 'Could not record the waiver.');
+          }
+          waiveButton.disabled = false;
+          return;
+        }
+        applyPayload(payload);
+      }).catch(function () {
+        if (errorBox) {
+          errorBox.textContent = 'Could not record the waiver.';
+          errorBox.classList.add('show');
+        }
+        waiveButton.disabled = false;
+      });
+      return;
+    }
+
+    var revokeButton = event.target.closest('[data-revoke-id]');
+    if (!revokeButton) return;
+    if (!window.confirm('Revoke this waiver? The blocking exception will return until it is corrected or a new waiver is recorded.')) return;
+    var revokeData = paramsFrom(new FormData(form));
+    revokeData.set('waiver_id', revokeButton.getAttribute('data-revoke-id'));
+    revokeButton.disabled = true;
+    post('/payroll/optimizer/revoke', revokeData).then(function (payload) {
+      if (!payload.ok) {
+        showError(payload.error || 'Could not revoke the waiver.');
+        revokeButton.disabled = false;
+        return;
+      }
+      applyPayload(payload);
+    }).catch(function () {
+      showError('Could not revoke the waiver.');
+      revokeButton.disabled = false;
+    });
+  });
+
+  applyLimits({
+    caps: <%- JSON.stringify(_caps) %>,
+    profile: <%- JSON.stringify(_profile || {}) %>
+  });
+  if (results.querySelector('.pay-opt-blocked')) setSubmitState(true);
+})();
+</script>
 
 <%- include('partials/payroll-layout-end') %>

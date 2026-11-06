@@ -932,6 +932,15 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     ? await computeFromNet(pool, fid, year, amount, ctx)
     : await computeFromGross(pool, fid, year, amount, ctx);
 
+   // The row has editable Medical Risk / Responsibility columns, so send the
+   // engine's amounts for them instead of leaving them at zero. The monthly run
+   // already suppresses these flat fields whenever the engine computes the same
+   // code, so filling them cannot double-count the allowance.
+   const allowanceAmount = (code) => {
+    const line = (comp.allowance_lines || []).find((l) => l.code === code);
+    return Math.max(0, Math.round(Number(line && line.amount) || 0));
+   };
+
    return res.json({
     ok:                       true,
     mode,
@@ -939,8 +948,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     basic_salary:             comp.basic_salary,
     housing_allowance:        comp.housing_allowance,
     transport_allowance:      comp.transport_allowance,
-    medical_risk_allowance:   0,
-    responsibility_allowance: 0,
+    medical_risk_allowance:   allowanceAmount('medical_risk'),
+    responsibility_allowance: allowanceAmount('medical_responsibility'),
     allowance_lines:          comp.allowance_lines || [],
     allowance_total:          comp.allowance_total || 0,
     gross:                    comp.gross,

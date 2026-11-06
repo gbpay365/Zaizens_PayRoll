@@ -41,6 +41,70 @@ const TAX_FREE_ALLOWANCE_CODES = new Set(['night_duty', 'on_call']);
 const DEFAULT_EMPLOYER_RATES = { cnps: 11.2, cfc: 1.5, fne: 1.0 };
 const EMPLOYER_CNPS_CAP = 750000;
 
+function csvCell(value) {
+ const s = String(value == null ? '' : value);
+ return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Employer contributions for every payroll run matching the supplied filter. */
+async function loadEmployerRunTotals(pool, fid, fromJoin, listParams) {
+ const [[rateRow]] = await pool.query(
+  `SELECT employer_cnps_rate, employer_cfc_rate, employer_fne_rate
+     FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1`,
+  [fid]
+ );
+ const rateOr = (value, fallback) => {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : fallback;
+ };
+ const rates = {
+  cnps: rateOr(rateRow && rateRow.employer_cnps_rate, DEFAULT_EMPLOYER_RATES.cnps),
+  cfc: rateOr(rateRow && rateRow.employer_cfc_rate, DEFAULT_EMPLOYER_RATES.cfc),
+  fne: rateOr(rateRow && rateRow.employer_fne_rate, DEFAULT_EMPLOYER_RATES.fne),
+ };
+ const [groupRows] = await pool.query(
+  `SELECT p.year, p.month, COUNT(*) AS line_count,
+          COALESCE(SUM(p.gross_salary), 0) AS gross,
+          COALESCE(SUM(ROUND(LEAST(COALESCE(p.gross_salary, 0), ?) * ? / 100)), 0) AS employer_cnps,
+          COALESCE(SUM(ROUND(COALESCE(p.gross_salary, 0) * ? / 100)), 0) AS employer_cfc,
+          COALESCE(SUM(ROUND(COALESCE(p.gross_salary, 0) * ? / 100)), 0) AS employer_fne
+     ${fromJoin}
+    GROUP BY p.year, p.month
+    ORDER BY p.year DESC, p.month DESC`,
+  [EMPLOYER_CNPS_CAP, rates.cnps, rates.cfc, rates.fne, ...listParams]
+ );
+ const runTotals = (groupRows || []).map((r) => {
+  const gross = Number(r.gross) || 0;
+  const employerCnps = Number(r.employer_cnps) || 0;
+  const employerCfc = Number(r.employer_cfc) || 0;
+  const employerFne = Number(r.employer_fne) || 0;
+  return {
+   year: parseInt(r.year, 10) || 0,
+   month: parseInt(r.month, 10) || 0,
+   count: parseInt(r.line_count, 10) || 0,
+   gross,
+   employerCnps,
+   employerCfc,
+   employerFne,
+   cost: gross + employerCnps + employerCfc + employerFne,
+  };
+ });
+ const summary = runTotals.length
+  ? runTotals.reduce(
+     (acc, r) => ({
+      count: acc.count + r.count,
+      gross: acc.gross + r.gross,
+      employerCnps: acc.employerCnps + r.employerCnps,
+      employerCfc: acc.employerCfc + r.employerCfc,
+      employerFne: acc.employerFne + r.employerFne,
+      cost: acc.cost + r.cost,
+     }),
+     { count: 0, gross: 0, employerCnps: 0, employerCfc: 0, employerFne: 0, cost: 0 }
+    )
+  : null;
+ return { runTotals, summary, rates };
+}
+
 module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) {
  const { requirePayrollAccess, requireAdminOrSuper, requireHrSelfService } = deps;
 
@@ -188,60 +252,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    let runTotals = [];
    let runTotalsSummary = null;
    try {
-    const [[rateRow]] = await pool.query(
-     `SELECT employer_cnps_rate, employer_cfc_rate, employer_fne_rate
-        FROM tbl_hms_payroll_settings WHERE facility_id = ? ORDER BY tax_year DESC LIMIT 1`,
-     [fid]
-    );
-    const rateOr = (value, fallback) => {
-     const n = parseFloat(value);
-     return Number.isFinite(n) ? n : fallback;
-    };
-    const rates = {
-     cnps: rateOr(rateRow && rateRow.employer_cnps_rate, DEFAULT_EMPLOYER_RATES.cnps),
-     cfc: rateOr(rateRow && rateRow.employer_cfc_rate, DEFAULT_EMPLOYER_RATES.cfc),
-     fne: rateOr(rateRow && rateRow.employer_fne_rate, DEFAULT_EMPLOYER_RATES.fne),
-    };
-    const [groupRows] = await pool.query(
-     `SELECT p.year, p.month, COUNT(*) AS line_count,
-             COALESCE(SUM(p.gross_salary), 0) AS gross,
-             COALESCE(SUM(ROUND(LEAST(COALESCE(p.gross_salary, 0), ?) * ? / 100)), 0) AS employer_cnps,
-             COALESCE(SUM(ROUND(COALESCE(p.gross_salary, 0) * ? / 100)), 0) AS employer_cfc,
-             COALESCE(SUM(ROUND(COALESCE(p.gross_salary, 0) * ? / 100)), 0) AS employer_fne
-        ${fromJoin}
-       GROUP BY p.year, p.month
-       ORDER BY p.year DESC, p.month DESC`,
-     [EMPLOYER_CNPS_CAP, rates.cnps, rates.cfc, rates.fne, ...listParams]
-    );
-    runTotals = (groupRows || []).map((r) => {
-     const gross = Number(r.gross) || 0;
-     const employerCnps = Number(r.employer_cnps) || 0;
-     const employerCfc = Number(r.employer_cfc) || 0;
-     const employerFne = Number(r.employer_fne) || 0;
-     return {
-      year: parseInt(r.year, 10) || 0,
-      month: parseInt(r.month, 10) || 0,
-      count: parseInt(r.line_count, 10) || 0,
-      gross,
-      employerCnps,
-      employerCfc,
-      employerFne,
-      cost: gross + employerCnps + employerCfc + employerFne,
-     };
-    });
-    if (runTotals.length) {
-     runTotalsSummary = runTotals.reduce(
-      (acc, r) => ({
-       count: acc.count + r.count,
-       gross: acc.gross + r.gross,
-       employerCnps: acc.employerCnps + r.employerCnps,
-       employerCfc: acc.employerCfc + r.employerCfc,
-       employerFne: acc.employerFne + r.employerFne,
-       cost: acc.cost + r.cost,
-      }),
-      { count: 0, gross: 0, employerCnps: 0, employerCfc: 0, employerFne: 0, cost: 0 }
-     );
-    }
+    const totals = await loadEmployerRunTotals(pool, fid, fromJoin, listParams);
+    runTotals = totals.runTotals;
+    runTotalsSummary = totals.summary;
    } catch (err) {
     console.warn('PAYROLL MONTHLY employer totals:', err.message);
    }
@@ -266,6 +279,98 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   } catch (err) {
    console.error('PAYROLL MONTHLY GET:', err.message);
    res.status(500).render('error', { title: 'Error', message: err.message, status: 500 });
+  }
+ });
+
+ // Accounting export of the same employer-cost totals shown on the monthly page.
+ app.get('/payroll/monthly/export.csv', requireAuth, requirePayrollAccess, async (req, res) => {
+  try {
+   await ensureHrPayrollSchema(pool);
+   const fid = facilityId(req);
+   const uid = sessionEmpId(req);
+   const admin = isPayrollAdmin(req);
+   const searchQ = String(req.query.q || '').trim();
+   let where = 'p.facility_id = ?';
+   const listParams = [fid];
+   if (!admin) {
+    where += ' AND p.employee_id = ?';
+    listParams.push(uid);
+   }
+   if (searchQ) {
+    const like = '%' + searchQ + '%';
+    where +=
+     ' AND (e.first_name LIKE ? OR e.last_name LIKE ? OR CONCAT(e.first_name, " ", e.last_name) LIKE ?)';
+    listParams.push(like, like, like);
+   }
+   const fromJoin =
+    'FROM tbl_hms_payroll_record p INNER JOIN tbl_employee e ON e.id = p.employee_id WHERE ' +
+    where;
+   const { runTotals, summary, rates } = await loadEmployerRunTotals(
+    pool,
+    fid,
+    fromJoin,
+    listParams
+   );
+   const lines = [
+    [
+     'period',
+     'lines',
+     'gross_salary',
+     'employer_cnps_rate',
+     'employer_cnps',
+     'employer_cfc_rate',
+     'employer_cfc',
+     'employer_fne_rate',
+     'employer_fne',
+     'total_employer_cost',
+    ].join(';'),
+   ];
+   runTotals.forEach((run) => {
+    lines.push(
+     [
+      `${run.year}-${String(run.month).padStart(2, '0')}`,
+      run.count,
+      run.gross.toFixed(2),
+      rates.cnps,
+      run.employerCnps.toFixed(2),
+      rates.cfc,
+      run.employerCfc.toFixed(2),
+      rates.fne,
+      run.employerFne.toFixed(2),
+      run.cost.toFixed(2),
+     ]
+      .map(csvCell)
+      .join(';')
+    );
+   });
+   if (summary) {
+    lines.push(
+     [
+      'ALL',
+      summary.count,
+      summary.gross.toFixed(2),
+      rates.cnps,
+      summary.employerCnps.toFixed(2),
+      rates.cfc,
+      summary.employerCfc.toFixed(2),
+      rates.fne,
+      summary.employerFne.toFixed(2),
+      summary.cost.toFixed(2),
+     ]
+      .map(csvCell)
+      .join(';')
+    );
+   }
+   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+   res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="payroll_employer_costs_${fid}_${stamp}.csv"`
+   );
+   res.send('\uFEFF' + lines.join('\r\n'));
+  } catch (err) {
+   console.error('PAYROLL MONTHLY CSV:', err.message);
+   res.status(500).send(err.message);
   }
  });
 

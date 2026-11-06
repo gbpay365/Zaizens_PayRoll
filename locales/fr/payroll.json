@@ -100,6 +100,7 @@
     "net_this_month": "Net ce mois (XAF)",
     "employer_cost_by_run": "Coût employeur par cycle",
     "employer_cost_hint": "Salaire brut plus les cotisations patronales CNPS, CFC et FNE configurées.",
+    "export_csv": "Exporter CSV",
     "run_lines": "Lignes",
     "employer_cnps": "CNPS employeur",
     "employer_cfc": "CFC employeur",

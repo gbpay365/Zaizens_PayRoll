@@ -280,7 +280,33 @@ if (typeof _tl !== 'function') {
       letter-spacing: .3px;
     }
 
-    /* ── EMPLOYER CONTRIBUTION NOTE ── */
+    /* ── EMPLOYER CONTRIBUTION SUMMARY ── */
+    .ps-employer-cost {
+      padding: 12px 20px 14px;
+      background: #f4f6f9;
+      border-top: 1px solid #d7dee8;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .ps-employer-cost .emp-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: #0d2137;
+      margin-bottom: 6px;
+    }
+    .ps-employer-cost table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    .ps-employer-cost td { padding: 3px 4px; border-bottom: 1px solid #e2e8f0; }
+    .ps-employer-cost td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+    .ps-employer-cost tr.total td {
+      border-top: 2px solid #c9a84c;
+      border-bottom: none;
+      padding-top: 6px;
+      font-weight: 700;
+      color: #0d2137;
+    }
+
     /* ── FOOTER ── */
     .ps-footer {
       padding: 9px 20px 11px;
@@ -634,6 +660,37 @@ if (typeof _tl !== 'function') {
     <div class="net-amount">FCFA &nbsp;<%= xaf(net) %></div>
     <div class="net-words"><%= netWords %></div>
   </div>
+
+  <!-- ── EMPLOYER CONTRIBUTIONS ── -->
+  <% if (employerCost > 0) { %>
+  <div class="ps-employer-cost">
+    <div class="emp-title"><%= _tl('payslip.employer_cost_hdr', 'Employer Contributions / Charges Patronales') %></div>
+    <table>
+      <tbody>
+        <tr>
+          <td><%= _tl('payslip.gross_salary', 'Gross Salary / Salaire Brut') %></td>
+          <td><%= xaf(gross) %></td>
+        </tr>
+        <tr>
+          <td><%= _tl('payslip.employer_cnps_contrib', 'Employer CNPS / CNPS Employeur') %> (<%= Number(cnpsEmployerRate) %>%)</td>
+          <td><%= xaf(cnpsEmployer) %></td>
+        </tr>
+        <tr>
+          <td><%= _tl('payslip.employer_cfc_contrib', 'Employer CFC / CFC Employeur') %> (<%= Number(cfcEmployerRate) %>%)</td>
+          <td><%= xaf(cimrEmployer) %></td>
+        </tr>
+        <tr>
+          <td><%= _tl('payslip.employer_fne_contrib', 'FNE (employer) / FNE Employeur') %> (<%= Number(fneEmployerRate) %>%)</td>
+          <td><%= xaf(fneEmployer) %></td>
+        </tr>
+        <tr class="total">
+          <td><%= _tl('payslip.total_employer_cost', 'Total Employer Cost / Coût Total Employeur') %></td>
+          <td><%= xaf(employerCost) %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
 
   <!-- ── FOOTER ── -->
   <div class="ps-footer">

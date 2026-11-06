@@ -295,9 +295,12 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    };
    const cnpsEmployerRate = rateOr(empSettings && empSettings.employer_cnps_rate, DEFAULT_EMPLOYER_RATES.cnps);
    const cfcEmployerRate = rateOr(empSettings && empSettings.employer_cfc_rate, DEFAULT_EMPLOYER_RATES.cfc);
+   const fneEmployerRate = rateOr(empSettings && empSettings.employer_fne_rate, DEFAULT_EMPLOYER_RATES.fne);
    const cnpsBase = Math.min(gross, EMPLOYER_CNPS_CAP);
    const cnpsEmployer = Math.round((cnpsBase * cnpsEmployerRate) / 100);
    const cimrEmployer = Math.round((gross * cfcEmployerRate) / 100); // column kept as cimrEmployer for compat
+   const fneEmployer = Math.round((gross * fneEmployerRate) / 100);
+   const employerCost = Math.round(gross) + cnpsEmployer + cimrEmployer + fneEmployer;
    const dept = String(row.primary_department || '').trim();
    const printed = hmsFormatDate.formatDisplayDate(new Date());
 
@@ -365,7 +368,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     slipNo,
     b, h, t, o,
     gross, ded,
-    cnpsEmployer, cimrEmployer,
+    cnpsEmployer, cimrEmployer, fneEmployer, employerCost,
+    cnpsEmployerRate, cfcEmployerRate, fneEmployerRate,
     dept, printed,
     allowanceLines, allowancesTotal,
     taxableAllowanceLines, taxFreeAllowanceLines,

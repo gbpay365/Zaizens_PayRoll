@@ -20,6 +20,7 @@ const { loadMonthlySummary } = require('../lib/hmsStatutoryReports');
 const { syncPayrollPeriodToCoreAccount } = require('../lib/coreAccountPayrollSync');
 const registerStaffDirectoryRoutes = require('../routes/staffDirectory');
 const registerHrPayrollRoutes = require('../routes/hrPayroll');
+const registerAdminRoutes = require('../routes/admin');
 const { makeApp, withApp, request } = require('./helpers/app');
 
 const DB_NAME = `zaizens_payroll_it_${process.pid}_${Date.now()}`;
@@ -470,4 +471,245 @@ test('reversed payroll lines are excluded from totals, statutory exports and cor
   assert.equal(deptCall.body.departments.length, 1);
   assert.equal(deptCall.body.departments[0].headcount, 1);
   assert.equal(deptCall.body.departments[0].gross_payroll, 100000);
+});
+
+test('audit integrity report lists only null-facility rows with no employee source', async (t) => {
+  if (!requireDatabase(t)) return;
+
+  const marker = `audit integrity ${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const noFacilityEmployeeId = await insertEmployee('Audit', 'NoFacility', 1, null);
+  const rows = [
+    {
+      key: 'noFacility',
+      action: 'payroll.salary_delete',
+      targetType: 'employee',
+      targetId: String(noFacilityEmployeeId),
+      detail: `${marker} employee without facility`,
+    },
+    {
+      key: 'missingEmployee',
+      action: 'payroll.salary_delete',
+      targetType: 'employee',
+      targetId: '99999999',
+      detail: `${marker} missing employee`,
+    },
+    {
+      key: 'nonEmployee',
+      action: 'security.policy',
+      targetType: 'security',
+      targetId: 'policy',
+      detail: `${marker} non-employee target`,
+    },
+    {
+      key: 'resolvable',
+      action: 'employee.delete',
+      targetType: 'employee',
+      targetId: String(includedEmployeeId),
+      detail: `${marker} resolvable employee`,
+    },
+  ];
+  const ids = {};
+  for (const row of rows) {
+    const [result] = await pool.query(
+      `INSERT INTO tbl_admin_audit
+        (actor_id, actor_name, facility_id, action, target_type, target_id, detail)
+       VALUES (NULL, 'Integrity test', NULL, ?, ?, ?, ?)`,
+      [row.action, row.targetType, row.targetId, row.detail]
+    );
+    ids[row.key] = result.insertId;
+  }
+
+  await withApp(makeApp(registerAdminRoutes, pool), async (base) => {
+    const res = await request(base, '/admin/audit-integrity');
+    assert.equal(res.status, 200);
+    const body = JSON.parse(res.text);
+    assert.equal(body.view, 'admin-audit-integrity');
+    assert.equal(body.locals.payNavActive, 'admin-audit-integrity');
+    assert.equal(body.locals.stats.totalNull, 4);
+    assert.equal(body.locals.stats.unresolved, 3);
+    assert.equal(body.locals.stats.resolvable, 1);
+    assert.ok(body.locals.facilities.some((facility) => Number(facility.id) === FACILITY_ID));
+
+    const byId = new Map(body.locals.rows.map((row) => [Number(row.id), row]));
+    assert.ok(byId.has(ids.noFacility));
+    assert.equal(byId.get(ids.noFacility).resolution_reason, 'Employee has no default facility');
+    assert.ok(byId.has(ids.missingEmployee));
+    assert.equal(byId.get(ids.missingEmployee).resolution_reason, 'Target employee no longer exists');
+    assert.ok(byId.has(ids.nonEmployee));
+    assert.equal(byId.get(ids.nonEmployee).resolution_reason, 'Not linked to an employee record');
+    assert.ok(!byId.has(ids.resolvable), 'rows recoverable from an employee must not be listed');
+  });
+
+  await withApp(
+    makeApp(registerAdminRoutes, pool, { role: '101', userPerms: ['payroll.read'] }),
+    async (base) => {
+      const res = await request(base, `/admin/audit-integrity/${ids.noFacility}/assign`, {
+        method: 'POST',
+        body: new URLSearchParams({ facility_id: String(FACILITY_ID) }),
+      });
+      assert.equal(res.status, 403);
+    }
+  );
+
+  await withApp(makeApp(registerAdminRoutes, pool), async (base) => {
+    const assignRes = await request(base, `/admin/audit-integrity/${ids.noFacility}/assign`, {
+      method: 'POST',
+      body: new URLSearchParams({ facility_id: String(FACILITY_ID) }),
+    });
+    assert.equal(assignRes.status, 302);
+    assert.match(decodeURIComponent(assignRes.headers.get('location')), /assigned to audit row/i);
+
+    const guardRes = await request(base, `/admin/audit-integrity/${ids.resolvable}/assign`, {
+      method: 'POST',
+      body: new URLSearchParams({ facility_id: String(FACILITY_ID) }),
+    });
+    assert.equal(guardRes.status, 302);
+    assert.match(
+      decodeURIComponent(guardRes.headers.get('location')),
+      /resolved from employee data/i
+    );
+
+    const refreshed = await request(base, '/admin/audit-integrity');
+    const refreshedBody = JSON.parse(refreshed.text);
+    assert.equal(refreshedBody.locals.stats.totalNull, 3);
+    assert.equal(refreshedBody.locals.stats.unresolved, 2);
+  });
+
+  const [[assigned]] = await pool.query(
+    'SELECT facility_id FROM tbl_admin_audit WHERE id = ?',
+    [ids.noFacility]
+  );
+  assert.equal(assigned.facility_id, FACILITY_ID);
+
+  const [[stillResolvable]] = await pool.query(
+    'SELECT facility_id FROM tbl_admin_audit WHERE id = ?',
+    [ids.resolvable]
+  );
+  assert.equal(stillResolvable.facility_id, null);
+
+  const [[assignmentAudit]] = await pool.query(
+    `SELECT action, target_type, target_id, facility_id, detail
+       FROM tbl_admin_audit
+      WHERE action = 'audit.facility_assign' AND target_id = ?
+      ORDER BY id DESC LIMIT 1`,
+    [String(ids.noFacility)]
+  );
+  assert.ok(assignmentAudit, 'the manual assignment must be audited');
+  assert.equal(assignmentAudit.target_type, 'audit');
+  assert.equal(assignmentAudit.facility_id, FACILITY_ID);
+  assert.match(assignmentAudit.detail, /audit row #/i);
+});
+
+test('bulk audit facility assignment keeps the authorization and unresolved-row guards', async (t) => {
+  if (!requireDatabase(t)) return;
+
+  const marker = `audit bulk ${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const firstEmployeeId = await insertEmployee('Bulk', 'UnresolvedOne', 1, null);
+  const secondEmployeeId = await insertEmployee('Bulk', 'UnresolvedTwo', 1, null);
+  const resolvableEmployeeId = await insertEmployee('Bulk', 'Resolvable', 1, FACILITY_ID);
+
+  const insertAudit = async (action, targetType, targetId, facilityId, detail) => {
+    const [result] = await pool.query(
+      `INSERT INTO tbl_admin_audit
+        (actor_id, actor_name, facility_id, action, target_type, target_id, detail)
+       VALUES (NULL, 'Bulk integrity test', ?, ?, ?, ?, ?)`,
+      [facilityId, action, targetType, targetId, detail]
+    );
+    return result.insertId;
+  };
+
+  const firstId = await insertAudit(
+    'payroll.salary_delete', 'employee', String(firstEmployeeId), null, `${marker} first unresolved`
+  );
+  const secondId = await insertAudit(
+    'security.policy', 'security', 'policy', null, `${marker} second unresolved`
+  );
+  const resolvableId = await insertAudit(
+    'employee.delete', 'employee', String(resolvableEmployeeId), null, `${marker} resolvable`
+  );
+  const assignedId = await insertAudit(
+    'account.update', 'account', 'existing', FACILITY_ID, `${marker} already assigned`
+  );
+  const postBulk = (base, auditIds, facilityId = FACILITY_ID) => request(base, '/admin/audit-integrity/assign', {
+    method: 'POST',
+    body: new URLSearchParams([
+      ['facility_id', String(facilityId)],
+      ...auditIds.map((id) => ['audit_ids[]', String(id)]),
+    ]),
+  });
+
+  await withApp(
+    makeApp(registerAdminRoutes, pool, { role: '101', userPerms: ['payroll.read'] }),
+    async (base) => {
+      const res = await postBulk(base, [firstId]);
+      assert.equal(res.status, 403);
+    }
+  );
+
+  await withApp(makeApp(registerAdminRoutes, pool), async (base) => {
+    const resolvableGuard = await postBulk(base, [firstId, resolvableId]);
+    assert.equal(resolvableGuard.status, 302);
+    assert.match(
+      decodeURIComponent(resolvableGuard.headers.get('location')),
+      /can still be resolved from employee data/i
+    );
+
+    const assignedGuard = await postBulk(base, [firstId, assignedId]);
+    assert.equal(assignedGuard.status, 302);
+    assert.match(
+      decodeURIComponent(assignedGuard.headers.get('location')),
+      /already (?:has|have) a facility/i
+    );
+
+    const [[afterGuards]] = await pool.query(
+      'SELECT facility_id FROM tbl_admin_audit WHERE id = ?',
+      [firstId]
+    );
+    assert.equal(afterGuards.facility_id, null, 'a rejected bulk selection must not partially assign rows');
+
+    const success = await postBulk(base, [firstId, secondId]);
+    assert.equal(success.status, 302);
+    assert.match(decodeURIComponent(success.headers.get('location')), /assigned to 2 audit rows/i);
+
+    const refreshed = await request(base, '/admin/audit-integrity');
+    const refreshedBody = JSON.parse(refreshed.text);
+    const reportIds = new Set(refreshedBody.locals.rows.map((row) => Number(row.id)));
+    assert.ok(!reportIds.has(firstId), 'assigned rows must leave the unresolved report');
+    assert.ok(!reportIds.has(secondId), 'assigned rows must leave the unresolved report');
+    assert.ok(!reportIds.has(resolvableId), 'employee-resolvable rows are not shown for manual assignment');
+  });
+
+  const [assignedRows] = await pool.query(
+    'SELECT id, facility_id FROM tbl_admin_audit WHERE id IN (?, ?) ORDER BY id',
+    [firstId, secondId]
+  );
+  assert.deepEqual(
+    assignedRows.map((row) => Number(row.id)),
+    [firstId, secondId].sort((a, b) => a - b)
+  );
+  assert.ok(assignedRows.every((row) => Number(row.facility_id) === FACILITY_ID));
+
+  const [[resolvableRow]] = await pool.query(
+    'SELECT facility_id FROM tbl_admin_audit WHERE id = ?',
+    [resolvableId]
+  );
+  assert.equal(resolvableRow.facility_id, null);
+
+  const [bulkAudits] = await pool.query(
+    `SELECT target_type, target_id, facility_id, detail
+       FROM tbl_admin_audit
+      WHERE action = 'audit.facility_assign' AND target_id IN (?, ?)
+      ORDER BY id`,
+    [String(firstId), String(secondId)]
+  );
+  assert.equal(bulkAudits.length, 2, 'bulk assignment must write one audit entry per selected row');
+  assert.deepEqual(
+    bulkAudits.map((row) => Number(row.target_id)).sort((a, b) => a - b),
+    [firstId, secondId].sort((a, b) => a - b)
+  );
+  for (const row of bulkAudits) {
+    assert.equal(row.target_type, 'audit');
+    assert.equal(Number(row.facility_id), FACILITY_ID);
+    assert.match(row.detail, /Bulk-assigned facility/i);
+  }
 });

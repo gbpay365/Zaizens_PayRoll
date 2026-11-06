@@ -205,39 +205,64 @@ var _calcLabels = {
     </div>
   </form>
 
-  <form method="POST" action="/payroll/settings/allowances/save" class="pay-settings-pane" data-pay-settings-pane="allowances" <%= _initialTab === 'allowances' ? '' : 'hidden' %>>
-    <input type="hidden" name="sector" value="<%= _activeSector %>">
-    <div class="p-3 p-md-4">
-      <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+  <div class="pay-settings-pane allowance-settings p-3 p-md-4" data-pay-settings-pane="allowances" <%= _initialTab === 'allowances' ? '' : 'hidden' %>>
+    <div class="allowance-header">
+      <div class="allowance-head-main">
+        <span class="allowance-head-icon" aria-hidden="true"><i class="fa fa-gift"></i></span>
         <div>
-          <h2 class="h6 font-weight-bold mb-1"><%= _t('settings.tab_allowances', { ns: 'payroll', defaultValue: 'Allowances & Bonuses' }) %></h2>
-          <div class="small text-muted"><%= _t('settings.sector_label', { ns: 'payroll', defaultValue: 'Sector:' }) %>
-            <% Object.keys(_allSectors).forEach(function(secKey) {
-              var isActive = secKey === _activeSector;
-            %>
-            <a href="/payroll/settings?sector=<%= secKey %>&tab=allowances" class="badge ml-1 <%= isActive ? 'badge-success' : 'badge-light border' %>"><%= _allSectors[secKey] %></a>
-            <% }); %>
-          </div>
+          <h2><%= _t('settings.tab_allowances', { ns: 'payroll', defaultValue: 'Allowances & Bonuses' }) %></h2>
+          <p><%= _t('settings.allowances_hint', { ns: 'payroll', defaultValue: 'Statutory rates and caps used by payroll runs for this facility.' }) %></p>
         </div>
-        <% if (_canEdit && _activeSector === 'medical') { %>
+      </div>
+      <% if (_canEdit && _activeSector === 'medical') { %>
+      <div class="allowance-header-actions">
         <a href="/payroll/settings/allowances/repair?sector=<%= _activeSector %>" class="btn btn-sm hms-btn-secondary"
            data-pay-confirm="<%= _t('settings.restore_confirm', { ns: 'payroll', defaultValue: 'Restore medical allowance rates and legal references to Cameroon defaults?' }) %>"
            onclick="return window.HmsPayroll && window.HmsPayroll.confirmPayAction(this.getAttribute('data-pay-confirm'));">
           <i class="fa fa-undo mr-1"></i><%= _t('settings.restore_medical', { ns: 'payroll', defaultValue: 'Restore medical defaults' }) %>
         </a>
-        <% } %>
       </div>
+      <% } %>
+    </div>
 
-      <div class="pay-table-wrap">
-        <table class="pay-table">
+    <div class="allowance-toolbar">
+      <form method="GET" action="/payroll/settings" class="allowance-sector-form">
+        <input type="hidden" name="tab" value="allowances">
+        <label for="allowanceSectorSelect"><%= _t('settings.sector_defaults', { ns: 'payroll', defaultValue: 'Sector defaults' }) %></label>
+        <div class="allowance-select-wrap">
+          <select id="allowanceSectorSelect" name="sector" class="form-control form-control-sm" onchange="this.form.submit()">
+            <% Object.keys(_allSectors).forEach(function(secKey) { %>
+            <option value="<%= secKey %>" <%= secKey === _activeSector ? 'selected' : '' %>><%= _allSectors[secKey] %></option>
+            <% }); %>
+          </select>
+          <i class="fa fa-chevron-down" aria-hidden="true"></i>
+        </div>
+        <noscript><button type="submit" class="btn btn-sm hms-btn-secondary"><%= _t('monthly.apply', { ns: 'payroll', defaultValue: 'Apply' }) %></button></noscript>
+      </form>
+      <span class="allowance-sector-note"><i class="fa fa-info-circle mr-1" aria-hidden="true"></i><%= _t('settings.sector_scope_note', { ns: 'payroll', defaultValue: 'Applies to this facility’s next payroll run.' }) %></span>
+    </div>
+
+    <form method="POST" action="/payroll/settings/allowances/save" class="allowance-form">
+      <input type="hidden" name="sector" value="<%= _activeSector %>">
+      <div class="pay-table-wrap allowance-table-wrap">
+        <table class="pay-table allowance-table">
+          <caption class="sr-only"><%= _t('settings.tab_allowances', { ns: 'payroll', defaultValue: 'Allowances & Bonuses' }) %></caption>
+          <colgroup>
+            <col class="allowance-col-on">
+            <col class="allowance-col-label">
+            <col class="allowance-col-formula">
+            <col class="allowance-col-rate">
+            <col class="allowance-col-cap">
+            <col class="allowance-col-legal">
+          </colgroup>
           <thead>
             <tr>
-              <th><%= _t('settings.col_on', { ns: 'payroll', defaultValue: 'On' }) %></th>
-              <th><%= _t('settings.col_label', { ns: 'payroll', defaultValue: 'Label (EN / FR)' }) %></th>
-              <th><%= _t('settings.col_formula', { ns: 'payroll', defaultValue: 'Formula type' }) %></th>
-              <th><%= _t('settings.col_rate', { ns: 'payroll', defaultValue: 'Rate / Amt' }) %></th>
-              <th><%= _t('settings.col_cap', { ns: 'payroll', defaultValue: 'Cap %' }) %></th>
-              <th><%= _t('settings.col_legal', { ns: 'payroll', defaultValue: 'Legal basis' }) %></th>
+              <th scope="col" class="allowance-col-on"><%= _t('settings.col_on', { ns: 'payroll', defaultValue: 'On' }) %></th>
+              <th scope="col"><%= _t('settings.col_label', { ns: 'payroll', defaultValue: 'Label (EN / FR)' }) %></th>
+              <th scope="col"><%= _t('settings.col_formula', { ns: 'payroll', defaultValue: 'Formula type' }) %></th>
+              <th scope="col"><%= _t('settings.col_rate', { ns: 'payroll', defaultValue: 'Rate / amount' }) %></th>
+              <th scope="col"><%= _t('settings.col_cap', { ns: 'payroll', defaultValue: 'Cap %' }) %></th>
+              <th scope="col"><%= _t('settings.col_legal', { ns: 'payroll', defaultValue: 'Legal basis' }) %></th>
             </tr>
           </thead>
           <tbody>
@@ -246,8 +271,8 @@ var _calcLabels = {
             var calcType = String(row.calc_type || 'none');
             var enabled = row.enabled === 1 || row.enabled === '1' || row.enabled === true;
           %>
-            <tr>
-              <td>
+            <tr class="allowance-row" data-allowance-row>
+              <td class="allowance-col-on">
                 <input type="hidden" name="allowance_code[]" value="<%= code %>">
                 <input type="hidden" name="allowance_label[]" value="<%= row.label || '' %>">
                 <input type="hidden" name="allowance_label_fr[]" value="<%= row.label_fr || '' %>">
@@ -255,18 +280,18 @@ var _calcLabels = {
                 <input type="hidden" name="allowance_applies_roles[]" value="<%= row.applies_to_roles || '' %>">
                 <input type="hidden" name="allowance_description[]" value="<%= row.description || '' %>">
                 <% if (_canEdit) { %>
-                <input type="checkbox" name="allowance_enabled[]" value="<%= code %>" <%= enabled ? 'checked' : '' %> title="<%= _t('settings.enable_allowance', { ns: 'payroll', defaultValue: 'Enable this allowance' }) %>">
+                <input type="checkbox" class="allowance-row-check" name="allowance_enabled[]" value="<%= code %>" <%= enabled ? 'checked' : '' %> title="<%= _t('settings.enable_allowance', { ns: 'payroll', defaultValue: 'Enable this allowance' }) %>">
                 <% } else { %>
-                <input type="checkbox" disabled <%= enabled ? 'checked' : '' %>>
+                <input type="checkbox" class="allowance-row-check" disabled <%= enabled ? 'checked' : '' %>>
                 <% } %>
               </td>
-              <td>
-                <strong><%= row.label || code %></strong>
-                <% if (row.label_fr && row.label_fr !== row.label) { %><br><small class="text-muted"><%= row.label_fr %></small><% } %>
+              <td class="allowance-col-label">
+                <span class="allowance-label-en"><%= row.label || code %></span>
+                <% if (row.label_fr && row.label_fr !== row.label) { %><span class="allowance-label-fr"><%= row.label_fr %></span><% } %>
               </td>
-              <td>
+              <td class="allowance-col-formula">
                 <% if (_canEdit) { %>
-                <select name="allowance_calc_type[]" class="form-control form-control-sm">
+                <select name="allowance_calc_type[]" class="form-control form-control-sm allowance-formula-select" data-allowance-calc aria-label="<%= _t('settings.col_formula', { ns: 'payroll', defaultValue: 'Formula type' }) %> — <%= row.label || code %>">
                   <% ['seniority_scale','pct_basic','fixed','per_shift','none'].forEach(function(ct) { %>
                   <option value="<%= ct %>" <%= calcType === ct ? 'selected' : '' %>><%= _calcLabels[ct] || ct %></option>
                   <% }); %>
@@ -276,35 +301,68 @@ var _calcLabels = {
                 <input type="hidden" name="allowance_calc_type[]" value="<%= calcType %>">
                 <% } %>
               </td>
-              <td>
+              <td class="allowance-col-rate">
                 <% if (_canEdit) { %>
-                <input type="number" step="0.01" name="allowance_pct_value[]" class="form-control form-control-sm mb-1" value="<%= row.pct_value != null && row.pct_value !== '' ? row.pct_value : '' %>" placeholder="%" title="% of basic">
-                <input type="number" step="1" name="allowance_fixed_amount[]" class="form-control form-control-sm mb-1" value="<%= row.fixed_amount != null && row.fixed_amount !== '' ? row.fixed_amount : '' %>" placeholder="XAF fixed">
-                <input type="number" step="1" name="allowance_per_unit_amount[]" class="form-control form-control-sm" value="<%= row.per_unit_amount != null && row.per_unit_amount !== '' ? row.per_unit_amount : '' %>" placeholder="XAF / shift">
-                <% if (calcType === 'seniority_scale') { %><small class="text-muted"><%= _t('settings.rate_auto_hire', { ns: 'payroll', defaultValue: '(auto — hire date)' }) %></small><% } %>
+                <div class="allowance-rate-fields">
+                  <div class="allowance-field" data-amount-for="pct_basic" <% if (calcType !== 'pct_basic') { %>hidden<% } %>>
+                    <div class="input-group input-group-sm allowance-rate-group">
+                      <input type="number" step="0.01" min="0" max="100" name="allowance_pct_value[]" class="form-control" value="<%= row.pct_value != null && row.pct_value !== '' ? row.pct_value : '' %>" placeholder="0" inputmode="decimal" aria-label="<%= _t('settings.col_rate', { ns: 'payroll', defaultValue: 'Rate / amount' }) %> — <%= row.label || code %>">
+                      <div class="input-group-append"><span class="input-group-text">%</span></div>
+                    </div>
+                    <span class="allowance-field-hint"><%= _t('settings.rate_of_basic', { ns: 'payroll', defaultValue: 'of basic salary' }) %></span>
+                  </div>
+                  <div class="allowance-field" data-amount-for="fixed" <% if (calcType !== 'fixed') { %>hidden<% } %>>
+                    <div class="input-group input-group-sm allowance-rate-group">
+                      <div class="input-group-prepend"><span class="input-group-text">XAF</span></div>
+                      <input type="number" step="1" min="0" name="allowance_fixed_amount[]" class="form-control" value="<%= row.fixed_amount != null && row.fixed_amount !== '' ? row.fixed_amount : '' %>" placeholder="0" inputmode="numeric" aria-label="<%= _t('settings.col_rate', { ns: 'payroll', defaultValue: 'Rate / amount' }) %> — <%= row.label || code %>">
+                    </div>
+                    <span class="allowance-field-hint"><%= _t('settings.rate_per_month', { ns: 'payroll', defaultValue: 'per month' }) %></span>
+                  </div>
+                  <div class="allowance-field" data-amount-for="per_shift" <% if (calcType !== 'per_shift') { %>hidden<% } %>>
+                    <div class="input-group input-group-sm allowance-rate-group">
+                      <div class="input-group-prepend"><span class="input-group-text">XAF</span></div>
+                      <input type="number" step="1" min="0" name="allowance_per_unit_amount[]" class="form-control" value="<%= row.per_unit_amount != null && row.per_unit_amount !== '' ? row.per_unit_amount : '' %>" placeholder="0" inputmode="numeric" aria-label="<%= _t('settings.col_rate', { ns: 'payroll', defaultValue: 'Rate / amount' }) %> — <%= row.label || code %>">
+                      <div class="input-group-append"><span class="input-group-text">/ shift</span></div>
+                    </div>
+                    <span class="allowance-field-hint"><%= _t('settings.rate_per_shift', { ns: 'payroll', defaultValue: 'per shift worked' }) %></span>
+                  </div>
+                  <div class="allowance-auto-note" data-amount-for="seniority_scale" <% if (calcType !== 'seniority_scale') { %>hidden<% } %>>
+                    <i class="fa fa-magic" aria-hidden="true"></i><span><%= _t('settings.rate_auto', { ns: 'payroll', defaultValue: 'Automatic from hire date' }) %></span>
+                  </div>
+                  <div class="allowance-auto-note" data-amount-for="none" <% if (calcType !== 'none') { %>hidden<% } %>>
+                    <i class="fa fa-ban" aria-hidden="true"></i><span><%= _t('settings.rate_none', { ns: 'payroll', defaultValue: 'No amount applied' }) %></span>
+                  </div>
+                </div>
                 <% } else { %>
-                <% if (row.pct_value != null && row.pct_value !== '') { %><%= row.pct_value %>%<% } %>
-                <% if (row.fixed_amount != null && row.fixed_amount !== '') { %><%= row.fixed_amount %> XAF<% } %>
-                <% if (row.per_unit_amount != null && row.per_unit_amount !== '') { %><%= row.per_unit_amount %> / shift<% } %>
+                <span class="allowance-readonly-value">
+                  <% if (calcType === 'pct_basic') { %><%= row.pct_value != null && row.pct_value !== '' ? row.pct_value + '%' : '—' %><% } %>
+                  <% if (calcType === 'fixed') { %><%= row.fixed_amount != null && row.fixed_amount !== '' ? row.fixed_amount + ' XAF' : '—' %><% } %>
+                  <% if (calcType === 'per_shift') { %><%= row.per_unit_amount != null && row.per_unit_amount !== '' ? row.per_unit_amount + ' XAF / shift' : '—' %><% } %>
+                  <% if (calcType === 'seniority_scale') { %><%= _t('settings.rate_auto', { ns: 'payroll', defaultValue: 'Automatic from hire date' }) %><% } %>
+                  <% if (calcType === 'none') { %>—<% } %>
+                </span>
                 <input type="hidden" name="allowance_pct_value[]" value="<%= row.pct_value != null ? row.pct_value : '' %>">
                 <input type="hidden" name="allowance_fixed_amount[]" value="<%= row.fixed_amount != null ? row.fixed_amount : '' %>">
                 <input type="hidden" name="allowance_per_unit_amount[]" value="<%= row.per_unit_amount != null ? row.per_unit_amount : '' %>">
                 <% if (!enabled && _canEdit === false) { %><input type="hidden" name="allowance_enabled[]" value="<%= code %>"><% } %>
                 <% } %>
               </td>
-              <td>
+              <td class="allowance-col-cap">
                 <% if (_canEdit) { %>
-                <input type="number" step="0.01" name="allowance_cap_pct[]" class="form-control form-control-sm" value="<%= row.cap_pct != null && row.cap_pct !== '' ? row.cap_pct : '' %>" placeholder="<%= _t('settings.no_cap', { ns: 'payroll', defaultValue: 'No cap on this allowance type' }) %>">
+                <div class="input-group input-group-sm allowance-cap-group">
+                  <input type="number" step="0.01" min="0" max="100" name="allowance_cap_pct[]" class="form-control" value="<%= row.cap_pct != null && row.cap_pct !== '' ? row.cap_pct : '' %>" placeholder="—" title="<%= _t('settings.no_cap', { ns: 'payroll', defaultValue: 'No cap on this allowance type' }) %>" aria-label="<%= _t('settings.col_cap', { ns: 'payroll', defaultValue: 'Cap %' }) %> — <%= row.label || code %>">
+                  <div class="input-group-append"><span class="input-group-text">%</span></div>
+                </div>
                 <% } else { %>
-                <%= row.cap_pct != null && row.cap_pct !== '' ? row.cap_pct + '%' : '—' %>
+                <span class="allowance-readonly-value"><%= row.cap_pct != null && row.cap_pct !== '' ? row.cap_pct + '%' : '—' %></span>
                 <input type="hidden" name="allowance_cap_pct[]" value="<%= row.cap_pct != null ? row.cap_pct : '' %>">
                 <% } %>
               </td>
-              <td class="small">
+              <td class="allowance-col-legal">
                 <% if (_canEdit) { %>
-                <input type="text" name="allowance_legal_basis[]" class="form-control form-control-sm" value="<%= row.legal_basis || '' %>">
+                <input type="text" name="allowance_legal_basis[]" class="form-control form-control-sm allowance-legal-input" maxlength="255" value="<%= row.legal_basis || '' %>" aria-label="<%= _t('settings.col_legal', { ns: 'payroll', defaultValue: 'Legal basis' }) %> — <%= row.label || code %>">
                 <% } else { %>
-                <%= row.legal_basis || '—' %>
+                <span class="allowance-legal-text"><%= row.legal_basis || '—' %></span>
                 <input type="hidden" name="allowance_legal_basis[]" value="<%= row.legal_basis || '' %>">
                 <% } %>
               </td>
@@ -314,13 +372,14 @@ var _calcLabels = {
         </table>
       </div>
 
-      <% if (_canEdit) { %>
-      <div class="text-right mt-3">
+      <div class="allowance-footer">
+        <span class="allowance-footer-note"><i class="fa fa-shield mr-1" aria-hidden="true"></i><%= _t('settings.allowances_save_note', { ns: 'payroll', defaultValue: 'Changes apply to this facility and are used by the next payroll run.' }) %></span>
+        <% if (_canEdit) { %>
         <button type="submit" class="btn hms-btn-primary font-weight-bold"><i class="fa fa-save mr-1"></i><%= _t('settings.save_allowances', { ns: 'payroll', defaultValue: 'Save allowance settings' }) %></button>
+        <% } %>
       </div>
-      <% } %>
-    </div>
-  </form>
+    </form>
+  </div>
 </div>
 
 <style>
@@ -331,6 +390,124 @@ var _calcLabels = {
   }
   .pay-settings-tab:hover { background: #e2e8f0; color: #1e293b; }
   .pay-settings-tab.active { background: #059669; color: #fff; }
+
+  /* Allowances & Bonuses */
+  .allowance-settings { background: #fff; }
+  .allowance-header {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+    padding-bottom: 16px; border-bottom: 1px solid #eef2f7;
+  }
+  .allowance-head-main { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+  .allowance-head-icon {
+    width: 40px; height: 40px; flex: 0 0 40px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 10px; background: #ecfdf5; color: #047857; font-size: 1rem;
+    box-shadow: inset 0 0 0 1px #d1fae5;
+  }
+  .allowance-head-main h2 { margin: 0 0 3px; font-size: 1rem; line-height: 1.3; font-weight: 800; color: #0f172a; }
+  .allowance-head-main p { margin: 0; max-width: 680px; font-size: 0.78rem; line-height: 1.45; color: #64748b; }
+  .allowance-header-actions { flex: 0 0 auto; }
+  .allowance-header-actions .btn { white-space: nowrap; }
+
+  .allowance-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    margin: 16px 0; padding: 11px 13px;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+  }
+  .allowance-sector-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+  .allowance-sector-form label {
+    margin: 0; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em;
+    text-transform: uppercase; color: #64748b; white-space: nowrap;
+  }
+  .allowance-select-wrap { position: relative; flex: 1 1 300px; min-width: 300px; max-width: 440px; }
+  .allowance-select-wrap select.form-control {
+    appearance: none; -webkit-appearance: none; cursor: pointer; width: 100%;
+    height: 34px; padding: 5px 32px 5px 10px;
+    border-color: #cbd5e1; background: #fff; color: #334155; font-size: 0.8rem; font-weight: 600;
+  }
+  .allowance-select-wrap select.form-control:focus { border-color: #059669; box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12); }
+  .allowance-select-wrap > .fa {
+    position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+    pointer-events: none; font-size: 0.68rem; color: #64748b;
+  }
+  .allowance-sector-note { margin-left: auto; font-size: 0.72rem; color: #64748b; }
+
+  .allowance-table-wrap {
+    overflow: auto; -webkit-overflow-scrolling: touch;
+    border: 1px solid #e2e8f0; border-radius: 10px;
+  }
+  .allowance-settings .allowance-table { min-width: 900px; table-layout: fixed; margin: 0; }
+  .allowance-settings .allowance-table thead th {
+    position: sticky; top: 0; z-index: 1; padding: 10px 12px;
+    background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+    color: #475569; font-size: 0.65rem; font-weight: 800;
+    letter-spacing: 0.055em; text-transform: uppercase; white-space: nowrap;
+  }
+  .allowance-settings .allowance-table tbody td { padding: 12px; vertical-align: middle; }
+  .allowance-col-on { width: 48px; }
+  .allowance-col-label { width: 24%; }
+  .allowance-col-formula { width: 18%; }
+  .allowance-col-rate { width: 18%; }
+  .allowance-col-cap { width: 12%; }
+  .allowance-col-legal { width: 26%; }
+
+  .allowance-row-check { width: 16px; height: 16px; margin: 0; vertical-align: middle; cursor: pointer; accent-color: #059669; }
+  .allowance-label-en { display: block; color: #0f172a; font-size: 0.8rem; font-weight: 700; line-height: 1.35; }
+  .allowance-label-fr { display: block; margin-top: 2px; color: #64748b; font-size: 0.7rem; line-height: 1.35; }
+
+  .allowance-settings .allowance-table .form-control {
+    height: 32px; padding: 4px 8px; border-color: #cbd5e1; color: #0f172a; font-size: 0.8rem;
+  }
+  .allowance-settings .allowance-table .form-control:focus { border-color: #059669; box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.1); }
+  .allowance-formula-select { padding-right: 24px !important; }
+  .allowance-rate-fields { display: flex; flex-direction: column; gap: 5px; }
+  .allowance-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .allowance-field[hidden], .allowance-auto-note[hidden] { display: none !important; }
+  .allowance-rate-group { width: 100%; max-width: 190px; }
+  .allowance-rate-group .form-control { min-width: 0; text-align: right; font-variant-numeric: tabular-nums; }
+  .allowance-settings .allowance-table .input-group-text {
+    padding: 4px 7px; border-color: #cbd5e1; background: #f8fafc;
+    color: #475569; font-size: 0.65rem; font-weight: 700; white-space: nowrap;
+  }
+  .allowance-field-hint { color: #94a3b8; font-size: 0.65rem; line-height: 1.2; }
+  .allowance-auto-note {
+    display: inline-flex; align-items: center; gap: 6px; max-width: 190px;
+    padding: 6px 8px; border: 1px dashed #cbd5e1; border-radius: 7px;
+    background: #f8fafc; color: #64748b; font-size: 0.7rem; line-height: 1.25;
+  }
+  .allowance-auto-note .fa { color: #94a3b8; }
+  .allowance-cap-group { max-width: 112px; }
+  .allowance-settings .allowance-table .allowance-cap-group .form-control {
+    min-width: 0; padding-left: 5px; padding-right: 5px;
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .allowance-settings .allowance-table .allowance-cap-group input[type=number] {
+    -moz-appearance: textfield; appearance: textfield;
+  }
+  .allowance-settings .allowance-table .allowance-cap-group input[type=number]::-webkit-outer-spin-button,
+  .allowance-settings .allowance-table .allowance-cap-group input[type=number]::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .allowance-legal-input { font-size: 0.74rem !important; text-overflow: ellipsis; }
+  .allowance-legal-text { display: block; color: #475569; font-size: 0.72rem; line-height: 1.4; overflow-wrap: anywhere; }
+  .allowance-readonly-value { color: #0f172a; font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .allowance-footer {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+    margin-top: 16px;
+  }
+  .allowance-footer-note { color: #64748b; font-size: 0.72rem; line-height: 1.4; }
+
+  @media (max-width: 991.98px) {
+    .allowance-sector-note { width: 100%; margin-left: 0; }
+  }
+  @media (max-width: 767.98px) {
+    .allowance-header { flex-direction: column; }
+    .allowance-header-actions { width: 100%; }
+    .allowance-header-actions .btn { width: 100%; }
+    .allowance-select-wrap { flex: 1 1 220px; min-width: 0; }
+    .allowance-footer { align-items: stretch; }
+    .allowance-footer .btn { width: 100%; }
+  }
 </style>
 
 <script>
@@ -397,6 +574,27 @@ var _calcLabels = {
   secSel.addEventListener('change', applyPreset);
   if (applyBtn) applyBtn.addEventListener('click', applyPreset);
   render(currentPreset());
+})();
+
+/** Show only the rate control that matches each row's selected formula. */
+(function () {
+  function syncAllowanceRate(row) {
+    var select = row.querySelector('[data-allowance-calc]');
+    if (!select) return;
+    var type = select.value;
+    row.querySelectorAll('[data-amount-for]').forEach(function (field) {
+      var matches = (field.getAttribute('data-amount-for') || '').split(/\s+/).indexOf(type) !== -1;
+      field.hidden = !matches;
+    });
+  }
+
+  document.querySelectorAll('[data-allowance-row]').forEach(function (row) {
+    var select = row.querySelector('[data-allowance-calc]');
+    if (select) {
+      select.addEventListener('change', function () { syncAllowanceRate(row); });
+    }
+    syncAllowanceRate(row);
+  });
 })();
 </script>
 

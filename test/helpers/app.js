@@ -6,13 +6,15 @@ const { once } = require('node:events');
 function makeApp(register, pool, options = {}) {
   const app = express();
   const actorId = Number(options.actorId) || 7;
+  const role = String(options.role || '1');
+  const userPerms = Array.isArray(options.userPerms) ? options.userPerms : ['*'];
   app.use(express.urlencoded({ extended: false }));
   app.use((req, res, next) => {
     req.session = {
-      user: { id: actorId, name: 'Test Admin', username: 'testadmin', role: '1' },
+      user: { id: actorId, name: 'Test Admin', username: 'testadmin', role },
       facilityId: 1,
     };
-    res.locals.userPerms = ['*'];
+    res.locals.userPerms = userPerms;
     next();
   });
   app.use((req, res, next) => {

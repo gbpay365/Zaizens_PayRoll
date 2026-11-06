@@ -823,6 +823,238 @@ module.exports = function registerAdminRoutes(app, pool, requireAuth) {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
+  // Audit integrity
+  // ═══════════════════════════════════════════════════════════════════════
+  app.get('/admin/audit-integrity', requireAuth, requireAdminModule, async (req, res) => {
+    try {
+      await schema();
+      const [rawRows] = await pool.query(
+        `SELECT a.id, a.created_at, a.actor_name, a.action, a.target_type, a.target_id,
+                a.detail, a.ip, a.facility_id,
+                e.id AS matched_employee_id, e.first_name, e.last_name,
+                e.employee_id AS matricule, e.default_facility_id AS employee_facility_id
+           FROM tbl_admin_audit a
+           LEFT JOIN tbl_employee e
+             ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+          WHERE a.facility_id IS NULL
+            AND (e.id IS NULL OR e.default_facility_id IS NULL)
+          ORDER BY a.created_at DESC, a.id DESC
+          LIMIT 500`
+      );
+      const [[counts]] = await pool.query(
+        `SELECT COUNT(*) AS total_null,
+                COALESCE(SUM(CASE WHEN e.id IS NULL OR e.default_facility_id IS NULL THEN 1 ELSE 0 END), 0) AS unresolved
+           FROM tbl_admin_audit a
+           LEFT JOIN tbl_employee e
+             ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+          WHERE a.facility_id IS NULL`
+      );
+      const [facilityRows] = await pool.query(
+        'SELECT id, code, name, status FROM tbl_facility ORDER BY id ASC'
+      );
+
+      const rows = (rawRows || []).map((row) => {
+        let reason = 'Not linked to an employee record';
+        if (String(row.target_type || '').toLowerCase() === 'employee') {
+          reason = row.matched_employee_id == null
+            ? 'Target employee no longer exists'
+            : 'Employee has no default facility';
+        }
+        return { ...row, resolution_reason: reason };
+      });
+
+      const totalNull = Number(counts && counts.total_null) || 0;
+      const unresolved = Number(counts && counts.unresolved) || 0;
+      res.render('admin-audit-integrity', {
+        title: 'Audit integrity — Administration',
+        payNavActive: 'admin-audit-integrity',
+        rows,
+        facilities: facilityRows || [],
+        stats: {
+          totalNull,
+          unresolved,
+          resolvable: Math.max(0, totalNull - unresolved),
+        },
+        flash: req.query.msg || null,
+        error: req.query.err || null,
+      });
+    } catch (e) {
+      console.error('[admin/audit-integrity]', e.message);
+      res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });
+    }
+  });
+
+  app.post('/admin/audit-integrity/:id/assign', requireAuth, requireAdminModule, async (req, res) => {
+    const auditId = parseInt(req.params.id, 10) || 0;
+    const facilityId = parseInt(req.body.facility_id, 10) || 0;
+    const back = '/admin/audit-integrity';
+    const fail = (message) => res.redirect(back + '?err=' + encodeURIComponent(message));
+    if (auditId < 1) return fail('Invalid audit row.');
+    if (facilityId < 1) return fail('Select a facility.');
+
+    try {
+      await schema();
+      const [[facility]] = await pool.query(
+        'SELECT id, name FROM tbl_facility WHERE id = ? LIMIT 1',
+        [facilityId]
+      );
+      if (!facility) return fail('Facility not found.');
+
+      const [[audit]] = await pool.query(
+        `SELECT a.id, a.action, a.target_type, a.target_id, a.facility_id,
+                e.id AS matched_employee_id, e.default_facility_id AS employee_facility_id
+           FROM tbl_admin_audit a
+           LEFT JOIN tbl_employee e
+             ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+          WHERE a.id = ? LIMIT 1`,
+        [auditId]
+      );
+      if (!audit) return fail('Audit row not found.');
+      if (audit.facility_id != null) return fail('This audit row already has a facility.');
+
+      const resolvable = String(audit.target_type || '').toLowerCase() === 'employee'
+        && audit.matched_employee_id != null
+        && audit.employee_facility_id != null;
+      if (resolvable) {
+        return fail('This audit row can still be resolved from employee data and is not listed for manual assignment.');
+      }
+
+      const [result] = await pool.query(
+        `UPDATE tbl_admin_audit a
+           LEFT JOIN tbl_employee e
+             ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+            SET a.facility_id = ?
+          WHERE a.id = ? AND a.facility_id IS NULL
+            AND (e.id IS NULL OR e.default_facility_id IS NULL)`,
+        [facilityId, auditId]
+      );
+      if (!result.affectedRows) {
+        return fail('This audit row could not be assigned. Refresh the report and try again.');
+      }
+
+      const facilityLabel = facility.name || `#${facilityId}`;
+      await logAdminAction(pool, req, 'audit.facility_assign', {
+        targetType: 'audit',
+        targetId: auditId,
+        facilityId,
+        detail: `Assigned facility ${facilityLabel} (#${facilityId}) to audit row #${auditId} ` +
+          `(${audit.action || 'unknown action'}, target ${audit.target_type || '—'} ${audit.target_id || ''}).`,
+      });
+      return res.redirect(
+        back + '?msg=' + encodeURIComponent(`Facility ${facilityLabel} assigned to audit row #${auditId}.`)
+      );
+    } catch (e) {
+      console.error('[admin/audit-integrity/assign]', e.message);
+      return fail(e.message);
+    }
+  });
+
+  app.post('/admin/audit-integrity/assign', requireAuth, requireAdminModule, async (req, res) => {
+    const facilityId = parseInt(req.body.facility_id, 10) || 0;
+    const back = '/admin/audit-integrity';
+    const fail = (message) => res.redirect(back + '?err=' + encodeURIComponent(message));
+    const rawIds = [].concat(req.body['audit_ids[]'] || req.body.audit_ids || []);
+    const ids = [...new Set(rawIds.map((value) => parseInt(value, 10)).filter((id) => id > 0))];
+
+    if (!ids.length) return fail('Select at least one audit row.');
+    if (ids.length > 500) return fail('Select no more than 500 audit rows at a time.');
+    if (facilityId < 1) return fail('Select a facility.');
+
+    let conn = null;
+    try {
+      await schema();
+      const [[facility]] = await pool.query(
+        'SELECT id, name FROM tbl_facility WHERE id = ? LIMIT 1',
+        [facilityId]
+      );
+      if (!facility) return fail('Facility not found.');
+
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+      const placeholders = ids.map(() => '?').join(',');
+      const [auditRows] = await conn.query(
+        `SELECT a.id, a.action, a.target_type, a.target_id, a.facility_id,
+                e.id AS matched_employee_id, e.default_facility_id AS employee_facility_id
+           FROM tbl_admin_audit a
+           LEFT JOIN tbl_employee e
+             ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+          WHERE a.id IN (${placeholders})
+          ORDER BY a.id ASC
+            FOR UPDATE`,
+        ids
+      );
+      const rowsById = new Map((auditRows || []).map((row) => [Number(row.id), row]));
+      if (ids.some((id) => !rowsById.has(id))) {
+        await conn.rollback();
+        return fail('Some selected audit rows no longer exist. Refresh the report and try again.');
+      }
+
+      const assigned = (auditRows || []).filter((row) => row.facility_id != null);
+      if (assigned.length) {
+        await conn.rollback();
+        return fail(
+          `${assigned.length} selected audit row${assigned.length === 1 ? '' : 's'} already ` +
+          `${assigned.length === 1 ? 'has' : 'have'} a facility. Refresh the report and try again.`
+        );
+      }
+
+      const resolvable = (auditRows || []).filter((row) =>
+        String(row.target_type || '').toLowerCase() === 'employee' &&
+        row.matched_employee_id != null &&
+        row.employee_facility_id != null
+      );
+      if (resolvable.length) {
+        await conn.rollback();
+        return fail(
+          `${resolvable.length} selected audit row${resolvable.length === 1 ? '' : 's'} can still be ` +
+          'resolved from employee data and cannot be manually assigned. Refresh the report and try again.'
+        );
+      }
+
+      const [result] = await conn.query(
+        `UPDATE tbl_admin_audit a
+           LEFT JOIN tbl_employee e
+             ON a.target_type = 'employee' AND CAST(e.id AS CHAR) = a.target_id
+            SET a.facility_id = ?
+          WHERE a.id IN (${placeholders}) AND a.facility_id IS NULL
+            AND (e.id IS NULL OR e.default_facility_id IS NULL)`,
+        [facilityId, ...ids]
+      );
+      if (Number(result.affectedRows) !== ids.length) {
+        await conn.rollback();
+        return fail('The selected audit rows could not all be assigned. Refresh the report and try again.');
+      }
+
+      await conn.commit();
+      conn.release();
+      conn = null;
+
+      const facilityLabel = facility.name || `#${facilityId}`;
+      for (const audit of auditRows) {
+        await logAdminAction(pool, req, 'audit.facility_assign', {
+          targetType: 'audit',
+          targetId: audit.id,
+          facilityId,
+          detail: `Bulk-assigned facility ${facilityLabel} (#${facilityId}) to audit row #${audit.id} ` +
+            `(${audit.action || 'unknown action'}, target ${audit.target_type || '—'} ${audit.target_id || ''}) ` +
+            `as part of a ${ids.length}-row selection.`,
+        });
+      }
+      return res.redirect(
+        back + '?msg=' + encodeURIComponent(
+          `Facility ${facilityLabel} assigned to ${ids.length} audit row${ids.length === 1 ? '' : 's'}.`
+        )
+      );
+    } catch (e) {
+      if (conn) await conn.rollback().catch(() => {});
+      console.error('[admin/audit-integrity/assign-bulk]', e.message);
+      return fail(e.message);
+    } finally {
+      if (conn) conn.release();
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
   // Own password
   // ═══════════════════════════════════════════════════════════════════════
   app.get('/account/password', requireAuth, async (req, res) => {

@@ -1,0 +1,195 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'admin-audit-integrity' }) %>
+<%
+var _rows = rows || [];
+var _facilities = facilities || [];
+var _s = stats || {};
+var _fmtWhen = function (v) {
+  if (!v) return '—';
+  var d = new Date(v);
+  if (isNaN(d.getTime())) return String(v);
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+var _actionLabel = function (a) {
+  return String(a || '').replace(/[._]/g, ' ').replace(/\b\w/g, function (ch) { return ch.toUpperCase(); });
+};
+var _name = function (row) {
+  return [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
+};
+var _facilityOption = function (f) {
+  return (f.name || ('Facility ' + f.id)) +
+    (f.code ? ' · ' + f.code : '') +
+    (Number(f.status) === 1 ? '' : ' (inactive)');
+};
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow">Administration &middot; Audit</p>
+    <h1>Audit integrity</h1>
+    <p class="sage-sub">Audit rows with no facility scope that cannot be recovered from an employee record. The boot-time backfill repairs employee-linked payroll rows when the employee still has a default facility.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/admin/activity" class="btn btn-sage-ghost"><i class="fa fa-history mr-1"></i> Activity trail</a>
+    <a href="/admin" class="btn btn-sage-ghost"><i class="fa fa-dashboard mr-1"></i> Overview</a>
+  </div>
+</div>
+
+<%- include('partials/admin-tabs') %>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Null-facility rows</div>
+    <div class="sage-stat-value"><%= _s.totalNull || 0 %></div>
+    <p class="sage-stat-foot">All audit rows without a facility</p>
+  </div>
+  <div class="sage-stat <%= (_s.unresolved || 0) > 0 ? 'sage-stat--warn' : '' %>">
+    <div class="sage-stat-label">Unresolved</div>
+    <div class="sage-stat-value"><%= _s.unresolved || 0 %></div>
+    <p class="sage-stat-foot">No employee source can supply the facility</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Recoverable</div>
+    <div class="sage-stat-value"><%= _s.resolvable || 0 %></div>
+    <p class="sage-stat-foot">Employee default facility is still available</p>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head">
+    <div><h2>Unresolved audit rows</h2><p class="sage-card-sub">Most recent 500 rows that require manual facility review</p></div>
+  </div>
+  <% if (_rows.length && _facilities.length) { %>
+  <div class="audit-bulk-bar no-print">
+    <form method="POST" action="/admin/audit-integrity/assign" id="auditBulkAssignForm">
+      <span class="audit-selection-count" id="auditSelectionCount" aria-live="polite">0 rows selected</span>
+      <label class="sr-only" for="auditBulkFacility">Facility for selected audit rows</label>
+      <select name="facility_id" id="auditBulkFacility" class="form-control form-control-sm" required>
+        <option value="">Choose facility…</option>
+        <% _facilities.forEach(function (f) { %>
+        <option value="<%= f.id %>"><%= _facilityOption(f) %></option>
+        <% }); %>
+      </select>
+      <button type="submit" class="btn btn-sage btn-sm" id="auditBulkAssignBtn" aria-describedby="auditBulkHint">
+        <i class="fa fa-check mr-1" aria-hidden="true"></i>Assign selected
+      </button>
+      <button type="button" class="btn btn-sage-ghost btn-sm" id="auditClearSelection" hidden>Clear</button>
+    </form>
+    <span class="audit-bulk-hint" id="auditBulkHint"><i class="fa fa-info-circle mr-1" aria-hidden="true"></i>Only selected rows that are still unresolved will be updated.</span>
+  </div>
+  <% } %>
+  <div class="pay-table-wrap">
+    <table class="pay-table">
+      <thead>
+        <tr><th class="audit-col-check no-print"><% if (_facilities.length) { %><input type="checkbox" class="audit-row-check" id="auditSelectAll" aria-label="Select all unresolved audit rows"><% } %></th><th>When</th><th>Action</th><th>Target</th><th>Administrator</th><th>Why unresolved</th><th>Assign facility</th><th>Detail</th></tr>
+      </thead>
+      <tbody>
+        <% if (!_rows.length) { %>
+        <tr><td colspan="8" class="sage-empty"><i class="fa fa-check-circle"></i>No unresolved audit rows were found.</td></tr>
+        <% } %>
+        <% _rows.forEach(function (r) { %>
+        <tr>
+          <td class="audit-col-check no-print">
+            <% if (_facilities.length) { %>
+            <input type="checkbox" class="audit-row-check" name="audit_ids[]" value="<%= r.id %>" form="auditBulkAssignForm" data-audit-row-check aria-label="Select audit row <%= r.id %>">
+            <% } %>
+          </td>
+          <td class="sage-muted" style="white-space:nowrap; font-size:12px;"><%= _fmtWhen(r.created_at) %></td>
+          <td><span class="pay-badge"><%= _actionLabel(r.action) %></span></td>
+          <td>
+            <span class="sage-mono" style="font-size:12px;"><%= r.target_type ? r.target_type + ' ' + (r.target_id || '') : '—' %></span>
+            <% if (_name(r)) { %><small class="d-block text-muted"><%= _name(r) %><%= r.matricule ? ' · ' + r.matricule : '' %></small><% } %>
+          </td>
+          <td><%= r.actor_name || 'System' %></td>
+          <td><span class="pay-badge" style="background:#fdf1dc;color:#8a4c08;"><%= r.resolution_reason %></span></td>
+          <td class="no-print">
+            <% if (_facilities.length) { %>
+            <form method="POST" action="/admin/audit-integrity/<%= r.id %>/assign" style="display:flex; gap:6px; min-width:190px; align-items:center;">
+              <select name="facility_id" class="form-control form-control-sm" required aria-label="Facility for audit row <%= r.id %>">
+                <option value="">Choose…</option>
+                <% _facilities.forEach(function (f) { %>
+                <option value="<%= f.id %>"><%= _facilityOption(f) %></option>
+                <% }); %>
+              </select>
+              <button type="submit" class="btn btn-sage btn-sm">Assign</button>
+            </form>
+            <% } else { %>
+            <span class="sage-muted" style="font-size:12px;">No facilities configured</span>
+            <% } %>
+          </td>
+          <td style="font-size:12.5px;"><%= r.detail || '' %></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+  <div class="sage-card-foot">
+    <span class="sage-muted" style="font-size:12px;">Source table <span class="sage-mono">tbl_admin_audit</span>. Single or bulk assignment updates only null-facility rows and is recorded per row in the admin audit trail.</span>
+    <span class="sage-muted" style="font-size:12px;"><%= _rows.length %> unresolved row(s)</span>
+  </div>
+</section>
+
+<style>
+  .audit-bulk-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    padding: 12px 18px; background: #fbfcfb;
+    border-bottom: 1px solid var(--sage-line-soft, #e9eeeb);
+  }
+  .audit-bulk-bar form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+  .audit-selection-count { min-width: 108px; color: #4a5a53; font-size: 12px; font-weight: 700; }
+  .audit-bulk-bar select { width: auto; min-width: 220px; max-width: 320px; }
+  .audit-bulk-hint { margin-left: auto; color: #6b7280; font-size: 11.5px; line-height: 1.4; }
+  .audit-col-check { width: 38px; text-align: center; }
+  .audit-row-check {
+    width: 15px; height: 15px; margin: 0; vertical-align: middle;
+    accent-color: var(--sage-green, #2f6f4f); cursor: pointer;
+  }
+  .audit-bulk-bar .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+  @media (max-width: 991.98px) {
+    .audit-bulk-hint { width: 100%; margin-left: 0; }
+  }
+  @media (max-width: 575.98px) {
+    .audit-bulk-bar form { width: 100%; }
+    .audit-selection-count { width: 100%; }
+    .audit-bulk-bar select { flex: 1 1 100%; width: 100%; max-width: none; min-width: 0; }
+  }
+</style>
+
+<script>
+(function () {
+  var form = document.getElementById('auditBulkAssignForm');
+  if (!form) return;
+  var selectAll = document.getElementById('auditSelectAll');
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('[data-audit-row-check]'));
+  var count = document.getElementById('auditSelectionCount');
+  var button = document.getElementById('auditBulkAssignBtn');
+  var clear = document.getElementById('auditClearSelection');
+
+  function sync() {
+    var selected = boxes.filter(function (box) { return box.checked; }).length;
+    if (count) count.textContent = selected === 1 ? '1 row selected' : selected + ' rows selected';
+    if (button) button.disabled = selected === 0;
+    if (selectAll) {
+      selectAll.checked = selected > 0 && selected === boxes.length;
+      selectAll.indeterminate = selected > 0 && selected < boxes.length;
+    }
+    if (clear) clear.hidden = selected === 0;
+  }
+
+  boxes.forEach(function (box) { box.addEventListener('change', sync); });
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      boxes.forEach(function (box) { box.checked = selectAll.checked; });
+      sync();
+    });
+  }
+  if (clear) {
+    clear.addEventListener('click', function () {
+      boxes.forEach(function (box) { box.checked = false; });
+      sync();
+    });
+  }
+  sync();
+})();
+</script>
+
+<%- include('partials/payroll-layout-end') %>

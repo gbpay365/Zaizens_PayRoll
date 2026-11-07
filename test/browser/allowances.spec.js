@@ -22,9 +22,12 @@ const ADMIN_USER = 'payadmin';
 const ADMIN_PASSWORD = 'admin123';
 const EMPLOYEE_USER = 'leavetester';
 const EMPLOYEE_PASSWORD = 'employee123';
+const HR2_USER = 'payadmin2';
+const HR2_PASSWORD = 'admin123';
 
 let admin = null;
 let adminId = 0;
+let hrAdmin2Id = 0;
 let employeeId = 0;
 let pool = null;
 let server = null;
@@ -139,6 +142,16 @@ test.beforeAll(async () => {
     [EMPLOYEE_USER, employeeHash]
   );
   employeeId = employeeResult.insertId;
+
+  const hr2Hash = await bcrypt.hash(HR2_PASSWORD, 4);
+  const [hr2Result] = await pool.query(
+    `INSERT INTO tbl_employee
+      (first_name, last_name, username, password, role, status, joining_date,
+       address, bio, emailid, dob, gender, phone, employee_id, default_facility_id)
+     VALUES ('Second', 'HR Admin', ?, ?, '1', 1, CURDATE(), '', '', '', '', '', '', 'PAY-ADMIN-2', 1)`,
+    [HR2_USER, hr2Hash]
+  );
+  hrAdmin2Id = hr2Result.insertId;
 
   const port = await getFreePort();
   baseURL = `http://127.0.0.1:${port}`;
@@ -360,6 +373,15 @@ test('HR leave policy, balances, calendar, reports and employee settings render'
   await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
   await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Accrual' })).toHaveCount(1);
 
+  // Leaving for another page and returning through the policy page keeps the filter.
+  await page.goto(`${baseURL}/hr/leave-types`);
+  await Promise.all([
+    page.waitForURL(/\/hr\/leave-maintenance/, { timeout: 15_000 }),
+    page.locator('.sage-head-actions').getByRole('link', { name: /maintenance log/i }).click(),
+  ]);
+  await expect(page.locator('select[name="task"]')).toHaveValue('leave_accrual');
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
+
   await page.goto(`${baseURL}/hr/leave-maintenance`);
   await expect(page.locator('select[name="task"]')).toHaveValue('leave_accrual');
   await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
@@ -386,6 +408,54 @@ test('HR leave policy, balances, calendar, reports and employee settings render'
   await page.goto(`${baseURL}/hr/leave-maintenance`);
   await expect(page.locator('#maintenanceHealth tbody tr').filter({ hasText: 'Carry-over' })).toContainText('Last run succeeded');
   await expect(page.locator('#maintenanceHealth tbody tr').filter({ hasText: 'Email digest' })).toContainText('Failed 2 runs in a row');
+});
+
+test('each HR account keeps its own maintenance filters', async ({ browser }) => {
+  test.setTimeout(60_000);
+  const contextOne = await browser.newContext();
+  const contextTwo = await browser.newContext();
+  try {
+    const pageOne = await contextOne.newPage();
+    await login(pageOne, ADMIN_USER, ADMIN_PASSWORD, /\/(payroll|hr)(\?|$)/);
+    await pageOne.goto(`${baseURL}/hr/leave-maintenance?clear=1`);
+    await pageOne.locator('select[name="task"]').selectOption('leave_accrual');
+    await Promise.all([
+      pageOne.waitForURL(/task=leave_accrual/, { timeout: 15_000 }),
+      pageOne.getByRole('button', { name: /apply filters/i }).click(),
+    ]);
+
+    const pageTwo = await contextTwo.newPage();
+    await login(pageTwo, HR2_USER, HR2_PASSWORD, /\/(payroll|hr)(\?|$)/);
+    await pageTwo.goto(`${baseURL}/hr/leave-maintenance?clear=1`);
+    await pageTwo.locator('select[name="status"]').selectOption('failed');
+    await Promise.all([
+      pageTwo.waitForURL(/status=failed/, { timeout: 15_000 }),
+      pageTwo.getByRole('button', { name: /apply filters/i }).click(),
+    ]);
+
+    await pageOne.goto(`${baseURL}/hr/leave-maintenance`);
+    await expect(pageOne.locator('select[name="task"]')).toHaveValue('leave_accrual');
+    await expect(pageOne.locator('select[name="status"]')).toHaveValue('');
+
+    await pageTwo.goto(`${baseURL}/hr/leave-maintenance`);
+    await expect(pageTwo.locator('select[name="task"]')).toHaveValue('');
+    await expect(pageTwo.locator('select[name="status"]')).toHaveValue('failed');
+
+    const [filterRows] = await pool.query(
+      'SELECT employee_id, task, status FROM tbl_hms_maintenance_filter WHERE employee_id IN (?,?) ORDER BY employee_id',
+      [adminId, hrAdmin2Id]
+    );
+    expect(filterRows).toHaveLength(2);
+    const firstFilter = filterRows.find((row) => Number(row.employee_id) === adminId);
+    const secondFilter = filterRows.find((row) => Number(row.employee_id) === hrAdmin2Id);
+    expect(firstFilter && firstFilter.task).toBe('leave_accrual');
+    expect(firstFilter && firstFilter.status).toBeNull();
+    expect(secondFilter && secondFilter.task).toBeNull();
+    expect(secondFilter && secondFilter.status).toBe('failed');
+  } finally {
+    await contextOne.close().catch(() => {});
+    await contextTwo.close().catch(() => {});
+  }
 });
 
 test('hourly permission records a partial-day request and partial attendance note', async ({ page }) => {

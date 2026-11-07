@@ -1,21 +1,22 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'leave', paySelfServiceOnly: 'leave' }) %>
 <%
-var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
-var _leaveLabel = function (t) {
-  var map = { annual: 'Annual leave', sick: 'Sick leave', unpaid: 'Unpaid leave', other: 'Other leave' };
-  return map[t] || String(t || '').replace(/_/g, ' ');
-};
+var _types = leaveTypes || [];
+var _typeLabels = {};
+_types.forEach(function (type) { _typeLabels[type.code] = type.label; });
+var _leaveLabel = function (code) { return _typeLabels[code] || String(code || '').replace(/_/g, ' '); };
 var _bal = balances || [];
+var _today = today || new Date().toISOString().slice(0, 10);
 %>
 
 <div class="sage-page-head">
   <div>
     <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Time off</p>
     <h1>Request time off</h1>
-    <p class="sage-sub">Pick your dates and send the request for approval. Approved leave is recorded against your <%= year %> balance.</p>
+    <p class="sage-sub">Choose a policy, dates and (for permission) hours. Weekends and public holidays are excluded automatically; approved leave updates attendance.</p>
   </div>
   <div class="sage-head-actions no-print">
     <a href="/hr/my-leave-balance" class="btn btn-sage-ghost"><i class="fa fa-balance-scale mr-1"></i> My leave balance</a>
+    <a href="/hr/notifications" class="btn btn-sage-ghost position-relative"><i class="fa fa-bell mr-1"></i> Notifications<% if (unreadNotifications) { %><span class="badge badge-danger ml-1"><%= unreadNotifications %></span><% } %></a>
     <a href="/hr" class="btn btn-sage-ghost"><i class="fa fa-home mr-1"></i> HR overview</a>
   </div>
 </div>
@@ -25,36 +26,64 @@ var _bal = balances || [];
     <div class="sage-card-head">
       <div><h2>New request</h2><p class="sage-card-sub">All fields marked * are required</p></div>
     </div>
-    <form method="POST" action="/hr/request-leave" class="sage-card-body">
+    <form method="POST" action="/hr/request-leave" class="sage-card-body" enctype="multipart/form-data" id="leaveRequestForm">
       <div class="sage-form-grid">
         <div class="sage-field">
           <label for="leaveType">Leave type *</label>
           <select name="leave_type" id="leaveType" class="form-control" required>
-            <option value="annual">Annual leave</option>
-            <option value="sick">Sick leave</option>
-            <option value="unpaid">Unpaid leave</option>
-            <option value="other">Other</option>
+            <% if (!_types.length) { %><option value="annual">Annual leave</option><% } %>
+            <% _types.forEach(function (type) { %>
+            <option value="<%= type.code %>" data-unit="<%= type.unit %>" data-document="<%= type.requires_document ? '1' : '0' %>"><%= type.label %><%= type.requires_document ? ' (document required)' : '' %></option>
+            <% }); %>
           </select>
         </div>
         <div class="sage-field">
-          <label>Duration</label>
+          <label for="durationUnit">Duration type</label>
+          <select name="duration_unit" id="durationUnit" class="form-control">
+            <option value="day">Full / multiple days</option>
+            <option value="hour">Hours (permission)</option>
+          </select>
+        </div>
+        <div class="sage-field">
+          <label>Working-day duration</label>
           <div class="sage-duration" id="leaveDuration">Select dates</div>
         </div>
         <div class="sage-field">
+          <label for="halfDayPeriod">Half day</label>
+          <select name="half_day_period" id="halfDayPeriod" class="form-control">
+            <option value="">Full day(s)</option>
+            <option value="am">Morning (AM)</option>
+            <option value="pm">Afternoon (PM)</option>
+          </select>
+        </div>
+        <div class="sage-field">
           <label for="startDate">Start date *</label>
-          <input type="date" name="start_date" id="startDate" class="form-control" required value="<%= today %>">
+          <input type="date" name="start_date" id="startDate" class="form-control" required value="<%= _today %>">
         </div>
         <div class="sage-field">
           <label for="endDate">End date *</label>
-          <input type="date" name="end_date" id="endDate" class="form-control" required value="<%= today %>">
+          <input type="date" name="end_date" id="endDate" class="form-control" required value="<%= _today %>">
+        </div>
+        <div class="sage-field hour-field" style="display:none;">
+          <label for="startTime">Start time *</label>
+          <input type="time" name="start_time" id="startTime" class="form-control">
+        </div>
+        <div class="sage-field hour-field" style="display:none;">
+          <label for="endTime">End time *</label>
+          <input type="time" name="end_time" id="endTime" class="form-control">
         </div>
       </div>
       <div class="sage-field">
-        <label for="reason">Reason <span class="sage-muted">(optional)</span></label>
+        <label for="attachment">Supporting document <span class="sage-muted">(PDF, PNG or JPEG; max 5 MB)</span></label>
+        <input type="file" name="attachment" id="attachment" class="form-control-file" accept=".pdf,.png,.jpg,.jpeg">
+        <small class="sage-muted" id="documentHint" style="display:none;">This leave type requires a supporting document.</small>
+      </div>
+      <div class="sage-field">
+        <label for="reason">Reason <span class="sage-muted">(optional, shared with your approver)</span></label>
         <textarea name="reason" id="reason" class="form-control" rows="3" maxlength="2000" placeholder="A short note for the approver"></textarea>
       </div>
       <div class="sage-card-foot px-0 pb-0" style="background:transparent;">
-        <span class="sage-muted" style="font-size:12px;"><i class="fa fa-info-circle mr-1"></i>Your manager receives the request on the leave approvals queue.</span>
+        <span class="sage-muted" style="font-size:12px;"><i class="fa fa-info-circle mr-1"></i>Your manager is notified first; HR receives the final approval when multi-level approval is configured.</span>
         <button type="submit" class="btn btn-sage"><i class="fa fa-paper-plane mr-1"></i> Submit request</button>
       </div>
     </form>
@@ -63,7 +92,7 @@ var _bal = balances || [];
   <div>
     <section class="sage-card">
       <div class="sage-card-head">
-        <div><h2>My balances</h2><p class="sage-card-sub"><%= year %> entitlement</p></div>
+        <div><h2>My balances</h2><p class="sage-card-sub"><%= year %> entitlement and availability</p></div>
       </div>
       <div class="sage-card-body">
         <% if (!_bal.length) { %>
@@ -72,10 +101,10 @@ var _bal = balances || [];
         <% _bal.forEach(function (b) { %>
         <div class="sage-balance-row">
           <div>
-            <strong><%= _leaveLabel(b.leave_type) %></strong>
-            <small class="sage-muted">days remaining</small>
+            <strong><%= b.label || _leaveLabel(b.leave_type) %></strong>
+            <small class="sage-muted"><%= Number(b.used || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %> used &middot; <%= Number(b.pending || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %> pending</small>
           </div>
-          <span class="sage-balance-value"><%= (Number(b.balance) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %></span>
+          <span class="sage-balance-value"><%= Number(b.unit === 'hour' ? Number(b.remaining || 0) * 8 : (b.remaining || 0)).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %><small style="font-size:11px;color:#5f6f68;display:block;font-weight:400;"><%= b.unit === 'hour' ? 'hours' : 'days' %> left</small></span>
         </div>
         <% }); %>
         <% } %>
@@ -84,25 +113,37 @@ var _bal = balances || [];
 
     <section class="sage-card">
       <div class="sage-card-head">
-        <div><h2>Recent requests</h2><p class="sage-card-sub">Latest 30</p></div>
+        <div><h2>Recent requests</h2><p class="sage-card-sub">Latest 60 requests</p></div>
       </div>
       <div class="pay-table-wrap">
         <table class="pay-table">
           <thead>
-            <tr><th>Type</th><th>Dates</th><th class="pay-num">Days</th><th>Status</th></tr>
+            <tr><th>Type</th><th>Dates</th><th class="pay-num">Days</th><th>Status</th><th class="no-print">Document</th><th></th></tr>
           </thead>
           <tbody>
             <% if (!mine || !mine.length) { %>
-            <tr><td colspan="4" class="sage-empty"><i class="fa fa-calendar-o"></i>No requests yet.</td></tr>
+            <tr><td colspan="6" class="sage-empty"><i class="fa fa-calendar-o"></i>No requests yet.</td></tr>
             <% } %>
             <% (mine || []).forEach(function (r) {
               var st = String(r.status || '').toLowerCase();
+              var badge = st === 'approved' ? 'pay-badge-paid' : (st === 'pending' ? 'pay-badge-pending' : (st === 'rejected' ? 'pay-badge--error' : ''));
             %>
             <tr>
-              <td><%= _leaveLabel(r.leave_type) %></td>
+              <td><strong style="font-weight:600;"><%= _leaveLabel(r.leave_type) %></strong>
+                <% if (r.duration_unit === 'hour') { %><small class="d-block text-muted"><%= r.start_time ? String(r.start_time).slice(0, 5) : '' %>–<%= r.end_time ? String(r.end_time).slice(0, 5) : '' %></small><% } %>
+                <% if (r.half_day_period) { %><small class="d-block text-muted"><%= r.half_day_period === 'am' ? 'Morning' : 'Afternoon' %> half day</small><% } %>
+              </td>
               <td><%= r.start_date_fmt || r.start_date %> → <%= r.end_date_fmt || r.end_date %></td>
               <td class="pay-num"><%= Number(r.days_requested) || 0 %></td>
-              <td><span class="pay-badge <%= st === 'approved' ? 'pay-badge-paid' : (st === 'pending' ? 'pay-badge-pending' : '') %>"><%= st.charAt(0).toUpperCase() + st.slice(1) %></span></td>
+              <td><span class="pay-badge <%= badge %>"><%= st ? st.charAt(0).toUpperCase() + st.slice(1) : '—' %></span></td>
+              <td><% if (r.attachment_name) { %><a href="/hr/leave-requests/<%= r.id %>/attachment" target="_blank" rel="noopener"><i class="fa fa-paperclip"></i> View</a><% } else { %><span class="sage-muted">—</span><% } %></td>
+              <td class="text-right">
+                <% if (r.can_cancel) { %>
+                <form method="POST" action="/hr/request-leave/<%= r.id %>/cancel" class="d-inline" data-pay-confirm="Cancel this leave request?">
+                  <button type="submit" class="btn btn-sage-ghost btn-sm">Cancel</button>
+                </form>
+                <% } %>
+              </td>
             </tr>
             <% }); %>
           </tbody>
@@ -113,16 +154,12 @@ var _bal = balances || [];
 </div>
 
 <style>
-  .sage-duration {
-    height: 36px; display: flex; align-items: center; padding: 0 12px;
-    border: 1px dashed #d9e2dc; border-radius: 4px; background: #f8faf9;
-    font-size: 13px; font-weight: 600; color: #006b3d;
-  }
+  .sage-duration { height: 36px; display: flex; align-items: center; padding: 0 12px; border: 1px dashed #d9e2dc; border-radius: 4px; background: #f8faf9; font-size: 13px; font-weight: 600; color: #006b3d; }
   .sage-balance-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #e8eeea; }
   .sage-balance-row:last-child { border-bottom: 0; }
   .sage-balance-row strong { display: block; font-size: 13px; font-weight: 600; }
   .sage-balance-row small { display: block; font-size: 11px; }
-  .sage-balance-value { font-size: 20px; font-weight: 600; color: #006b3d; font-variant-numeric: tabular-nums; }
+  .sage-balance-value { font-size: 20px; font-weight: 600; color: #006b3d; font-variant-numeric: tabular-nums; text-align:right; }
 </style>
 
 <script>
@@ -130,18 +167,51 @@ var _bal = balances || [];
   var start = document.getElementById('startDate');
   var end = document.getElementById('endDate');
   var out = document.getElementById('leaveDuration');
+  var unit = document.getElementById('durationUnit');
+  var half = document.getElementById('halfDayPeriod');
+  var type = document.getElementById('leaveType');
+  var hourFields = document.querySelectorAll('.hour-field');
+  var documentHint = document.getElementById('documentHint');
   if (!start || !end || !out) return;
-  function update() {
-    if (!start.value || !end.value) { out.textContent = 'Select dates'; return; }
-    var a = new Date(start.value + 'T12:00:00');
-    var b = new Date(end.value + 'T12:00:00');
-    if (isNaN(a.getTime()) || isNaN(b.getTime())) { out.textContent = 'Select dates'; return; }
-    if (b < a) { out.textContent = 'End date is before start date'; return; }
-    var days = Math.round((b - a) / 86400000) + 1;
-    out.textContent = days + ' day' + (days === 1 ? '' : 's');
+  function syncType() {
+    if (!type) return;
+    var option = type.options[type.selectedIndex];
+    if (option && option.getAttribute('data-unit') === 'hour' && unit) unit.value = 'hour';
+    if (documentHint) documentHint.style.display = option && option.getAttribute('data-document') === '1' ? 'block' : 'none';
+    update();
   }
-  start.addEventListener('change', update);
-  end.addEventListener('change', update);
+  function update() {
+    var isHour = unit && unit.value === 'hour';
+    hourFields.forEach(function (field) { field.style.display = isHour ? '' : 'none'; });
+    if (isHour) {
+      var a = document.getElementById('startTime').value;
+      var b = document.getElementById('endTime').value;
+      if (a && b) {
+        var pa = a.split(':').map(Number); var pb = b.split(':').map(Number);
+        var mins = (pb[0] * 60 + pb[1]) - (pa[0] * 60 + pa[1]);
+        out.textContent = mins > 0 ? (Math.round(mins / 6) / 10) + ' hours' : 'Check times';
+      } else { out.textContent = 'Select times'; }
+      return;
+    }
+    if (!start.value || !end.value) { out.textContent = 'Select dates'; return; }
+    var d1 = new Date(start.value + 'T12:00:00');
+    var d2 = new Date(end.value + 'T12:00:00');
+    if (isNaN(d1.getTime()) || isNaN(d2.getTime())) { out.textContent = 'Select dates'; return; }
+    if (d2 < d1) { out.textContent = 'End date is before start date'; return; }
+    var days = 0; var d = new Date(d1.getTime());
+    while (d <= d2) { if (d.getDay() !== 0 && d.getDay() !== 6) days += 1; d.setDate(d.getDate() + 1); }
+    if (half && half.value) days = days / 2;
+    out.textContent = days + ' day' + (days === 1 ? '' : 's') + ' (weekends excluded)';
+  }
+  ['change', 'input'].forEach(function (evt) {
+    start.addEventListener(evt, update); end.addEventListener(evt, update);
+    if (unit) unit.addEventListener(evt, update);
+    if (half) half.addEventListener(evt, update);
+    if (type) type.addEventListener(evt, syncType);
+    var st = document.getElementById('startTime'); var et = document.getElementById('endTime');
+    if (st) st.addEventListener(evt, update); if (et) et.addEventListener(evt, update);
+  });
+  syncType();
   update();
 })();
 </script>

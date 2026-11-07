@@ -324,6 +324,9 @@ app.get('/payroll', requireAuth, requirePayrollAccess, async (req, res) => {
   }
 });
 
+require('./routes/hrLeaveSystem')(app, pool, requireAuth, {
+  requireHrSelfService,
+});
 require('./routes/hrPayroll')(app, pool, requireAuth, {
   requirePayrollAccess,
   requireAdminOrSuper,
@@ -344,6 +347,7 @@ async function boot() {
       await require('./lib/ensurePayrollBootstrapSchema')(pool);
       await require('./lib/ensureEmployeeHrSchema')(pool);
       await require('./lib/ensureHrPayrollSchema')(pool);
+      await require('./lib/leaveSystem').ensureLeaveSystemSchema(pool);
       await require('./lib/ensureFacilityIntegrationSchema')(pool);
       await require('./lib/ensureAdminSchema')(pool).catch((e) => console.warn('[admin schema]', e.message));
       await require('./lib/ensurePayrollRoleProfiles')(pool).catch((e) => console.warn('[payroll roles]', e.message));

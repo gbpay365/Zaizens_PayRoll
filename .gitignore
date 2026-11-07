@@ -6,3 +6,6 @@ tmp/
 test-results/
 playwright-report/
 blob-report/
+
+public/uploads/leave/*
+!public/uploads/leave/.gitkeep

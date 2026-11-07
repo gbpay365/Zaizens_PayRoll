@@ -1,15 +1,18 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
 <%
-var _nums = function (n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }); };
+var _nums = function (n) { return (Number(n) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 }); };
 var _rows = rows || [];
 var _totals = totals || { entitled: 0, used: 0, pending: 0, remaining: 0 };
+var _labels = {};
+(types || []).forEach(function (type) { _labels[type.code] = type.label; });
+var _label = function (code) { return _labels[code] || String(code || '').replace(/_/g, ' '); };
 %>
 
 <div class="sage-page-head">
   <div>
     <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Time off</p>
     <h1>Leave balances</h1>
-    <p class="sage-sub">Set the annual entitlement per employee. Taken and pending days come from approved and waiting requests.</p>
+    <p class="sage-sub">Annual entitlement, every leave type, ledger adjustments and year-end carry-over. Taken and pending come from approved and waiting requests.</p>
   </div>
   <div class="sage-head-actions no-print">
     <form method="GET" action="/hr/leave-balances" class="d-flex align-items-center" style="gap:8px;">
@@ -20,42 +23,36 @@ var _totals = totals || { entitled: 0, used: 0, pending: 0, remaining: 0 };
         <% } %>
       </select>
     </form>
-    <a href="/hr/leave-requests" class="btn btn-sage-ghost"><i class="fa fa-inbox mr-1"></i> Requests</a>
+    <a href="/hr/leave-types" class="btn btn-sage-ghost"><i class="fa fa-sliders mr-1"></i> Policy</a>
+    <a href="/hr/leave-reports" class="btn btn-sage-ghost"><i class="fa fa-bar-chart mr-1"></i> Reports</a>
+    <a href="/hr/leave-requests" class="btn btn-sage"><i class="fa fa-inbox mr-1"></i> Requests</a>
   </div>
 </div>
 
 <div class="sage-stats">
-  <div class="sage-stat">
-    <div class="sage-stat-label">Entitlement</div>
-    <div class="sage-stat-value"><%= _nums(_totals.entitled) %></div>
-    <p class="sage-stat-foot">Days across <%= _rows.length %> employees</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">Taken</div>
-    <div class="sage-stat-value"><%= _nums(_totals.used) %></div>
-    <p class="sage-stat-foot">Approved in <%= year %></p>
-  </div>
-  <div class="sage-stat sage-stat--warn">
-    <div class="sage-stat-label">Pending</div>
-    <div class="sage-stat-value"><%= _nums(_totals.pending) %></div>
-    <p class="sage-stat-foot">Waiting for approval</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">Remaining</div>
-    <div class="sage-stat-value"><%= _nums(_totals.remaining) %></div>
-    <p class="sage-stat-foot">Entitlement − taken − pending</p>
-  </div>
+  <div class="sage-stat"><div class="sage-stat-label">Annual entitlement</div><div class="sage-stat-value"><%= _nums(_totals.entitled) %></div><p class="sage-stat-foot">Days across <%= _rows.length %> employees</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">Taken</div><div class="sage-stat-value"><%= _nums(_totals.used) %></div><p class="sage-stat-foot">Approved in <%= year %></p></div>
+  <div class="sage-stat sage-stat--warn"><div class="sage-stat-label">Pending</div><div class="sage-stat-value"><%= _nums(_totals.pending) %></div><p class="sage-stat-foot">Waiting for approval</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">Remaining</div><div class="sage-stat-value"><%= _nums(_totals.remaining) %></div><p class="sage-stat-foot">Entitlement − taken − pending</p></div>
 </div>
 
 <section class="sage-card">
   <div class="sage-card-head">
-    <div><h2>Annual entitlement <%= year %></h2><p class="sage-card-sub">Enter days; the remaining column updates when you save</p></div>
+    <div><h2>Annual entitlement <%= year %></h2><p class="sage-card-sub">Enter days; saving writes an audited ledger adjustment</p></div>
     <div class="pay-toolbar no-print" style="flex-wrap:wrap;gap:10px;">
       <form method="POST" action="/hr/leave-balances/apply-default" class="d-flex align-items-center mb-0" style="gap:6px;">
         <input type="hidden" name="year" value="<%= year %>">
         <label for="defaultDays" class="mb-0 sage-muted" style="font-size:12px;white-space:nowrap;">Default days</label>
         <input type="number" id="defaultDays" name="default_days" min="0" max="365" step="0.5" class="form-control form-control-sm" style="width:90px;" placeholder="18" aria-label="Default annual entitlement in days">
         <button type="submit" class="btn btn-sage-ghost btn-sm" title="Write this entitlement to every active employee"><i class="fa fa-users mr-1"></i>Apply to all</button>
+      </form>
+      <form method="POST" action="/hr/leave-balances/carryover" class="mb-0" data-pay-confirm="Run year-end carry-over for every employee?">
+        <input type="hidden" name="year" value="<%= year %>">
+        <button type="submit" class="btn btn-sage-ghost btn-sm"><i class="fa fa-retweet mr-1"></i>Run carry-over</button>
+      </form>
+      <form method="POST" action="/hr/leave-balances/accrue" class="mb-0" data-pay-confirm="Recalculate policy accrual for every employee?">
+        <input type="hidden" name="year" value="<%= year %>">
+        <button type="submit" class="btn btn-sage-ghost btn-sm"><i class="fa fa-calculator mr-1"></i>Run accrual</button>
       </form>
       <input type="search" id="balanceSearch" class="pay-search" placeholder="Filter employee…" aria-label="Filter employees" autocomplete="off">
     </div>
@@ -64,38 +61,17 @@ var _totals = totals || { entitled: 0, used: 0, pending: 0, remaining: 0 };
     <input type="hidden" name="year" value="<%= year %>">
     <div class="pay-table-wrap">
       <table class="pay-table" id="balanceTable">
-        <thead>
-          <tr>
-            <th>Employee</th>
-            <th>Ref</th>
-            <th class="pay-num">Entitlement (days)</th>
-            <th class="pay-num">Taken</th>
-            <th class="pay-num">Pending</th>
-            <th class="pay-num">Remaining</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Employee</th><th>Ref</th><th class="pay-num">Annual entitlement</th><th class="pay-num">Taken</th><th class="pay-num">Pending</th><th class="pay-num">Remaining</th></tr></thead>
         <tbody>
-          <% if (!_rows.length) { %>
-          <tr><td colspan="6" class="sage-empty"><i class="fa fa-users"></i>No active employees.</td></tr>
-          <% } %>
+          <% if (!_rows.length) { %><tr><td colspan="6" class="sage-empty"><i class="fa fa-users"></i>No active employees.</td></tr><% } %>
           <% _rows.forEach(function (r) {
             var eid = parseInt(r.id, 10) || 0;
             var initials = ((r.first_name || '?').charAt(0) + (r.last_name || '').charAt(0)).toUpperCase();
           %>
           <tr data-search="<%= [r.first_name, r.last_name, r.employee_ref, r.employee_id].filter(Boolean).join(' ').toLowerCase() %>">
-            <td>
-              <div class="d-flex align-items-center" style="gap:10px;">
-                <span class="sage-person-avatar"><%= initials %></span>
-                <span>
-                  <a href="/payroll/employees/<%= eid %>" style="color:#16211c !important;text-decoration:none;font-weight:600;"><%= r.first_name %> <%= r.last_name %></a>
-                  <% if (r.job_title || r.role_title) { %><small class="d-block text-muted"><%= r.job_title || r.role_title %></small><% } %>
-                </span>
-              </div>
-            </td>
+            <td><div class="d-flex align-items-center" style="gap:10px;"><span class="sage-person-avatar"><%= initials %></span><span><a href="/payroll/employees/<%= eid %>" style="color:#16211c !important;text-decoration:none;font-weight:600;"><%= r.first_name %> <%= r.last_name %></a><% if (r.job_title) { %><small class="d-block text-muted"><%= r.job_title %></small><% } %></span></div></td>
             <td class="sage-mono"><%= r.employee_ref || r.employee_id || eid %></td>
-            <td class="pay-num" style="max-width:150px;">
-              <input type="number" step="0.5" min="0" name="bal_<%= eid %>" class="form-control form-control-sm" style="max-width:110px;margin-left:auto;text-align:right;" value="<%= Number(r.balance || 0) %>" aria-label="Annual days for <%= r.first_name %> <%= r.last_name %>">
-            </td>
+            <td class="pay-num" style="max-width:150px;"><input type="number" step="0.5" min="0" name="bal_<%= eid %>" class="form-control form-control-sm" style="max-width:110px;margin-left:auto;text-align:right;" value="<%= Number(r.balance || 0) %>" aria-label="Annual days for <%= r.first_name %> <%= r.last_name %>"></td>
             <td class="pay-num"><%= _nums(r.used) %></td>
             <td class="pay-num"><%= _nums(r.pending) %></td>
             <td class="pay-num"><strong><%= _nums(r.remaining) %></strong></td>
@@ -104,18 +80,52 @@ var _totals = totals || { entitled: 0, used: 0, pending: 0, remaining: 0 };
         </tbody>
       </table>
     </div>
-    <div class="sage-card-foot">
-      <span class="sage-muted" style="font-size:12px;">Saving writes the annual entitlement for every employee on this page.</span>
-      <button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save balances</button>
-    </div>
+    <div class="sage-card-foot"><span class="sage-muted" style="font-size:12px;">Saving writes the annual entitlement for every employee on this page and records the difference in the leave ledger.</span><button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save annual balances</button></div>
   </form>
 </section>
 
+<div class="sage-grid">
+  <section class="sage-card">
+    <div class="sage-card-head"><div><h2>Ledger adjustment</h2><p class="sage-card-sub">Manual accrual, correction, carry-over or encashment</p></div></div>
+    <form method="POST" action="/hr/leave-balances/adjust" class="sage-card-body">
+      <input type="hidden" name="year" value="<%= year %>">
+      <div class="sage-form-grid">
+        <div class="sage-field"><label>Employee *</label><select name="employee_id" class="form-control" required><option value="">Choose…</option><% _rows.forEach(function (r) { %><option value="<%= r.id %>"><%= r.first_name %> <%= r.last_name %></option><% }); %></select></div>
+        <div class="sage-field"><label>Leave type *</label><select name="leave_type" class="form-control" required><% (types || []).forEach(function (type) { %><option value="<%= type.code %>"><%= type.label %></option><% }); %></select></div>
+        <div class="sage-field"><label>Entry type</label><select name="entry_type" class="form-control"><option value="adjustment">Adjustment</option><option value="accrual">Accrual</option><option value="carryover">Carry-over</option><option value="encashment">Encashment</option></select></div>
+        <div class="sage-field"><label>Days/hours *</label><input type="number" name="days" step="0.01" class="form-control" required placeholder="e.g. 2.5 or -1"></div>
+      </div>
+      <div class="sage-field"><label>Note</label><input type="text" name="note" class="form-control" maxlength="500" placeholder="Reason for the ledger entry"></div>
+      <button type="submit" class="btn btn-sage"><i class="fa fa-plus mr-1"></i> Post ledger entry</button>
+    </form>
+  </section>
+
+  <section class="sage-card">
+    <div class="sage-card-head"><div><h2>Employee setup</h2><p class="sage-card-sub">Reporting lines, schedules and employment type</p></div></div>
+    <div class="sage-card-body">
+      <p class="sage-muted" style="font-size:13px;">Managers can approve their direct reports. Schedules drive late, early, overtime and clock-derived hours. Employment type and probation dates are used by the leave policy checks.</p>
+      <a href="/hr/leave-employees" class="btn btn-sage-ghost"><i class="fa fa-users mr-1"></i> Manage employee leave settings</a>
+    </div>
+  </section>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>All leave types — <%= year %></h2><p class="sage-card-sub">Entitlement, taken, pending and remaining per employee</p></div></div>
+  <div class="pay-table-wrap">
+    <table class="pay-table">
+      <thead><tr><th>Employee</th><th>Leave type</th><th class="pay-num">Entitlement</th><th class="pay-num">Taken</th><th class="pay-num">Pending</th><th class="pay-num">Remaining</th></tr></thead>
+      <tbody>
+        <% var _any = false; _rows.forEach(function (r) { (r.balances || []).forEach(function (b) { if (!b.balance_tracked) return; _any = true; %>
+        <tr><td><strong style="font-weight:600;"><%= r.first_name %> <%= r.last_name %></strong><small class="d-block text-muted"><%= r.employee_ref || r.employee_id %></small></td><td><%= b.label || _label(b.leave_type) %></td><td class="pay-num"><%= _nums(b.entitled) %></td><td class="pay-num"><%= _nums(b.used) %></td><td class="pay-num"><%= _nums(b.pending) %></td><td class="pay-num"><strong><%= _nums(b.remaining) %></strong></td></tr>
+        <% }); }); %>
+        <% if (!_any) { %><tr><td colspan="6" class="sage-empty"><i class="fa fa-balance-scale"></i>No tracked leave balances for this year.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <style>
-  .sage-person-avatar {
-    width: 30px; height: 30px; border-radius: 50%; background: #e7f3ec; color: #006b3d;
-    font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
+  .sage-person-avatar { width: 30px; height: 30px; border-radius: 50%; background: #e7f3ec; color: #006b3d; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 </style>
 
 <script>
@@ -126,10 +136,7 @@ var _totals = totals || { entitled: 0, used: 0, pending: 0, remaining: 0 };
   var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-search]'));
   input.addEventListener('input', function () {
     var q = (input.value || '').trim().toLowerCase();
-    rows.forEach(function (tr) {
-      var hay = tr.getAttribute('data-search') || '';
-      tr.style.display = !q || hay.indexOf(q) !== -1 ? '' : 'none';
-    });
+    rows.forEach(function (tr) { tr.style.display = !q || (tr.getAttribute('data-search') || '').indexOf(q) !== -1 ? '' : 'none'; });
   });
 })();
 </script>

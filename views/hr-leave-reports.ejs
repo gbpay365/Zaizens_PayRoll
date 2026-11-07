@@ -1,0 +1,50 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
+<%
+var _summary = summary || [];
+var _types = types || [];
+var _labels = labels || {};
+var _qs = '?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to) + (status ? '&status=' + encodeURIComponent(status) : '') + (leaveType ? '&leave_type=' + encodeURIComponent(leaveType) : '');
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Reporting</p>
+    <h1>Leave reports</h1>
+    <p class="sage-sub">Day-level leave usage by employee, type and status. Export the filtered result to CSV for payroll or audit.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr/leave-reports.csv<%= _qs %>" class="btn btn-sage"><i class="fa fa-download mr-1"></i> Export CSV</a>
+    <a href="/hr/leave-calendar" class="btn btn-sage-ghost"><i class="fa fa-calendar mr-1"></i> Calendar</a>
+    <a href="/hr/leave-balances" class="btn btn-sage-ghost"><i class="fa fa-balance-scale mr-1"></i> Balances</a>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>Filters</h2><p class="sage-card-sub">Inclusive dates; only day rows inside the range are counted</p></div></div>
+  <form method="GET" action="/hr/leave-reports" class="sage-card-body">
+    <div class="sage-form-grid">
+      <div class="sage-field"><label for="from">From</label><input type="date" id="from" name="from" class="form-control" value="<%= from %>"></div>
+      <div class="sage-field"><label for="to">To</label><input type="date" id="to" name="to" class="form-control" value="<%= to %>"></div>
+      <div class="sage-field"><label for="leaveType">Leave type</label><select id="leaveType" name="leave_type" class="form-control"><option value="">All types</option><% _types.forEach(function (type) { %><option value="<%= type.code %>" <%= leaveType === type.code ? 'selected' : '' %>><%= type.label %></option><% }); %></select></div>
+      <div class="sage-field"><label for="status">Status</label><select id="status" name="status" class="form-control"><option value="">All statuses</option><% ['pending','approved','rejected','cancelled'].forEach(function (s) { %><option value="<%= s %>" <%= status === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option><% }); %></select></div>
+    </div>
+    <button type="submit" class="btn btn-sage-ghost"><i class="fa fa-filter mr-1"></i> Apply filters</button>
+  </form>
+</section>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>Summary</h2><p class="sage-card-sub"><%= _summary.length %> employee/type/status line(s) &middot; <%= rows.length %> day row(s)</p></div></div>
+  <div class="pay-table-wrap">
+    <table class="pay-table">
+      <thead><tr><th>Employee</th><th>Ref</th><th>Leave type</th><th>Status</th><th class="pay-num">Days</th><th class="pay-num">Requests</th></tr></thead>
+      <tbody>
+        <% if (!_summary.length) { %><tr><td colspan="6" class="sage-empty"><i class="fa fa-bar-chart"></i>No leave rows match these filters.</td></tr><% } %>
+        <% _summary.forEach(function (row) { %>
+        <tr><td><strong style="font-weight:600;"><%= row.employee_name %></strong></td><td><%= row.employee_ref || row.employee_id %></td><td><%= _labels[row.leave_type] || String(row.leave_type || '').replace(/_/g, ' ') %></td><td><span class="pay-badge <%= row.status === 'approved' ? 'pay-badge-paid' : (row.status === 'pending' ? 'pay-badge-pending' : '') %>"><%= String(row.status).charAt(0).toUpperCase() + String(row.status).slice(1) %></span></td><td class="pay-num"><%= Number(row.days || 0).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) %></td><td class="pay-num"><%= row.requests %></td></tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<%- include('partials/payroll-layout-end') %>

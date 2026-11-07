@@ -1,127 +1,96 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
 <%
-var _t = (typeof t === 'function' ? t : function (k, o) { return (o && o.defaultValue != null) ? o.defaultValue : k; });
-var _leaveLabel = function (t) {
-  var map = { annual: 'Annual leave', sick: 'Sick leave', unpaid: 'Unpaid leave', other: 'Other leave' };
-  return map[t] || String(t || '').replace(/_/g, ' ');
-};
 var _rows = rows || [];
-var _c = counts || { pending: 0, approved: 0, rejected: 0 };
+var _c = counts || { pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+var _labels = {};
+(leaveTypes || []).forEach(function (type) { _labels[type.code] = type.label; });
+var _label = function (code) { return _labels[code] || String(code || '').replace(/_/g, ' '); };
 %>
 
 <div class="sage-page-head">
   <div>
     <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Time off</p>
-    <h1>Leave requests</h1>
-    <p class="sage-sub">Approve or reject time off. Approved leave appears on the HR overview and in the leave balances.</p>
+    <h1>Leave approvals</h1>
+    <p class="sage-sub">Managers see their direct reports; HR sees every request. Comments are kept in the approval history and the employee is notified of each decision.</p>
   </div>
   <div class="sage-head-actions no-print">
     <a href="/hr/leave-balances" class="btn btn-sage-ghost"><i class="fa fa-balance-scale mr-1"></i> Leave balances</a>
-    <a href="/hr/holidays" class="btn btn-sage-ghost"><i class="fa fa-calendar mr-1"></i> Holidays</a>
+    <a href="/hr/leave-calendar" class="btn btn-sage-ghost"><i class="fa fa-calendar mr-1"></i> Team calendar</a>
+    <a href="/hr/holidays" class="btn btn-sage-ghost"><i class="fa fa-flag mr-1"></i> Holidays</a>
   </div>
 </div>
 
 <div class="sage-stats">
-  <div class="sage-stat sage-stat--warn">
-    <div class="sage-stat-label">Waiting</div>
-    <div class="sage-stat-value"><%= _c.pending %></div>
-    <p class="sage-stat-foot">Pending approval</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">Approved</div>
-    <div class="sage-stat-value"><%= _c.approved %></div>
-    <p class="sage-stat-foot">This register</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">Rejected</div>
-    <div class="sage-stat-value"><%= _c.rejected %></div>
-    <p class="sage-stat-foot">Declined requests</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">Total requests</div>
-    <div class="sage-stat-value"><%= _rows.length %></div>
-    <p class="sage-stat-foot">Last 200 records</p>
-  </div>
+  <div class="sage-stat sage-stat--warn"><div class="sage-stat-label">Waiting</div><div class="sage-stat-value"><%= _c.pending || 0 %></div><p class="sage-stat-foot">Pending approval</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">Approved</div><div class="sage-stat-value"><%= _c.approved || 0 %></div><p class="sage-stat-foot">This register</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">Rejected</div><div class="sage-stat-value"><%= _c.rejected || 0 %></div><p class="sage-stat-foot">Declined requests</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">Total requests</div><div class="sage-stat-value"><%= _rows.length %></div><p class="sage-stat-foot">Last 300 records</p></div>
 </div>
 
 <section class="sage-card">
   <div class="sage-card-head">
-    <div>
-      <h2>Approval queue</h2>
-      <p class="sage-card-sub">Oldest pending first</p>
-    </div>
-    <div class="pay-toolbar no-print">
-      <input type="search" id="leaveSearch" class="pay-search" placeholder="Search employee…" aria-label="Search leave requests" autocomplete="off">
-    </div>
+    <div><h2>Approval queue</h2><p class="sage-card-sub">Oldest pending first</p></div>
+    <div class="pay-toolbar no-print"><input type="search" id="leaveSearch" class="pay-search" placeholder="Search employee, type or reason…" aria-label="Search leave requests" autocomplete="off"></div>
   </div>
   <div class="sage-card-body pb-0 no-print">
     <div class="sage-filter-tabs" id="leaveFilterTabs">
       <button type="button" class="sage-filter-tab active" data-status="">All <span><%= _rows.length %></span></button>
-      <button type="button" class="sage-filter-tab" data-status="pending">Pending <span><%= _c.pending %></span></button>
-      <button type="button" class="sage-filter-tab" data-status="approved">Approved <span><%= _c.approved %></span></button>
-      <button type="button" class="sage-filter-tab" data-status="rejected">Rejected <span><%= _c.rejected %></span></button>
+      <button type="button" class="sage-filter-tab" data-status="pending">Pending <span><%= _c.pending || 0 %></span></button>
+      <button type="button" class="sage-filter-tab" data-status="approved">Approved <span><%= _c.approved || 0 %></span></button>
+      <button type="button" class="sage-filter-tab" data-status="rejected">Rejected <span><%= _c.rejected || 0 %></span></button>
+      <button type="button" class="sage-filter-tab" data-status="cancelled">Cancelled <span><%= _c.cancelled || 0 %></span></button>
     </div>
   </div>
   <div class="pay-table-wrap">
     <table class="pay-table" id="leaveRequestsTable">
       <thead>
-        <tr>
-          <th>Employee</th>
-          <th>Type</th>
-          <th>From</th>
-          <th>To</th>
-          <th class="pay-num">Days</th>
-          <th>Requested</th>
-          <th>Status</th>
-          <th class="text-right no-print">Actions</th>
-        </tr>
+        <tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th class="pay-num">Days</th><th>Stage</th><th>Status</th><th>History</th><th class="text-right no-print">Decision</th></tr>
       </thead>
       <tbody>
-        <% if (!_rows.length) { %>
-        <tr><td colspan="8" class="sage-empty"><i class="fa fa-inbox"></i>No leave requests yet.</td></tr>
-        <% } %>
+        <% if (!_rows.length) { %><tr><td colspan="9" class="sage-empty"><i class="fa fa-inbox"></i>No leave requests yet.</td></tr><% } %>
         <% _rows.forEach(function (r) {
           var st = String(r.status || 'pending').toLowerCase();
           var rid = parseInt(r.id, 10) || 0;
           var created = r.created_at ? new Date(r.created_at) : null;
-          var createdFmt = created && !isNaN(created.getTime())
-            ? created.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
-            : '—';
+          var createdFmt = created && !isNaN(created.getTime()) ? created.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—';
           var initials = ((r.first_name || '?').charAt(0) + (r.last_name || '').charAt(0)).toUpperCase();
+          var stage = st !== 'pending' ? '—' : (r.current_step > 1 ? 'HR final' : (r.manager_id ? 'Manager / HR' : 'HR'));
+          var badge = st === 'approved' ? 'pay-badge-paid' : (st === 'pending' ? 'pay-badge-pending' : (st === 'rejected' ? 'pay-badge--error' : ''));
         %>
-        <tr data-status="<%= st %>" data-search="<%= [r.first_name, r.last_name, r.leave_type, r.status].join(' ').toLowerCase() %>">
+        <tr data-status="<%= st %>" data-search="<%= [r.first_name, r.last_name, r.leave_type, r.type_label, r.status, r.reason, r.employee_ref].join(' ').toLowerCase() %>">
           <td>
             <div class="d-flex align-items-center" style="gap:10px;">
               <span class="sage-person-avatar"><%= initials %></span>
               <span>
                 <strong style="font-weight:600;"><%= r.first_name %> <%= r.last_name %></strong>
+                <small class="d-block text-muted"><%= r.employee_ref || ('Employee #' + rid) %> &middot; <%= createdFmt %></small>
                 <% if (r.reason) { %><small class="d-block text-muted" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<%= r.reason %>"><i class="fa fa-comment-o mr-1"></i><%= r.reason %></small><% } %>
+                <% if (r.attachment_count) { %><a href="/hr/leave-requests/<%= rid %>/attachment" target="_blank" rel="noopener" class="small"><i class="fa fa-paperclip"></i> Supporting document</a><% } %>
               </span>
             </div>
           </td>
-          <td><%= _leaveLabel(r.leave_type) %></td>
+          <td><%= r.type_label || _label(r.leave_type) %><% if (r.duration_unit === 'hour') { %><small class="d-block text-muted"><%= r.start_time ? String(r.start_time).slice(0, 5) : '' %>–<%= r.end_time ? String(r.end_time).slice(0, 5) : '' %></small><% } %></td>
           <td><%= r.start_date_fmt || r.start_date %></td>
           <td><%= r.end_date_fmt || r.end_date %></td>
           <td class="pay-num"><%= Number(r.days_requested) || 0 %></td>
-          <td class="sage-muted"><%= createdFmt %></td>
-          <td>
-            <span class="pay-badge <%= st === 'approved' ? 'pay-badge-paid' : (st === 'pending' ? 'pay-badge-pending' : '') %>"><%= st.charAt(0).toUpperCase() + st.slice(1) %></span>
+          <td class="sage-muted"><%= stage %></td>
+          <td><span class="pay-badge <%= badge %>"><%= st.charAt(0).toUpperCase() + st.slice(1) %></span></td>
+          <td style="max-width:220px;">
+            <% if (r.history && r.history.length) { %>
+            <details><summary class="small"><%= r.history.length %> step(s)</summary>
+              <% r.history.forEach(function (h) { %><div class="small text-muted"><%= h.action %> &middot; <%= h.acted_at ? new Date(h.acted_at).toLocaleDateString('en-GB') : '' %><% if (h.comment) { %><br><%= h.comment %><% } %></div><% }); %>
+            </details>
+            <% } else { %><span class="sage-muted">—</span><% } %>
           </td>
           <td class="text-right text-nowrap no-print">
-            <% if (st === 'pending' && rid > 0) { %>
-            <form method="POST" action="/hr/leave-requests/action" class="d-inline" data-pay-confirm="Approve this leave request?">
+            <% if (st === 'pending' && rid > 0 && r.can_act) { %>
+            <form method="POST" action="/hr/leave-requests/action" class="d-inline" data-pay-confirm="Submit this leave decision?">
               <input type="hidden" name="request_id" value="<%= rid %>">
-              <input type="hidden" name="action" value="approve">
-              <button type="submit" class="btn btn-sage btn-sm">Approve</button>
+              <input type="text" name="comment" class="form-control form-control-sm mb-1" maxlength="1000" placeholder="Comment (required to reject)" style="min-width:210px;">
+              <button type="submit" name="action" value="approve" class="btn btn-sage btn-sm">Approve</button>
+              <button type="submit" name="action" value="reject" class="btn btn-sage-ghost btn-sm ml-1">Reject</button>
             </form>
-            <form method="POST" action="/hr/leave-requests/action" class="d-inline ml-1" data-pay-confirm="Reject this leave request?">
-              <input type="hidden" name="request_id" value="<%= rid %>">
-              <input type="hidden" name="action" value="reject">
-              <button type="submit" class="btn btn-sage-ghost btn-sm">Reject</button>
-            </form>
-            <% } else { %>
-            <span class="sage-muted" style="font-size:12px;">No action</span>
-            <% } %>
+            <% } else if (st === 'pending') { %><span class="sage-muted" style="font-size:12px;">Awaiting another approver</span><% } else { %><span class="sage-muted" style="font-size:12px;">No action</span><% } %>
           </td>
         </tr>
         <% }); %>
@@ -131,15 +100,9 @@ var _c = counts || { pending: 0, approved: 0, rejected: 0 };
 </section>
 
 <style>
-  .sage-person-avatar {
-    width: 30px; height: 30px; border-radius: 50%; background: #e7f3ec; color: #006b3d;
-    font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
+  .sage-person-avatar { width: 30px; height: 30px; border-radius: 50%; background: #e7f3ec; color: #006b3d; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .sage-filter-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #e8eeea; margin: 0 -18px; padding: 0 18px; }
-  .sage-filter-tab {
-    background: transparent; border: 0; border-bottom: 2px solid transparent;
-    padding: 8px 12px 10px; font-size: 12.5px; font-weight: 600; color: #5f6f68; cursor: pointer;
-  }
+  .sage-filter-tab { background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px 10px; font-size: 12.5px; font-weight: 600; color: #5f6f68; cursor: pointer; }
   .sage-filter-tab span { font-weight: 500; opacity: 0.7; margin-left: 4px; }
   .sage-filter-tab:hover { color: #006b3d; }
   .sage-filter-tab.active { color: #006b3d; border-bottom-color: #00a651; }
@@ -152,29 +115,10 @@ var _c = counts || { pending: 0, approved: 0, rejected: 0 };
   var tabs = document.querySelectorAll('#leaveFilterTabs [data-status]');
   if (!table) return;
   var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-status]'));
-  var status = '';
-  var q = '';
-  function apply() {
-    rows.forEach(function (tr) {
-      var okStatus = !status || tr.getAttribute('data-status') === status;
-      var hay = tr.getAttribute('data-search') || '';
-      tr.style.display = okStatus && (!q || hay.indexOf(q) !== -1) ? '' : 'none';
-    });
-  }
-  tabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      tabs.forEach(function (t) { t.classList.remove('active'); });
-      tab.classList.add('active');
-      status = tab.getAttribute('data-status') || '';
-      apply();
-    });
-  });
-  if (input) {
-    input.addEventListener('input', function () {
-      q = (input.value || '').trim().toLowerCase();
-      apply();
-    });
-  }
+  var status = ''; var q = '';
+  function apply() { rows.forEach(function (tr) { var okStatus = !status || tr.getAttribute('data-status') === status; var hay = tr.getAttribute('data-search') || ''; tr.style.display = okStatus && (!q || hay.indexOf(q) !== -1) ? '' : 'none'; }); }
+  tabs.forEach(function (tab) { tab.addEventListener('click', function () { tabs.forEach(function (t) { t.classList.remove('active'); }); tab.classList.add('active'); status = tab.getAttribute('data-status') || ''; apply(); }); });
+  if (input) input.addEventListener('input', function () { q = (input.value || '').trim().toLowerCase(); apply(); });
 })();
 </script>
 

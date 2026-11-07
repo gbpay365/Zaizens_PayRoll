@@ -1,0 +1,67 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
+<%
+var _days = (calendar && calendar.days) || [];
+var _labels = labels || {};
+var _monthName = new Date(year, month - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+var _prev = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 };
+var _next = month === 12 ? { y: year + 1, m: 1 } : { y: year, m: month + 1 };
+var _first = new Date(year, month - 1, 1).getDay();
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Calendar</p>
+    <h1>Leave calendar</h1>
+    <p class="sage-sub"><%= _monthName %> &middot; approved and pending leave alongside public holidays.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr/leave-calendar?year=<%= _prev.y %>&month=<%= _prev.m %>" class="btn btn-sage-ghost"><i class="fa fa-chevron-left mr-1"></i> Previous</a>
+    <a href="/hr/leave-calendar" class="btn btn-sage-ghost">This month</a>
+    <a href="/hr/leave-calendar?year=<%= _next.y %>&month=<%= _next.m %>" class="btn btn-sage-ghost">Next <i class="fa fa-chevron-right ml-1"></i></a>
+    <a href="/hr/leave-requests" class="btn btn-sage"><i class="fa fa-inbox mr-1"></i> Approvals</a>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2><%= _monthName %></h2><p class="sage-card-sub">Weekends are shaded; holidays appear in red</p></div></div>
+  <div class="sage-calendar">
+    <% ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function (day) { %><div class="sage-cal-head"><%= day %></div><% }); %>
+    <% for (var i = 0; i < _first; i++) { %><div class="sage-cal-cell sage-cal-empty"></div><% } %>
+    <% _days.forEach(function (day) {
+      var weekend = day.weekday === 0 || day.weekday === 6;
+      var classes = 'sage-cal-cell' + (weekend ? ' sage-cal-weekend' : '') + (day.holiday ? ' sage-cal-holiday' : '');
+    %>
+    <div class="<%= classes %>">
+      <div class="sage-cal-date"><%= day.day %></div>
+      <% if (day.holiday) { %><div class="sage-cal-holiday-name"><i class="fa fa-flag mr-1"></i><%= day.holiday %></div><% } %>
+      <% (day.leave || []).slice(0, 4).forEach(function (leave) { var st = String(leave.status || '').toLowerCase(); %>
+      <div class="sage-cal-leave <%= st === 'approved' ? 'is-approved' : 'is-pending' %>" title="<%= leave.first_name %> <%= leave.last_name %> &middot; <%= _labels[leave.leave_type] || leave.leave_type %> &middot; <%= leave.days %> day(s)">
+        <span><%= (leave.first_name || '?').charAt(0) %><%= (leave.last_name || '').charAt(0) %></span>
+        <span class="sage-cal-leave-name"><%= leave.first_name %> <%= leave.last_name %></span>
+        <small><%= _labels[leave.leave_type] || leave.leave_type %></small>
+      </div>
+      <% }); %>
+      <% if ((day.leave || []).length > 4) { %><small class="sage-muted">+<%= day.leave.length - 4 %> more</small><% } %>
+    </div>
+    <% }); %>
+  </div>
+</section>
+
+<style>
+  .sage-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-left: 1px solid #e1e8e4; border-top: 1px solid #e1e8e4; }
+  .sage-cal-head { padding: 8px 10px; background: #f3f6f4; border-right: 1px solid #e1e8e4; border-bottom: 1px solid #e1e8e4; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #5f6f68; font-weight: 600; }
+  .sage-cal-cell { min-height: 112px; padding: 7px; border-right: 1px solid #e1e8e4; border-bottom: 1px solid #e1e8e4; background: #fff; }
+  .sage-cal-empty { background: #fafbfa; }
+  .sage-cal-weekend { background: #f8faf9; }
+  .sage-cal-holiday { background: #fff7f6; }
+  .sage-cal-date { font-size: 12px; font-weight: 700; color: #16211c; margin-bottom: 4px; }
+  .sage-cal-holiday-name { font-size: 10.5px; color: #b42318; line-height: 1.25; margin-bottom: 4px; }
+  .sage-cal-leave { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 3px 4px; border-radius: 3px; margin-bottom: 3px; font-size: 10px; line-height: 1.25; }
+  .sage-cal-leave.is-approved { background: #e7f3ec; color: #006b3d; }
+  .sage-cal-leave.is-pending { background: #fff4dc; color: #8a5a00; }
+  .sage-cal-leave > span:first-child { width: 18px; height: 18px; border-radius: 50%; background: rgba(0,0,0,0.06); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
+  .sage-cal-leave-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  @media (max-width: 900px) { .sage-calendar { font-size: 9px; } .sage-cal-cell { min-height: 88px; } .sage-cal-leave-name { display: none; } }
+</style>
+
+<%- include('partials/payroll-layout-end') %>

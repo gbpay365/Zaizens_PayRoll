@@ -2,71 +2,66 @@
 <%
 var _rows = rows || [];
 var _s = summary || {};
-var _fmtDate = function (d) {
-  if (!d) return '—';
-  var dt = new Date(String(d).slice(0, 10) + 'T12:00:00');
-  if (isNaN(dt.getTime())) return String(d);
-  return dt.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
-};
+var _fmtDate = function (d) { if (!d) return '—'; var dt = new Date(String(d).slice(0, 10) + 'T12:00:00'); if (isNaN(dt.getTime())) return String(d); return dt.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }); };
 var _fmtTime = function (t) { return t ? String(t).substring(0, 5) : '—'; };
+var _lastDir = lastPunch ? String(lastPunch.direction) : '';
+var _canIn = !_lastDir || _lastDir === 'out';
+var _canOut = _lastDir === 'in';
 %>
 
 <div class="sage-page-head">
   <div>
     <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Attendance</p>
     <h1>My attendance</h1>
-    <p class="sage-sub">Check-in history recorded by HR. Monthly totals cover the current calendar month.</p>
+    <p class="sage-sub">Clock in and out from here, or review the register recorded by HR. Approved leave is reflected automatically.</p>
   </div>
   <div class="sage-head-actions no-print">
+    <a href="/hr/notifications" class="btn btn-sage-ghost position-relative"><i class="fa fa-bell mr-1"></i> Notifications<% if (unreadNotifications) { %><span class="badge badge-danger ml-1"><%= unreadNotifications %></span><% } %></a>
     <a href="/hr" class="btn btn-sage-ghost"><i class="fa fa-home mr-1"></i> HR overview</a>
   </div>
 </div>
 
+<section class="sage-card" style="margin-bottom:18px;">
+  <div class="sage-card-body d-flex align-items-center justify-content-between flex-wrap" style="gap:14px;">
+    <div>
+      <h2 style="margin:0;">Today &middot; <%= _fmtDate(today) %></h2>
+      <p class="sage-muted" style="margin:4px 0 0;font-size:13px;">
+        <% if (lastPunch) { %>Last punch: <strong><%= _lastDir %></strong> at <%= lastPunch.punch_time || _fmtTime(lastPunch.punched_at) %><% } else { %>No punches recorded yet.<% } %>
+      </p>
+    </div>
+    <div class="d-flex" style="gap:8px;">
+      <form method="POST" action="/hr/clock/in"><button type="submit" class="btn btn-sage" <%= _canIn ? '' : 'disabled' %>><i class="fa fa-sign-in mr-1"></i> Clock in</button></form>
+      <form method="POST" action="/hr/clock/out"><button type="submit" class="btn btn-sage-ghost" <%= _canOut ? '' : 'disabled' %>><i class="fa fa-sign-out mr-1"></i> Clock out</button></form>
+    </div>
+  </div>
+</section>
+
 <div class="sage-stats">
-  <div class="sage-stat">
-    <div class="sage-stat-label">Recorded this month</div>
-    <div class="sage-stat-value"><%= totalMonth || 0 %></div>
-    <p class="sage-stat-foot">Days on the register</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">Present</div>
-    <div class="sage-stat-value"><%= _s.present || 0 %></div>
-    <p class="sage-stat-foot">Including late arrivals</p>
-  </div>
-  <div class="sage-stat sage-stat--warn">
-    <div class="sage-stat-label">Absent / late</div>
-    <div class="sage-stat-value"><%= (_s.absent || 0) %> / <%= _s.late || 0 %></div>
-    <p class="sage-stat-foot">This month</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">Hours logged</div>
-    <div class="sage-stat-value"><%= (Number(hoursMonth) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %></div>
-    <p class="sage-stat-foot">From check-in / check-out</p>
-  </div>
+  <div class="sage-stat"><div class="sage-stat-label">Recorded this month</div><div class="sage-stat-value"><%= totalMonth || 0 %></div><p class="sage-stat-foot">Days on the register</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">Present</div><div class="sage-stat-value"><%= _s.present || 0 %></div><p class="sage-stat-foot">Including late arrivals</p></div>
+  <div class="sage-stat sage-stat--warn"><div class="sage-stat-label">Absent / late</div><div class="sage-stat-value"><%= (_s.absent || 0) %> / <%= _s.late || 0 %></div><p class="sage-stat-foot">This month</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">Hours logged</div><div class="sage-stat-value"><%= (Number(hoursMonth) || 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) %></div><p class="sage-stat-foot">From check-in / check-out</p></div>
 </div>
 
 <section class="sage-card">
-  <div class="sage-card-head">
-    <div><h2>Attendance history</h2><p class="sage-card-sub">Most recent 120 records</p></div>
-  </div>
+  <div class="sage-card-head"><div><h2>Attendance history</h2><p class="sage-card-sub">Most recent 120 records</p></div></div>
   <div class="pay-table-wrap">
     <table class="pay-table">
-      <thead>
-        <tr><th>Date</th><th>Check in</th><th>Check out</th><th>Status</th></tr>
-      </thead>
+      <thead><tr><th>Date</th><th>Check in</th><th>Check out</th><th>Status</th><th class="pay-num">Worked</th><th class="pay-num">Late / OT</th><th>Notes</th></tr></thead>
       <tbody>
-        <% if (!_rows.length) { %>
-        <tr><td colspan="4" class="sage-empty"><i class="fa fa-clock-o"></i>No attendance recorded yet.</td></tr>
-        <% } %>
+        <% if (!_rows.length) { %><tr><td colspan="7" class="sage-empty"><i class="fa fa-clock-o"></i>No attendance recorded yet.</td></tr><% } %>
         <% _rows.forEach(function (r) {
           var st = String(r.status || '').toLowerCase();
-          var badge = st === 'present' ? 'pay-badge-paid' : (st === 'absent' ? 'pay-badge--error' : (st === 'late' || st === 'half-day' ? 'pay-badge-pending' : ''));
+          var badge = st === 'present' ? 'pay-badge-paid' : (st === 'absent' ? 'pay-badge--error' : (st === 'late' || st === 'half-day' || st === 'on-leave' ? 'pay-badge-pending' : ''));
         %>
         <tr>
           <td><%= _fmtDate(r.att_date) %></td>
           <td class="sage-mono"><%= _fmtTime(r.check_in_time) %></td>
           <td class="sage-mono"><%= _fmtTime(r.check_out_time) %></td>
-          <td><span class="pay-badge <%= badge %>"><%= st ? st.charAt(0).toUpperCase() + st.slice(1) : '—' %></span></td>
+          <td><span class="pay-badge <%= badge %>"><%= st ? st.charAt(0).toUpperCase() + st.slice(1) : '—' %></span><% if (r.source) { %><small class="d-block text-muted"><%= String(r.source).replace(/_/g, ' ') %></small><% } %></td>
+          <td class="pay-num"><%= r.worked_minutes ? (Math.round(Number(r.worked_minutes) / 6) / 10) + 'h' : '—' %></td>
+          <td class="pay-num"><%= r.late_minutes || 0 %>m / <%= r.overtime_minutes || 0 %>m</td>
+          <td><%= r.notes || r.override_reason || '—' %></td>
         </tr>
         <% }); %>
       </tbody>

@@ -27,6 +27,7 @@
     "express-session": "^1.17.3",
     "i18next": "^26.3.0",
     "i18next-fs-backend": "^2.6.6",
+    "multer": "^2.5.0",
     "mysql2": "^3.6.1"
   },
   "devDependencies": {

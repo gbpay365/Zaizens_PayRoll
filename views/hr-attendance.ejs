@@ -1,6 +1,6 @@
 <%- include('partials/payroll-layout-start', { payNavActive: 'hratt', showHrLeaveAdmin: true }) %>
 <%
-var _s = summary || { present: 0, late: 0, absent: 0, 'half-day': 0, 'on-leave': 0, saved: 0 };
+var _s = summary || { present: 0, late: 0, absent: 0, 'half-day': 0, 'on-leave': 0, holiday: 0, saved: 0 };
 var _staff = staff || [];
 var _dateLabel = new Date(String(date) + 'T12:00:00');
 if (isNaN(_dateLabel.getTime())) _dateLabel = new Date();
@@ -10,84 +10,50 @@ if (isNaN(_dateLabel.getTime())) _dateLabel = new Date();
   <div>
     <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Attendance</p>
     <h1>Attendance register</h1>
-    <p class="sage-sub"><%= _dateLabel.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) %> &middot; record presence and hours for the payroll period.</p>
+    <p class="sage-sub"><%= _dateLabel.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }) %> &middot; approved leave and holidays are applied automatically. Manual changes require a reason when overriding clock or leave data.</p>
   </div>
   <div class="sage-head-actions no-print">
     <form action="/hr/attendance" method="GET" class="d-flex align-items-center" style="gap:8px;">
       <input type="date" name="date" class="form-control" style="width:160px;" value="<%= date %>" aria-label="Attendance date">
       <button type="submit" class="btn btn-sage-ghost">Fetch date</button>
     </form>
+    <a href="/hr/leave-calendar" class="btn btn-sage-ghost"><i class="fa fa-calendar mr-1"></i> Leave calendar</a>
     <a href="/hr" class="btn btn-sage-ghost"><i class="fa fa-home mr-1"></i> HR overview</a>
   </div>
 </div>
 
+<% if (holidayName) { %><div class="alert alert-info" style="border-radius:8px;"><i class="fa fa-flag mr-2"></i><strong><%= holidayName %></strong> is a public holiday. Employees default to holiday status.</div><% } %>
+
 <div class="sage-stats">
-  <div class="sage-stat">
-    <div class="sage-stat-label">Present</div>
-    <div class="sage-stat-value"><%= _s.present || 0 %></div>
-    <p class="sage-stat-foot">Including late arrivals</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">Late</div>
-    <div class="sage-stat-value"><%= _s.late || 0 %></div>
-    <p class="sage-stat-foot">Flagged on this date</p>
-  </div>
-  <div class="sage-stat sage-stat--warn">
-    <div class="sage-stat-label">Absent</div>
-    <div class="sage-stat-value"><%= _s.absent || 0 %></div>
-    <p class="sage-stat-foot">Not present</p>
-  </div>
-  <div class="sage-stat">
-    <div class="sage-stat-label">On leave</div>
-    <div class="sage-stat-value"><%= _s['on-leave'] || 0 %></div>
-    <p class="sage-stat-foot"><%= _s.saved || 0 %> row(s) already saved</p>
-  </div>
+  <div class="sage-stat"><div class="sage-stat-label">Present</div><div class="sage-stat-value"><%= _s.present || 0 %></div><p class="sage-stat-foot">Including late arrivals</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">Late</div><div class="sage-stat-value"><%= _s.late || 0 %></div><p class="sage-stat-foot">Flagged on this date</p></div>
+  <div class="sage-stat sage-stat--warn"><div class="sage-stat-label">Absent</div><div class="sage-stat-value"><%= _s.absent || 0 %></div><p class="sage-stat-foot">Not present</p></div>
+  <div class="sage-stat"><div class="sage-stat-label">On leave</div><div class="sage-stat-value"><%= _s['on-leave'] || 0 %></div><p class="sage-stat-foot"><%= _s.holiday || 0 %> holiday &middot; <%= _s.saved || 0 %> saved</p></div>
 </div>
 
 <section class="sage-card">
-  <div class="sage-card-head">
-    <div>
-      <h2>Daily register</h2>
-      <p class="sage-card-sub"><%= _staff.length %> active employees</p>
-    </div>
-    <div class="pay-toolbar no-print">
-      <input type="search" id="attendanceSearch" class="pay-search" placeholder="Filter staff…" aria-label="Filter staff" autocomplete="off">
-      <button type="button" id="markAllPresent" class="btn btn-sage-ghost btn-sm">Mark all present</button>
-    </div>
-  </div>
+  <div class="sage-card-head"><div><h2>Daily register</h2><p class="sage-card-sub"><%= _staff.length %> active employees</p></div><div class="pay-toolbar no-print"><input type="search" id="attendanceSearch" class="pay-search" placeholder="Filter staff…" aria-label="Filter staff" autocomplete="off"><button type="button" id="markAllPresent" class="btn btn-sage-ghost btn-sm">Mark all present</button></div></div>
   <form action="/hr/attendance/save" method="POST">
     <input type="hidden" name="date" value="<%= date %>">
     <div class="pay-table-wrap">
       <table class="pay-table" id="attendanceTable">
-        <thead>
-          <tr>
-            <th>Employee</th>
-            <th style="min-width:150px;">Status</th>
-            <th style="min-width:130px;">Check in</th>
-            <th style="min-width:130px;">Check out</th>
-            <th class="pay-num">Hours</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Employee</th><th style="min-width:140px;">Status</th><th style="min-width:125px;">Check in</th><th style="min-width:125px;">Check out</th><th class="pay-num">Hours</th><th>Source</th><th style="min-width:200px;">Override reason</th></tr></thead>
         <tbody>
-          <% if (!_staff.length) { %>
-          <tr><td colspan="5" class="sage-empty"><i class="fa fa-users"></i>No active employees.</td></tr>
-          <% } %>
+          <% if (!_staff.length) { %><tr><td colspan="7" class="sage-empty"><i class="fa fa-users"></i>No active employees.</td></tr><% } %>
           <% _staff.forEach(function (emp) {
             var ex = existing[emp.id] || {};
             var st = ex.status || 'present';
-            var cin = ex.check_in_time ? String(ex.check_in_time).substring(0, 5) : '08:00';
-            var cout = ex.check_out_time ? String(ex.check_out_time).substring(0, 5) : '17:00';
+            var onLeave = st === 'on-leave';
+            var blank = onLeave || st === 'absent' || st === 'holiday';
+            var cin = ex.check_in_time ? String(ex.check_in_time).substring(0, 5) : (blank ? '' : '08:00');
+            var cout = ex.check_out_time ? String(ex.check_out_time).substring(0, 5) : (blank ? '' : '17:00');
             var initials = ((emp.first_name || '?').charAt(0) + (emp.last_name || '').charAt(0)).toUpperCase();
+            var source = ex.source || (ex.id ? 'saved' : 'not saved');
           %>
-          <tr data-search="<%= [emp.first_name, emp.last_name, emp.id].join(' ').toLowerCase() %>">
+          <tr data-search="<%= [emp.first_name, emp.last_name, emp.id, source, ex.leave_type, ex.notes].filter(Boolean).join(' ').toLowerCase() %>">
             <td>
-              <div class="d-flex align-items-center" style="gap:10px;">
-                <span class="sage-person-avatar"><%= initials %></span>
-                <span>
-                  <strong style="font-weight:600;"><%= emp.first_name %> <%= emp.last_name %></strong>
-                  <small class="d-block text-muted">Employee #<%= emp.id %></small>
-                </span>
-              </div>
+              <input type="hidden" name="attendance[<%= emp.id %>][employee_id]" value="<%= emp.id %>">
+              <div class="d-flex align-items-center" style="gap:10px;"><span class="sage-person-avatar"><%= initials %></span><span><strong style="font-weight:600;"><%= emp.first_name %> <%= emp.last_name %></strong><small class="d-block text-muted">Employee #<%= emp.id %><% if (emp.start_time) { %> &middot; <%= String(emp.start_time).slice(0, 5) %>–<%= String(emp.end_time).slice(0, 5) %><% } %></small><% if (ex.source === 'approved_leave') { %><small class="d-block text-muted">Approved <%= ex.leave_type || 'leave' %> leave<%= Number(ex.leave_days) > 0 && Number(ex.leave_days) < 1 ? ' (partial)' : '' %></small><% } else if (ex.notes) { %><small class="d-block text-muted"><%= ex.notes %></small><% } %></span></div>
             </td>
             <td>
               <select name="attendance[<%= emp.id %>][status]" class="form-control form-control-sm att-status">
@@ -96,28 +62,25 @@ if (isNaN(_dateLabel.getTime())) _dateLabel = new Date();
                 <option value="absent" <%= st === 'absent' ? 'selected' : '' %>>Absent</option>
                 <option value="half-day" <%= st === 'half-day' ? 'selected' : '' %>>Half day</option>
                 <option value="on-leave" <%= st === 'on-leave' ? 'selected' : '' %>>On leave</option>
+                <option value="holiday" <%= st === 'holiday' ? 'selected' : '' %>>Holiday</option>
               </select>
             </td>
             <td><input type="time" name="attendance[<%= emp.id %>][in]" class="form-control form-control-sm att-time" value="<%= cin %>" aria-label="Check in for <%= emp.first_name %>"></td>
             <td><input type="time" name="attendance[<%= emp.id %>][out]" class="form-control form-control-sm att-time" value="<%= cout %>" aria-label="Check out for <%= emp.first_name %>"></td>
-            <td class="pay-num sage-muted att-hours">9h</td>
+            <td class="pay-num sage-muted att-hours"><%= ex.worked_minutes ? (Math.round(Number(ex.worked_minutes) / 6) / 10) + 'h' : '—' %></td>
+            <td><span class="pay-badge <%= source === 'clock' ? 'pay-badge-paid' : (source === 'approved_leave' || source === 'holiday' ? 'pay-badge-pending' : '') %>"><%= String(source).replace(/_/g, ' ') %></span><% if (ex.late_minutes) { %><small class="d-block text-muted"><%= ex.late_minutes %>m late</small><% } %></td>
+            <td><input type="text" name="attendance[<%= emp.id %>][reason]" class="form-control form-control-sm" maxlength="500" placeholder="Required for clock/leave overrides"></td>
           </tr>
           <% }); %>
         </tbody>
       </table>
     </div>
-    <div class="sage-card-foot">
-      <span class="sage-muted" style="font-size:12px;">Attendance is available to payroll and leave reporting but does not change salary automatically.</span>
-      <button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save attendance</button>
-    </div>
+    <div class="sage-card-foot"><span class="sage-muted" style="font-size:12px;">Saving writes an attendance audit row and marks the day as a locked manual entry. Payroll uses unpaid leave and unapproved absences for deductions.</span><button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save attendance</button></div>
   </form>
 </section>
 
 <style>
-  .sage-person-avatar {
-    width: 30px; height: 30px; border-radius: 50%; background: #e7f3ec; color: #006b3d;
-    font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  }
+  .sage-person-avatar { width: 30px; height: 30px; border-radius: 50%; background: #e7f3ec; color: #006b3d; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .att-status { max-width: 160px; }
   .att-time { max-width: 120px; }
 </style>
@@ -128,48 +91,23 @@ if (isNaN(_dateLabel.getTime())) _dateLabel = new Date();
   var input = document.getElementById('attendanceSearch');
   var markAll = document.getElementById('markAllPresent');
   if (!table) return;
-
-  function rows() {
-    return Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-search]'));
-  }
+  function rows() { return Array.prototype.slice.call(table.querySelectorAll('tbody tr[data-search]')); }
   function recalc(row) {
-    var cin = row.querySelector('input[name$="[in]"]');
-    var cout = row.querySelector('input[name$="[out]"]');
-    var out = row.querySelector('.att-hours');
+    var cin = row.querySelector('input[name$="[in]"]'); var cout = row.querySelector('input[name$="[out]"]'); var out = row.querySelector('.att-hours');
     if (!cin || !cout || !out) return;
     if (!cin.value || !cout.value) { out.textContent = '—'; return; }
-    var a = cin.value.split(':').map(Number);
-    var b = cout.value.split(':').map(Number);
+    var a = cin.value.split(':').map(Number); var b = cout.value.split(':').map(Number);
     var mins = (b[0] * 60 + b[1]) - (a[0] * 60 + a[1]);
     out.textContent = mins > 0 ? (Math.round(mins / 6) / 10) + 'h' : '—';
   }
-
   rows().forEach(function (row) {
-    var cin = row.querySelector('input[name$="[in]"]');
-    var cout = row.querySelector('input[name$="[out]"]');
+    var cin = row.querySelector('input[name$="[in]"]'); var cout = row.querySelector('input[name$="[out]"]');
     if (cin) cin.addEventListener('change', function () { recalc(row); });
     if (cout) cout.addEventListener('change', function () { recalc(row); });
     recalc(row);
   });
-
-  if (input) {
-    input.addEventListener('input', function () {
-      var q = (input.value || '').trim().toLowerCase();
-      rows().forEach(function (row) {
-        var hay = row.getAttribute('data-search') || '';
-        row.style.display = !q || hay.indexOf(q) !== -1 ? '' : 'none';
-      });
-    });
-  }
-
-  if (markAll) {
-    markAll.addEventListener('click', function () {
-      rows().forEach(function (row) {
-        var sel = row.querySelector('.att-status');
-        if (sel) sel.value = 'present';
-      });
-    });
-  }
+  if (input) input.addEventListener('input', function () { var q = (input.value || '').trim().toLowerCase(); rows().forEach(function (row) { row.style.display = !q || (row.getAttribute('data-search') || '').indexOf(q) !== -1 ? '' : 'none'; }); });
+  if (markAll) markAll.addEventListener('click', function () { rows().forEach(function (row) { var sel = row.querySelector('.att-status'); if (sel) sel.value = 'present'; }); });
 })();
 </script>
 

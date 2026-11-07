@@ -1,0 +1,46 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
+<%
+var _staff = staff || [];
+var _managers = managers || [];
+var _schedules = schedules || [];
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Leave setup</p>
+    <h1>Employee leave settings</h1>
+    <p class="sage-sub">Set reporting lines, employment type, grade, probation/termination dates and the work schedule used for leave and attendance.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr/leave-types" class="btn btn-sage-ghost"><i class="fa fa-sliders mr-1"></i> Leave policy</a>
+    <a href="/hr/leave-balances" class="btn btn-sage-ghost"><i class="fa fa-balance-scale mr-1"></i> Balances</a>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>Reporting lines &amp; employment</h2><p class="sage-card-sub"><%= _staff.length %> active employee(s)</p></div></div>
+  <form method="POST" action="/hr/leave-employees">
+    <div class="pay-table-wrap">
+      <table class="pay-table">
+        <thead><tr><th>Employee</th><th style="min-width:190px;">Manager</th><th>Employment type</th><th>Grade</th><th>Probation ends</th><th>Termination date</th><th>Work schedule</th></tr></thead>
+        <tbody>
+          <% if (!_staff.length) { %><tr><td colspan="7" class="sage-empty"><i class="fa fa-users"></i>No active employees.</td></tr><% } %>
+          <% _staff.forEach(function (emp) { var eid = Number(emp.id); %>
+          <tr>
+            <td><strong style="font-weight:600;"><%= emp.first_name %> <%= emp.last_name %></strong><small class="d-block text-muted"><%= emp.employee_ref || ('Employee #' + eid) %><% if (emp.manager_first) { %> &middot; currently <%= emp.manager_first %> <%= emp.manager_last %><% } %></small></td>
+            <td><select name="manager_<%= eid %>" class="form-control form-control-sm"><option value="">No manager</option><% _managers.forEach(function (mgr) { if (Number(mgr.id) === eid) return; %><option value="<%= mgr.id %>" <%= Number(emp.manager_id) === Number(mgr.id) ? 'selected' : '' %>><%= mgr.first_name %> <%= mgr.last_name %></option><% }); %></select></td>
+            <td><select name="employment_type_<%= eid %>" class="form-control form-control-sm"><option value="permanent" <%= emp.employment_type === 'permanent' ? 'selected' : '' %>>Permanent</option><option value="contract" <%= emp.employment_type === 'contract' ? 'selected' : '' %>>Contract</option><option value="probation" <%= emp.employment_type === 'probation' ? 'selected' : '' %>>Probation</option><option value="intern" <%= emp.employment_type === 'intern' ? 'selected' : '' %>>Intern</option><option value="consultant" <%= emp.employment_type === 'consultant' ? 'selected' : '' %>>Consultant</option></select></td>
+            <td><input type="text" name="grade_<%= eid %>" class="form-control form-control-sm" value="<%= emp.grade || '' %>" maxlength="40" placeholder="Grade"></td>
+            <td><input type="date" name="probation_end_<%= eid %>" class="form-control form-control-sm" value="<%= emp.probation_end ? String(emp.probation_end).slice(0, 10) : '' %>"></td>
+            <td><input type="date" name="termination_date_<%= eid %>" class="form-control form-control-sm" value="<%= emp.termination_date ? String(emp.termination_date).slice(0, 10) : '' %>"></td>
+            <td><select name="work_schedule_id_<%= eid %>" class="form-control form-control-sm"><option value="">Facility default</option><% _schedules.forEach(function (schedule) { %><option value="<%= schedule.id %>" <%= Number(emp.work_schedule_id) === Number(schedule.id) ? 'selected' : '' %>><%= schedule.name %> (<%= String(schedule.start_time).slice(0, 5) %>–<%= String(schedule.end_time).slice(0, 5) %>)</option><% }); %></select></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <div class="sage-card-foot"><span class="sage-muted" style="font-size:12px;">Managers approve direct reports first when the leave type uses two approval levels. Terminated employees cannot submit new leave.</span><button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save employee settings</button></div>
+  </form>
+</section>
+
+<%- include('partials/payroll-layout-end') %>

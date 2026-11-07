@@ -12,6 +12,7 @@ const { resolveDbConfig } = require('../../lib/resolveDbConfig');
 const ensurePayrollBootstrapSchema = require('../../lib/ensurePayrollBootstrapSchema');
 const ensureEmployeeHrSchema = require('../../lib/ensureEmployeeHrSchema');
 const ensureHrPayrollSchema = require('../../lib/ensureHrPayrollSchema');
+const { ensureLeaveSystemSchema } = require('../../lib/leaveSystem');
 const ensureFacilityIntegrationSchema = require('../../lib/ensureFacilityIntegrationSchema');
 const ensureAdminSchema = require('../../lib/ensureAdminSchema');
 
@@ -19,8 +20,12 @@ const ROOT = path.resolve(__dirname, '../..');
 const DB_NAME = `zaizens_payroll_browser_${process.pid}_${Date.now()}`;
 const ADMIN_USER = 'payadmin';
 const ADMIN_PASSWORD = 'admin123';
+const EMPLOYEE_USER = 'leavetester';
+const EMPLOYEE_PASSWORD = 'employee123';
 
 let admin = null;
+let adminId = 0;
+let employeeId = 0;
 let pool = null;
 let server = null;
 let baseURL = '';
@@ -59,6 +64,28 @@ function allowanceRow(page, code) {
   return page.locator(`tr.allowance-row:has(input[name="allowance_code[]"][value="${code}"])`);
 }
 
+function futureWorkingDate(offsetDays = 3) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() + offsetDays);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+async function login(page, username, password, urlPattern) {
+  await page.goto(`${baseURL}/`);
+  await page.getByLabel('Username').fill(username);
+  await page.getByLabel('Password').fill(password);
+  await Promise.all([
+    page.waitForURL(urlPattern, { timeout: 15_000 }),
+    page.getByRole('button', { name: /sign in/i }).click(),
+  ]);
+}
+
 test.beforeAll(async () => {
   test.setTimeout(120_000);
   loadEnv();
@@ -89,17 +116,29 @@ test.beforeAll(async () => {
   await ensurePayrollBootstrapSchema(pool);
   await ensureEmployeeHrSchema(pool);
   await ensureHrPayrollSchema(pool);
+  await ensureLeaveSystemSchema(pool);
   await ensureFacilityIntegrationSchema(pool);
   await ensureAdminSchema(pool);
 
   const hash = await bcrypt.hash(ADMIN_PASSWORD, 4);
-  await pool.query(
+  const [adminResult] = await pool.query(
     `INSERT INTO tbl_employee
       (first_name, last_name, username, password, role, status, joining_date,
        address, bio, emailid, dob, gender, phone, employee_id, default_facility_id)
      VALUES ('Payroll', 'Admin', ?, ?, '1', 1, CURDATE(), '', '', '', '', '', '', 'PAY-ADMIN', 1)`,
     [ADMIN_USER, hash]
   );
+  adminId = adminResult.insertId;
+
+  const employeeHash = await bcrypt.hash(EMPLOYEE_PASSWORD, 4);
+  const [employeeResult] = await pool.query(
+    `INSERT INTO tbl_employee
+      (first_name, last_name, username, password, role, status, joining_date,
+       address, bio, emailid, dob, gender, phone, employee_id, default_facility_id)
+     VALUES ('Leave', 'Tester', ?, ?, '101', 1, CURDATE(), '', '', '', '', '', '', 'LEAVE-TEST', 1)`,
+    [EMPLOYEE_USER, employeeHash]
+  );
+  employeeId = employeeResult.insertId;
 
   const port = await getFreePort();
   baseURL = `http://127.0.0.1:${port}`;
@@ -162,13 +201,7 @@ test.afterAll(async () => {
 });
 
 test('allowance settings form saves edits and reloads persisted values', async ({ page }) => {
-  await page.goto(`${baseURL}/`);
-  await page.getByLabel('Username').fill(ADMIN_USER);
-  await page.getByLabel('Password').fill(ADMIN_PASSWORD);
-  await Promise.all([
-    page.waitForURL(/\/(payroll|hr)(\?|$)/, { timeout: 15_000 }),
-    page.getByRole('button', { name: /sign in/i }).click(),
-  ]);
+  await login(page, ADMIN_USER, ADMIN_PASSWORD, /\/(payroll|hr)(\?|$)/);
 
   await page.goto(`${baseURL}/payroll/settings?sector=medical&tab=allowances`);
   await expect(page.getByRole('heading', { name: 'Allowances & Bonuses' })).toBeVisible();
@@ -215,4 +248,156 @@ test('allowance settings form saves edits and reloads persisted values', async (
     /^12\.5(?:0+)?$/
   );
   await expect(reloadedMedicalRisk.locator('input[name="allowance_enabled[]"]')).not.toBeChecked();
+});
+
+test('leave approval makes the employee on-leave in the attendance register', async ({ page }) => {
+  const leaveDate = futureWorkingDate();
+  await login(page, EMPLOYEE_USER, EMPLOYEE_PASSWORD, /\/hr(\?|$)/);
+
+  await page.goto(`${baseURL}/hr/request-leave`);
+  await page.locator('select[name="leave_type"]').selectOption('annual');
+  await page.locator('input[name="start_date"]').fill(leaveDate);
+  await page.locator('input[name="end_date"]').fill(leaveDate);
+  await page.locator('textarea[name="reason"]').fill('Browser leave approval regression');
+  await Promise.all([
+    page.waitForURL(/request-leave\?msg=/, { timeout: 15_000 }),
+    page.getByRole('button', { name: /submit request/i }).click(),
+  ]);
+
+  const [[request]] = await pool.query(
+    `SELECT id, status, days_requested
+       FROM tbl_hms_leave_request
+      WHERE employee_id = ? AND start_date = ?`,
+    [employeeId, leaveDate]
+  );
+  expect(request).toBeTruthy();
+  expect(request.status).toBe('pending');
+  expect(Number(request.days_requested)).toBe(1);
+
+  await page.goto(`${baseURL}/logout`);
+  await expect(page).toHaveURL(`${baseURL}/`);
+  await login(page, ADMIN_USER, ADMIN_PASSWORD, /\/(payroll|hr)(\?|$)/);
+
+  await page.goto(`${baseURL}/hr/leave-requests`);
+  const requestRow = page
+    .locator('tr[data-search*="leave tester"]')
+    .filter({ hasText: 'Browser leave approval regression' });
+  await expect(requestRow).toHaveCount(1);
+  page.once('dialog', (dialog) => dialog.accept());
+  await Promise.all([
+    page.waitForURL(/leave-requests\?msg=/, { timeout: 15_000 }),
+    requestRow.getByRole('button', { name: 'Approve' }).click(),
+  ]);
+
+  const [[approved]] = await pool.query(
+    'SELECT status, approved_by FROM tbl_hms_leave_request WHERE id = ?',
+    [request.id]
+  );
+  expect(approved.status).toBe('approved');
+  expect(Number(approved.approved_by)).toBe(adminId);
+
+  await page.goto(`${baseURL}/hr/attendance?date=${leaveDate}`);
+  const attendanceRow = page.locator('tr[data-search*="leave tester"]');
+  await expect(attendanceRow).toHaveCount(1);
+  await expect(attendanceRow.locator('select.att-status')).toHaveValue('on-leave');
+  await expect(attendanceRow.locator('input[name$="[in]"]')).toHaveValue('');
+  await expect(attendanceRow.locator('input[name$="[out]"]')).toHaveValue('');
+  await expect(attendanceRow).toContainText('Approved annual leave');
+  await expect(
+    page.locator('.sage-stat').filter({ hasText: 'On leave' }).locator('.sage-stat-value')
+  ).toHaveText('1');
+
+  await page.getByRole('button', { name: /save attendance/i }).click();
+  await page.waitForURL(/Attendance%20saved/i, { timeout: 15_000 });
+  const [[savedAttendance]] = await pool.query(
+    `SELECT status, check_in_time, check_out_time
+       FROM tbl_hms_attendance
+      WHERE facility_id = 1 AND employee_id = ? AND att_date = ?`,
+    [employeeId, leaveDate]
+  );
+  expect(savedAttendance.status).toBe('on-leave');
+  expect(savedAttendance.check_in_time).toBeNull();
+  expect(savedAttendance.check_out_time).toBeNull();
+});
+
+test('HR leave policy, balances, calendar, reports and employee settings render', async ({ page }) => {
+  await login(page, ADMIN_USER, ADMIN_PASSWORD, /\/(payroll|hr)(\?|$)/);
+  const screens = [
+    ['/hr/leave-balances', 'Leave balances'],
+    ['/hr/leave-types', 'Leave types & policy'],
+    ['/hr/leave-calendar', 'Leave calendar'],
+    ['/hr/leave-reports', 'Leave reports'],
+    ['/hr/leave-employees', 'Employee leave settings'],
+    ['/hr/notifications', 'Notifications'],
+  ];
+  for (const [path, heading] of screens) {
+    const response = await page.goto(`${baseURL}${path}`);
+    expect(response.status(), `${path} status`).toBe(200);
+    await expect(page.locator('h1').first(), `${path} heading`).toContainText(heading);
+  }
+});
+
+test('hourly permission records a partial-day request and partial attendance note', async ({ page }) => {
+  const leaveDate = futureWorkingDate(10);
+  await login(page, EMPLOYEE_USER, EMPLOYEE_PASSWORD, /\/hr(\?|$)/);
+  await page.goto(`${baseURL}/hr/request-leave`);
+  await page.locator('select[name="leave_type"]').selectOption('permission');
+  await page.locator('select[name="duration_unit"]').selectOption('hour');
+  await page.locator('input[name="start_date"]').fill(leaveDate);
+  await page.locator('input[name="end_date"]').fill(leaveDate);
+  await page.locator('input[name="start_time"]').fill('09:00');
+  await page.locator('input[name="end_time"]').fill('11:00');
+  await page.locator('textarea[name="reason"]').fill('Browser permission regression');
+  await Promise.all([
+    page.waitForURL(/request-leave\?msg=/, { timeout: 15_000 }),
+    page.getByRole('button', { name: /submit request/i }).click(),
+  ]);
+
+  const [[request]] = await pool.query(
+    `SELECT id, status, days_requested, total_hours, duration_unit
+       FROM tbl_hms_leave_request
+      WHERE employee_id = ? AND start_date = ?`,
+    [employeeId, leaveDate]
+  );
+  expect(request).toBeTruthy();
+  expect(request.status).toBe('pending');
+  expect(request.duration_unit).toBe('hour');
+  expect(Number(request.days_requested)).toBe(0.25);
+  expect(Number(request.total_hours)).toBe(2);
+  const [[day]] = await pool.query(
+    'SELECT days, minutes FROM tbl_hms_leave_request_day WHERE request_id = ?',
+    [request.id]
+  );
+  expect(Number(day.days)).toBe(0.25);
+  expect(Number(day.minutes)).toBe(120);
+
+  await page.goto(`${baseURL}/logout`);
+  await expect(page).toHaveURL(`${baseURL}/`);
+  await login(page, ADMIN_USER, ADMIN_PASSWORD, /\/(payroll|hr)(\?|$)/);
+  await page.goto(`${baseURL}/hr/leave-requests`);
+  const requestRow = page
+    .locator('tr[data-search*="leave tester"]')
+    .filter({ hasText: 'Browser permission regression' });
+  await expect(requestRow).toHaveCount(1);
+  page.once('dialog', (dialog) => dialog.accept());
+  await Promise.all([
+    page.waitForURL(/leave-requests\?msg=/, { timeout: 15_000 }),
+    requestRow.getByRole('button', { name: 'Approve' }).click(),
+  ]);
+  const [[approved]] = await pool.query(
+    'SELECT status, approved_by FROM tbl_hms_leave_request WHERE id = ?',
+    [request.id]
+  );
+  expect(approved.status).toBe('approved');
+  expect(Number(approved.approved_by)).toBe(adminId);
+
+  await page.goto(`${baseURL}/hr/attendance?date=${leaveDate}`);
+  const attendanceRow = page.locator('tr[data-search*="leave tester"]');
+  await expect(attendanceRow).toContainText('Approved permission leave');
+  const [[attendance]] = await pool.query(
+    'SELECT status, leave_request_id FROM tbl_hms_attendance WHERE employee_id = ? AND att_date = ?',
+    [employeeId, leaveDate]
+  );
+  expect(attendance.status).toBe('present');
+  expect(Number(attendance.leave_request_id)).toBe(Number(request.id));
 });

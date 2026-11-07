@@ -1,0 +1,83 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
+<%
+var _rows = rows || [];
+var _sched = schedule || {};
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Leave policy</p>
+    <h1>Leave types &amp; policy</h1>
+    <p class="sage-sub">Configure entitlements, paid/unpaid treatment, document rules, notice periods, carry-over, negative balances and approval levels.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <a href="/hr/leave-balances" class="btn btn-sage-ghost"><i class="fa fa-balance-scale mr-1"></i> Balances</a>
+    <a href="/hr/leave-employees" class="btn btn-sage-ghost"><i class="fa fa-users mr-1"></i> Employee settings</a>
+    <a href="/hr/leave-reports" class="btn btn-sage-ghost"><i class="fa fa-bar-chart mr-1"></i> Reports</a>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>Leave types</h2><p class="sage-card-sub">Policy changes apply to new requests and balance setup</p></div></div>
+  <form method="POST" action="/hr/leave-types">
+    <div class="pay-table-wrap">
+      <table class="pay-table">
+        <thead>
+          <tr><th>Type</th><th>Label</th><th>Unit</th><th>Paid</th><th>Tracked</th><th>Document</th><th>Active</th><th class="pay-num">Annual</th><th class="pay-num">Notice</th><th class="pay-num">Max run</th><th class="pay-num">Carry</th><th>Accrual</th><th class="pay-num">Levels</th><th>Prorate</th><th>Negative</th></tr>
+        </thead>
+        <tbody>
+          <% if (!_rows.length) { %><tr><td colspan="15" class="sage-empty"><i class="fa fa-sliders"></i>No leave types configured.</td></tr><% } %>
+          <% _rows.forEach(function (type) { var p = type.policy || {}; %>
+          <tr>
+            <td><input type="hidden" name="code" value="<%= type.code %>"><strong style="font-weight:600;"><%= type.code %></strong></td>
+            <td><input type="text" name="label_<%= type.code %>" class="form-control form-control-sm" value="<%= type.label %>" maxlength="120" required></td>
+            <td><select name="unit_<%= type.code %>" class="form-control form-control-sm"><option value="day" <%= type.unit === 'day' ? 'selected' : '' %>>Day</option><option value="hour" <%= type.unit === 'hour' ? 'selected' : '' %>>Hour</option></select></td>
+            <td><input type="checkbox" name="paid_<%= type.code %>" value="1" <%= Number(type.paid) ? 'checked' : '' %> aria-label="Paid"></td>
+            <td><input type="checkbox" name="balance_tracked_<%= type.code %>" value="1" <%= Number(type.balance_tracked) ? 'checked' : '' %> aria-label="Tracked"></td>
+            <td><input type="checkbox" name="requires_document_<%= type.code %>" value="1" <%= Number(type.requires_document) ? 'checked' : '' %> aria-label="Document required"></td>
+            <td><input type="checkbox" name="active_<%= type.code %>" value="1" <%= Number(type.active) ? 'checked' : '' %> aria-label="Active"></td>
+            <td class="pay-num"><input type="number" step="0.5" min="0" name="annual_days_<%= type.code %>" class="form-control form-control-sm" style="max-width:90px;margin-left:auto;" value="<%= Number(p.annual_days || 0) %>"></td>
+            <td class="pay-num"><input type="number" min="0" name="notice_days_<%= type.code %>" class="form-control form-control-sm" style="max-width:80px;margin-left:auto;" value="<%= Number(p.notice_days || 0) %>"></td>
+            <td class="pay-num"><input type="number" step="0.5" min="0" name="max_consecutive_days_<%= type.code %>" class="form-control form-control-sm" style="max-width:90px;margin-left:auto;" value="<%= Number(p.max_consecutive_days || 0) %>"></td>
+            <td class="pay-num"><input type="number" step="0.5" min="0" name="carryover_max_<%= type.code %>" class="form-control form-control-sm" style="max-width:90px;margin-left:auto;" value="<%= Number(p.carryover_max || 0) %>"></td>
+            <td><select name="accrual_method_<%= type.code %>" class="form-control form-control-sm"><option value="annual" <%= p.accrual_method === 'annual' ? 'selected' : '' %>>Annual</option><option value="monthly" <%= p.accrual_method === 'monthly' ? 'selected' : '' %>>Monthly</option><option value="none" <%= p.accrual_method === 'none' ? 'selected' : '' %>>None</option></select></td>
+            <td class="pay-num"><input type="number" min="1" max="3" name="approval_levels_<%= type.code %>" class="form-control form-control-sm" style="max-width:70px;margin-left:auto;" value="<%= Number(p.approval_levels || 1) %>"></td>
+            <td><input type="checkbox" name="prorate_<%= type.code %>" value="1" <%= Number(p.prorate) ? 'checked' : '' %> aria-label="Prorate"></td>
+            <td><input type="checkbox" name="negative_balance_allowed_<%= type.code %>" value="1" <%= Number(p.negative_balance_allowed) ? 'checked' : '' %> aria-label="Allow negative"></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+    <div class="sage-card-foot"><span class="sage-muted" style="font-size:12px;">Annual is the default entitlement. Prorate reduces a new joiner's first-year entitlement by complete months remaining. Levels = 2 routes manager first, then HR.</span><button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save policy</button></div>
+  </form>
+</section>
+
+<div class="sage-grid">
+  <section class="sage-card">
+    <div class="sage-card-head"><div><h2>Default work schedule</h2><p class="sage-card-sub">Used for clock-derived late, early, overtime and leave working days</p></div></div>
+    <form method="POST" action="/hr/leave-settings/schedule" class="sage-card-body">
+      <div class="sage-form-grid">
+        <div class="sage-field"><label>Name</label><input type="text" name="name" class="form-control" value="<%= _sched.name || 'Default schedule' %>" maxlength="120"></div>
+        <div class="sage-field"><label>Start time</label><input type="time" name="start_time" class="form-control" value="<%= _sched.start_time ? String(_sched.start_time).slice(0, 5) : '08:00' %>"></div>
+        <div class="sage-field"><label>End time</label><input type="time" name="end_time" class="form-control" value="<%= _sched.end_time ? String(_sched.end_time).slice(0, 5) : '17:00' %>"></div>
+        <div class="sage-field"><label>Break minutes</label><input type="number" min="0" max="240" name="break_minutes" class="form-control" value="<%= Number(_sched.break_minutes || 0) %>"></div>
+        <div class="sage-field"><label>Grace minutes</label><input type="number" min="0" max="120" name="grace_minutes" class="form-control" value="<%= Number(_sched.grace_minutes || 10) %>"></div>
+        <div class="sage-field"><label>Work days (0=Sun … 6=Sat)</label><input type="text" name="work_days" class="form-control" value="<%= _sched.work_days || '1,2,3,4,5' %>" placeholder="1,2,3,4,5"></div>
+      </div>
+      <button type="submit" class="btn btn-sage-ghost"><i class="fa fa-clock-o mr-1"></i> Save schedule</button>
+    </form>
+  </section>
+
+  <section class="sage-card">
+    <div class="sage-card-head"><div><h2>Policy notes</h2><p class="sage-card-sub">How the engine applies these values</p></div></div>
+    <div class="sage-card-body sage-muted" style="font-size:13px;line-height:1.7;">
+      <p><strong>Weekends and holidays</strong> are excluded from day counts. Hourly permission is converted at 8 hours per working day.</p>
+      <p><strong>Balances</strong> are reserved by pending requests and consumed when approved. Cancellation reverses the ledger entry. Carry-over is capped by the type's carry-over maximum.</p>
+      <p><strong>Documents</strong> are required at submission when enabled and are stored with the request. Employees and authorised approvers can download them.</p>
+      <p><strong>Attendance</strong> is written automatically on final approval. Full-day leave has blank clock times; partial leave keeps clock times and a leave note.</p>
+    </div>
+  </section>
+</div>
+
+<%- include('partials/payroll-layout-end') %>

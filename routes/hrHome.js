@@ -17,6 +17,11 @@ const LEAVE_TYPES = {
   annual: 'Annual leave',
   sick: 'Sick leave',
   unpaid: 'Unpaid leave',
+  permission: 'Permission',
+  maternity: 'Maternity leave',
+  paternity: 'Paternity leave',
+  compassionate: 'Compassionate leave',
+  study: 'Study leave',
   other: 'Other leave',
 };
 

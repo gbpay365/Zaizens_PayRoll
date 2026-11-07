@@ -33,6 +33,7 @@ const { allPresets: payrollTaxPresets, presetFor: payrollTaxPresetFor } = requir
 const { countRosterShiftsForMonth } = require('../lib/hmsRoster');
 const { syncPayrollPeriodToCoreAccount, syncPayrollPeriodsAfterDelete, formatCoreSyncNote } = require('../lib/coreAccountPayrollSync');
 const { logAdminAction } = require('../lib/adminAudit');
+const { applyLeaveDeductions } = require('../lib/payrollLeaveImpact');
 const crypto = require('crypto');
 
 /**
@@ -592,6 +593,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
    const o = parseFloat(row.other_allowances_snap) || 0;
    const gross = parseFloat(row.gross_salary) || 0;
    const net   = parseFloat(row.net_salary) || 0;
+   const unpaidDeduction = parseFloat(row.unpaid_leave_deduction) || 0;
+   const attendanceDeduction = parseFloat(row.attendance_deduction) || 0;
    const ded =
     (parseFloat(row.cnps_employee) || 0) +
     (parseFloat(row.cimr_employee) || 0) +
@@ -599,7 +602,9 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     (parseFloat(row.council_tax_deduction) || 0) +
     (parseFloat(row.development_tax_deduction) || 0) +
     (parseFloat(row.cnhc_deduction) || 0) +
-    (parseFloat(row.income_tax) || 0);
+    (parseFloat(row.income_tax) || 0) +
+    unpaidDeduction +
+    attendanceDeduction;
    // Employer rates come from the payroll settings (fall back to statutory defaults).
    const rateOr = (value, fallback) => {
     const n = parseFloat(value);
@@ -704,6 +709,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
   const year = Math.max(2000, Math.min(2100, parseInt(req.body.year, 10) || new Date().getFullYear()));
   try {
    await ensureHrPayrollSchema(pool);
+   await require('../lib/leaveSystem').ensureLeaveSystemSchema(pool);
    const staff = await activeStaff(fid);
    let processed = 0;
    let corrected = 0;
@@ -825,6 +831,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
         development_tax_deduction = ?, cnhc_deduction = ?, taxable_income = ?, income_tax = ?, net_salary = ?,
         basic_salary_snap = ?, housing_allowance_snap = ?, transport_allowance_snap = ?, other_allowances_snap = ?,
         payout_status = 'pending', allowances_snap = ?, non_taxable_allowance = ?,
+        unpaid_leave_days = 0, unpaid_leave_deduction = 0, attendance_deduction = 0,
         payment_date = NULL, reversed_at = NULL, reversal_reason = NULL, reversed_by = NULL
        WHERE id = ? AND facility_id = ? AND LOWER(COALESCE(payout_status, 'pending')) = 'reversed'`,
       [
@@ -887,6 +894,7 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
     );
      processed++;
     }
+    await applyLeaveDeductions(conn, fid, year, month);
     await conn.commit();
    } catch (txErr) {
     if (conn) await conn.rollback().catch(() => {});

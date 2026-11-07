@@ -258,12 +258,34 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
           [fid, date]
         ).catch(() => [[]]);
         for (const r of attRows || []) existing[r.employee_id] = r;
+
+        const [leaveRows] = await pool.query(
+          `SELECT id, employee_id, leave_type
+             FROM tbl_hms_leave_request
+            WHERE facility_id = ?
+              AND status = 'approved'
+              AND start_date <= ?
+              AND end_date >= ?
+            ORDER BY id ASC`,
+          [fid, date, date]
+        ).catch(() => [[]]);
+        for (const leave of leaveRows || []) {
+          if (existing[leave.employee_id]) continue;
+          existing[leave.employee_id] = {
+            status: 'on-leave',
+            check_in_time: null,
+            check_out_time: null,
+            leave_type: leave.leave_type,
+            leave_request_id: leave.id,
+            source: 'approved_leave',
+          };
+        }
       }
 
       const summary = { present: 0, late: 0, absent: 0, 'half-day': 0, 'on-leave': 0, saved: 0 };
       for (const row of rows) {
         const saved = existing[row.id];
-        if (saved) summary.saved += 1;
+        if (saved && saved.source !== 'approved_leave') summary.saved += 1;
         const st = String((saved && saved.status) || 'present').toLowerCase();
         if (summary[st] == null) summary[st] = 0;
         summary[st] += 1;
@@ -298,9 +320,12 @@ module.exports = function registerStaffDirectoryRoutes(app, pool, requireAuth) {
         [fid]
       ).catch(() => [[]]);
       const allowedIds = new Set((allowedRows || []).map((r) => parseInt(r.id, 10)));
+      const attendanceRows = Array.isArray(attendance)
+        ? attendance.map((row) => [row && row.employee_id, row])
+        : Object.entries(attendance);
 
-      for (const [eidStr, row] of Object.entries(attendance)) {
-        const employee_id = parseInt(eidStr, 10) || 0;
+      for (const [eidStr, row] of attendanceRows) {
+        const employee_id = parseInt((row && row.employee_id) || eidStr, 10) || 0;
         if (employee_id < 1 || !row || typeof row !== 'object') continue;
         if (!allowedIds.has(employee_id)) continue;
         const status = String(row.status || 'present').trim().slice(0, 24) || 'present';

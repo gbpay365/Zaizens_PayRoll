@@ -1,0 +1,36 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leave', paySelfServiceOnly: 'leave' }) %>
+<%
+var _rows = notifications || [];
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Notifications</p>
+    <h1>Notifications</h1>
+    <p class="sage-sub">Leave submission, approval, rejection and cancellation updates for your account.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <form method="POST" action="/hr/notifications/read"><button type="submit" class="btn btn-sage-ghost"><i class="fa fa-check mr-1"></i> Mark all read</button></form>
+    <a href="/hr/request-leave" class="btn btn-sage"><i class="fa fa-paper-plane mr-1"></i> Request leave</a>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>Recent notifications</h2><p class="sage-card-sub"><%= unreadNotifications || 0 %> unread</p></div></div>
+  <div class="sage-card-body">
+    <% if (!_rows.length) { %><div class="sage-empty"><i class="fa fa-bell-o"></i>No notifications yet.</div><% } %>
+    <% _rows.forEach(function (n) { %>
+    <div class="d-flex" style="gap:12px;padding:12px 0;border-bottom:1px solid #e8eeea;">
+      <span class="sage-person-avatar" style="background:<%= n.read_at ? '#f1f4f2' : '#e7f3ec' %>;"><i class="fa fa-bell"></i></span>
+      <div style="flex:1;min-width:0;">
+        <strong style="font-weight:600;display:block;"><%= n.title %></strong>
+        <span class="sage-muted" style="font-size:12.5px;"><%= n.body %></span>
+        <small class="d-block text-muted"><%= n.created_at ? new Date(n.created_at).toLocaleString('en-GB') : '' %></small>
+      </div>
+      <% if (n.link) { %><a href="<%= n.link %>" class="btn btn-sage-ghost btn-sm align-self-center">Open</a><% } %>
+    </div>
+    <% }); %>
+  </div>
+</section>
+
+<%- include('partials/payroll-layout-end') %>

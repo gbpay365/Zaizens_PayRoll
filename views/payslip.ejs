@@ -630,6 +630,26 @@ if (typeof _tl !== 'function') {
       </tr>
       <% } %>
 
+      <!-- Leave and absence deductions — applied from approved unpaid leave and the attendance register -->
+      <% const unpaidLeaveDed = parseFloat(row.unpaid_leave_deduction) || 0; %>
+      <% if (unpaidLeaveDed > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.unpaid_leave', 'Unpaid Leave') %><% if (parseFloat(row.unpaid_leave_days) > 0) { %> <em>(<%= row.unpaid_leave_days %> day(s))</em><% } %></td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td class="ded-amt"><%= xaf(unpaidLeaveDed) %></td>
+      </tr>
+      <% } %>
+      <% const absenceDed = parseFloat(row.attendance_deduction) || 0; %>
+      <% if (absenceDed > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.unapproved_absence', 'Unapproved Absence') %></td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td class="ded-amt"><%= xaf(absenceDed) %></td>
+      </tr>
+      <% } %>
+
       <!-- TOTAL DEDUCTIONS subtotal -->
       <tr class="subtotal-row pay-deductions-line">
         <td colspan="3" style="text-align:right;text-transform:uppercase;letter-spacing:.5px;"><%= _tl('payslip.total_deductions', 'Total Deductions / Total Retenues') %></td>

@@ -828,20 +828,35 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
       await ensureSchema();
       await Maintenance.ensureMaintenanceSchema(pool);
       const fid = facilityId(req);
+      const requestedTask = String(req.query.task || '').trim();
+      const requestedStatus = String(req.query.status || '').trim().toLowerCase();
+      const taskFilter = ['leave_carryover', 'leave_accrual', 'leave_digest'].includes(requestedTask) ? requestedTask : '';
+      const statusFilter = ['running', 'success', 'failed'].includes(requestedStatus) ? requestedStatus : '';
+      const where = ['facility_id = ?'];
+      const whereParams = [fid];
+      if (taskFilter) {
+        where.push('task = ?');
+        whereParams.push(taskFilter);
+      }
+      if (statusFilter) {
+        where.push('status = ?');
+        whereParams.push(statusFilter);
+      }
+      const whereSql = where.join(' AND ');
       const [rows] = await pool.query(
-        `SELECT id, task, run_key, status, detail, started_at, finished_at
+        `SELECT id, task, run_key, status, detail, actor_id, actor_name, started_at, finished_at
            FROM tbl_hms_maintenance_run
-          WHERE facility_id = ?
+          WHERE ${whereSql}
           ORDER BY started_at DESC, id DESC
           LIMIT 100`,
-        [fid]
+        whereParams
       ).catch(() => [[]]);
       const [stats] = await pool.query(
         `SELECT task, status, COUNT(*) AS total, MAX(finished_at) AS last_at
            FROM tbl_hms_maintenance_run
-          WHERE facility_id = ?
+          WHERE ${whereSql}
           GROUP BY task, status`,
-        [fid]
+        whereParams
       ).catch(() => [[]]);
 
       const runs = (rows || []).map((row) => {
@@ -855,6 +870,8 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
           ...row,
           taskLabel: maintenanceTaskLabel(row.task),
           statusKey: String(row.status || '').toLowerCase(),
+          triggerLabel: String(row.actor_name || '').trim()
+            || (n(row.actor_id) ? `Employee #${n(row.actor_id)}` : 'Scheduler'),
           startedDisplay: formatMaintenanceTime(row.started_at),
           finishedDisplay: formatMaintenanceTime(row.finished_at),
           durationLabel: formatMaintenanceDuration(elapsed),
@@ -890,6 +907,7 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
         title: 'Leave maintenance — ZAIZENS',
         runs,
         summary,
+        filters: { task: taskFilter, status: statusFilter, hasFilters: Boolean(taskFilter || statusFilter) },
         notifications: notes.rows,
         unreadNotifications: notes.unread,
         flash: req.query.msg || null,
@@ -906,9 +924,11 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
     try {
       await ensureSchema();
       await Maintenance.ensureMaintenanceSchema(pool);
+      const user = req.session.user || {};
       const out = await Maintenance.runDailyLeaveMaintenance(pool, {
         facilityId: fid,
         actorId: sessionEmpId(req),
+        actorName: String(user.name || user.username || '').trim().slice(0, 120),
         notify: false,
       });
       const result = (out.results || []).find((row) => Number(row.facilityId) === fid) || (out.results || [])[0] || {};

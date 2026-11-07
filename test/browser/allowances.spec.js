@@ -344,6 +344,21 @@ test('HR leave policy, balances, calendar, reports and employee settings render'
     page.getByRole('button', { name: /run now/i }).click(),
   ]);
   await expect(page.locator('.pay-flash-msg')).toContainText('Maintenance run finished');
+  const carryRow = page.locator('table tbody tr').filter({ hasText: 'Carry-over' }).first();
+  await expect(carryRow).toContainText('Payroll Admin');
+
+  await page.goto(`${baseURL}/hr/leave-maintenance?status=failed`);
+  await expect(page.locator('table tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
+  await expect(page.locator('.sage-empty')).toContainText('No maintenance runs match these filters');
+
+  await page.goto(`${baseURL}/hr/leave-maintenance`);
+  await page.locator('select[name="task"]').selectOption('leave_accrual');
+  await Promise.all([
+    page.waitForURL(/task=leave_accrual/, { timeout: 15_000 }),
+    page.getByRole('button', { name: /apply filters/i }).click(),
+  ]);
+  await expect(page.locator('table tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
+  await expect(page.locator('table tbody tr').filter({ hasText: 'Accrual' })).toHaveCount(1);
 });
 
 test('hourly permission records a partial-day request and partial attendance note', async ({ page }) => {

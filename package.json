@@ -13,6 +13,7 @@
     "sync:core:all": "node scripts/resync-payroll-to-core.js --all",
     "clear:core": "node scripts/clear-core-payroll-month.js",
     "migrate:from-hms": "node scripts/migrate-from-hms.js",
+    "smtp:check": "node scripts/check-smtp.js",
     "test:browser": "playwright test"
   },
   "engines": {

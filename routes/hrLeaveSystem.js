@@ -107,9 +107,17 @@ function formatMaintenanceDuration(seconds) {
 /**
  * A run's detail is either JSON from a completed task or plain error/digest text.
  */
-function parseMaintenanceDetail(task, detail) {
+function parseMaintenanceDetail(task, detail, statusKey) {
   const raw = String(detail == null ? '' : detail).trim();
-  if (!raw) return { note: 'No detail was recorded for this run.', changes: [], changeCount: 0 };
+  if (!raw) {
+    return {
+      note: statusKey === 'running'
+        ? 'Still running — the outcome will appear here when the task finishes.'
+        : 'No detail was recorded for this run.',
+      changes: [],
+      changeCount: 0,
+    };
+  }
   let parsed = null;
   try { parsed = JSON.parse(raw); } catch (_) { parsed = null; }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -912,7 +920,8 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
       ).catch(() => [[]]);
 
       const runs = (rows || []).map((row) => {
-        const parsed = parseMaintenanceDetail(row.task, row.detail);
+        const statusKey = String(row.status || '').toLowerCase();
+        const parsed = parseMaintenanceDetail(row.task, row.detail, statusKey);
         const started = row.started_at ? new Date(row.started_at) : null;
         const finished = row.finished_at ? new Date(row.finished_at) : null;
         const elapsed = started && finished && !Number.isNaN(finished - started)
@@ -921,7 +930,7 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
         return {
           ...row,
           taskLabel: maintenanceTaskLabel(row.task),
-          statusKey: String(row.status || '').toLowerCase(),
+          statusKey,
           triggerLabel: String(row.actor_name || '').trim()
             || (n(row.actor_id) ? `Employee #${n(row.actor_id)}` : 'Scheduler'),
           startedDisplay: formatMaintenanceTime(row.started_at),

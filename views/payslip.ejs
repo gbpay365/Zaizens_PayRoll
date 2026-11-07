@@ -390,7 +390,8 @@ if (typeof _tl !== 'function') {
     return r.trim();
   }
 
-  const net = gross - ded;
+  const overtimePay = parseFloat(row.overtime_amount) || 0;
+  const net = gross - ded + overtimePay;
   const netWords = numberToWords(net) + ' Francs CFA';
   const orgName  = brand.slipHeader || brand.orgName || brand.facilityName || (locals.company && locals.company.legalName) || 'Caminco S.A.';
   const empAddr        = (empSettings.employer_address || '').trim();
@@ -548,6 +549,16 @@ if (typeof _tl !== 'function') {
         <td><%= xaf(typeof taxableGross !== 'undefined' ? taxableGross : gross) %></td>
       </tr>
 
+      <!-- Overtime from the attendance register — paid on top of the taxable gross -->
+      <% if (overtimePay > 0) { %>
+      <tr class="pay-earnings-line">
+        <td><%= _tl('payslip.overtime', 'Overtime (Attendance)') %></td>
+        <td><%= (Number(row.overtime_minutes || 0) / 60).toFixed(2) %> h</td>
+        <td>&mdash;</td>
+        <td><%= xaf(overtimePay) %></td>
+      </tr>
+      <% } %>
+
       <!-- DEDUCTIONS HEADER -->
       <tr class="section-hdr section-deductions">
         <td colspan="4"><%= _tl('payslip.statutory_deductions', 'Statutory Deductions / Retenues Légales') %></td>
@@ -640,10 +651,21 @@ if (typeof _tl !== 'function') {
         <td class="ded-amt"><%= xaf(unpaidLeaveDed) %></td>
       </tr>
       <% } %>
-      <% const absenceDed = parseFloat(row.attendance_deduction) || 0; %>
+      <% const lateDed = parseFloat(row.late_deduction) || 0; %>
+      <% if (lateDed > 0) { %>
+      <tr class="pay-deductions-line">
+        <td><%= _tl('payslip.late_arrival', 'Late Arrival') %><% if (Number(row.late_minutes) > 0) { %> <em>(<%= row.late_minutes %> min)</em><% } %></td>
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+        <td class="ded-amt"><%= xaf(lateDed) %></td>
+      </tr>
+      <% } %>
+      <% const absenceDed = row.absence_deduction != null
+        ? (parseFloat(row.absence_deduction) || 0)
+        : Math.max(0, (parseFloat(row.attendance_deduction) || 0) - lateDed); %>
       <% if (absenceDed > 0) { %>
       <tr class="pay-deductions-line">
-        <td><%= _tl('payslip.unapproved_absence', 'Unapproved Absence') %></td>
+        <td><%= _tl('payslip.unapproved_absence', 'Unapproved Absence') %><% if (parseFloat(row.absence_days) > 0) { %> <em>(<%= row.absence_days %> day(s))</em><% } %></td>
         <td>&mdash;</td>
         <td>&mdash;</td>
         <td class="ded-amt"><%= xaf(absenceDed) %></td>

@@ -7,6 +7,8 @@ const multer = require('multer');
 const ensureHrPayrollSchema = require('../lib/ensureHrPayrollSchema');
 const L = require('../lib/leaveSystem');
 const W = require('../lib/leaveWorkflow');
+const Accrual = require('../lib/leaveAccrual');
+const AttendancePolicy = require('../lib/attendancePolicy');
 const { logAdminAction } = require('../lib/adminAudit');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'public', 'uploads', 'leave');
@@ -741,37 +743,8 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
     const back = `/hr/leave-balances?year=${year}`;
     try {
       await ensureSchema();
-      const policies = await L.loadPolicies(pool, fid);
-      const [staff] = await pool.query(
-        'SELECT id FROM tbl_employee WHERE status = 1 AND (default_facility_id IS NULL OR default_facility_id = ?)',
-        [fid]
-      );
-      let applied = 0;
-      for (const employee of staff || []) {
-        const prior = await L.getBalancesForEmployee(pool, fid, employee.id, year - 1);
-        for (const row of prior.rows || []) {
-          const policy = policies[row.leave_type] || {};
-          const cap = n(policy.carryover_max);
-          if (cap <= 0 || n(row.remaining) <= 0) continue;
-          const [[already]] = await pool.query(
-            "SELECT id FROM tbl_hms_leave_ledger WHERE facility_id = ? AND employee_id = ? AND leave_type = ? AND leave_year = ? AND entry_type = 'carryover' LIMIT 1",
-            [fid, employee.id, row.leave_type, year]
-          );
-          if (already) continue;
-          const carry = Math.min(cap, n(row.remaining));
-          await L.ensureEmployeeBalances(pool, fid, employee.id, year);
-          await pool.query(
-            'UPDATE tbl_hms_leave_balance SET carried_days = carried_days + ? WHERE facility_id = ? AND employee_id = ? AND leave_type = ? AND year = ?',
-            [carry, fid, employee.id, row.leave_type, year]
-          );
-          await pool.query(
-            `INSERT INTO tbl_hms_leave_ledger (facility_id, employee_id, leave_type, leave_year, entry_date, entry_type, days, note, created_by)
-             VALUES (?,?,?,?,?,?,?,?,?)`,
-            [fid, employee.id, row.leave_type, year, L.todayIso(), 'carryover', carry, `Carry-over from ${year - 1}`, sessionEmpId(req)]
-          );
-          applied += 1;
-        }
-      }
+      const result = await Accrual.runCarryOver(pool, fid, year, sessionEmpId(req));
+      const applied = result.applied;
       await audit(req, 'hr.leave.carryover', null, `Carry-over run for ${year}: ${applied} balance(s) updated.`);
       res.redirect(back + '&msg=' + encodeURIComponent(`Carry-over complete: ${applied} balance(s) updated.`));
     } catch (e) {
@@ -785,48 +758,8 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
     const back = `/hr/leave-balances?year=${year}`;
     try {
       await ensureSchema();
-      const types = await L.loadLeaveTypes(pool, fid, true);
-      const policies = await L.loadPolicies(pool, fid);
-      const [staff] = await pool.query(
-        'SELECT id FROM tbl_employee WHERE status = 1 AND (default_facility_id IS NULL OR default_facility_id = ?)',
-        [fid]
-      );
-      const today = new Date();
-      let updated = 0;
-      for (const employee of staff || []) {
-        const setup = await L.ensureEmployeeBalances(pool, fid, employee.id, year);
-        const joinDate = setup.employee && setup.employee.joining_date ? L.parseDate(setup.employee.joining_date) : null;
-        for (const type of types) {
-          if (!Number(type.balance_tracked)) continue;
-          const policy = policies[type.code] || {};
-          let target = n(policy.annual_days);
-          if (target <= 0) continue;
-          if (String(policy.accrual_method) === 'monthly') {
-            const elapsedMonths = year < today.getFullYear() ? 12 : (year > today.getFullYear() ? 0 : today.getMonth() + 1);
-            target = Math.round(target * (elapsedMonths / 12) * 100) / 100;
-          }
-          if (Number(policy.prorate) && joinDate && joinDate.getFullYear() === year) {
-            target = Math.round(target * ((12 - joinDate.getMonth()) / 12) * 100) / 100;
-          }
-          const [[existing]] = await pool.query(
-            'SELECT balance FROM tbl_hms_leave_balance WHERE facility_id = ? AND employee_id = ? AND leave_type = ? AND year = ? LIMIT 1 FOR UPDATE',
-            [fid, employee.id, type.code, year]
-          );
-          const before = n(existing && existing.balance);
-          const delta = Math.round((target - before) * 100) / 100;
-          if (Math.abs(delta) < 0.005) continue;
-          await pool.query(
-            'UPDATE tbl_hms_leave_balance SET balance = ? WHERE facility_id = ? AND employee_id = ? AND leave_type = ? AND year = ?',
-            [target, fid, employee.id, type.code, year]
-          );
-          await pool.query(
-            `INSERT INTO tbl_hms_leave_ledger (facility_id, employee_id, leave_type, leave_year, entry_date, entry_type, days, note, created_by)
-             VALUES (?,?,?,?,?,?,?,?,?)`,
-            [fid, employee.id, type.code, year, L.todayIso(), 'accrual', delta, `Entitlement accrual to ${target}`, sessionEmpId(req)]
-          );
-          updated += 1;
-        }
-      }
+      const result = await Accrual.runAccrual(pool, fid, year, sessionEmpId(req));
+      const updated = result.updated;
       await audit(req, 'hr.leave.accrual', null, `Entitlement accrual run for ${year}: ${updated} balance(s) updated.`);
       res.redirect(back + '&msg=' + encodeURIComponent(`Entitlement accrual complete: ${updated} balance(s) updated.`));
     } catch (e) {
@@ -845,11 +778,13 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
         'SELECT * FROM tbl_hms_work_schedule WHERE facility_id = ? ORDER BY active DESC, id LIMIT 1',
         [fid]
       ).catch(() => [[null]]);
+      const attendancePolicy = await AttendancePolicy.loadPolicy(pool, fid);
       const notes = await notificationsFor(req);
       res.render('hr-leave-types', {
         title: 'Leave policy — ZAIZENS',
         rows,
         schedule,
+        attendancePolicy,
         notifications: notes.rows,
         unreadNotifications: notes.unread,
         flash: req.query.msg || null,
@@ -1140,6 +1075,67 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
       res.redirect(back + '&msg=' + encodeURIComponent('Attendance saved.'));
     } catch (e) {
       res.redirect(back + '&err=' + encodeURIComponent(e.message));
+    }
+  });
+
+  app.post('/hr/attendance/policy', requireAuth, requireLeaveAdmin, async (req, res) => {
+    const fid = facilityId(req);
+    try {
+      await ensureSchema();
+      const policy = await AttendancePolicy.savePolicy(pool, fid, req.body);
+      await audit(
+        req,
+        'hr.attendance.policy',
+        null,
+        `Attendance policy saved: ${policy.monthly_work_days} work days, ${policy.standard_daily_hours}h day, overtime x${policy.overtime_multiplier}.`
+      );
+      res.redirect('/hr/leave-types?msg=' + encodeURIComponent('Attendance and payroll policy saved.'));
+    } catch (e) {
+      res.redirect('/hr/leave-types?err=' + encodeURIComponent(e.message));
+    }
+  });
+
+  app.get('/hr/attendance/export.csv', requireAuth, requireAttendanceAdmin, async (req, res) => {
+    const fid = facilityId(req);
+    const today = L.todayIso();
+    let from = String(req.query.from || '').slice(0, 10);
+    let to = String(req.query.to || '').slice(0, 10);
+    if (!L.parseDate(from)) from = `${today.slice(0, 8)}01`;
+    if (!L.parseDate(to)) to = from;
+    if (to < from) [from, to] = [to, from];
+    if (L.dateRange(from, to).length > 366) to = L.addDays(from, 365) || to;
+    try {
+      await ensureSchema();
+      const employeeId = int(req.query.employee_id, 0);
+      const [rows] = await pool.query(
+        `SELECT a.att_date, a.status, a.check_in_time, a.check_out_time, a.worked_minutes,
+                a.late_minutes, a.early_minutes, a.overtime_minutes, a.source, a.notes,
+                e.id AS employee_pk, e.employee_id AS employee_code, e.first_name, e.last_name
+           FROM tbl_hms_attendance a
+           JOIN tbl_employee e ON e.id = a.employee_id
+          WHERE a.facility_id = ? AND a.att_date BETWEEN ? AND ?
+            AND (? = 0 OR e.id = ?)
+          ORDER BY a.att_date, e.last_name, e.first_name`,
+        [fid, from, to, employeeId, employeeId]
+      );
+      const header = ['Employee code', 'Employee ID', 'Employee', 'Date', 'Status', 'Check in', 'Check out',
+        'Worked minutes', 'Late minutes', 'Early minutes', 'Overtime minutes', 'Source', 'Notes'];
+      const lines = [header.map(csv).join(',')];
+      for (const row of rows || []) {
+        lines.push([
+          row.employee_code || '', row.employee_pk, `${row.first_name || ''} ${row.last_name || ''}`.trim(),
+          L.isoDate(row.att_date), row.status, String(row.check_in_time || '').slice(0, 8),
+          String(row.check_out_time || '').slice(0, 8), Number(row.worked_minutes) || 0,
+          Number(row.late_minutes) || 0, Number(row.early_minutes) || 0, Number(row.overtime_minutes) || 0,
+          row.source || '', row.notes || '',
+        ].map(csv).join(','));
+      }
+      await audit(req, 'hr.attendance.export', employeeId || null, `Attendance CSV exported ${from} to ${to} (${(rows || []).length} row(s)).`);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="attendance_${from}_${to}.csv"`);
+      res.send('\uFEFF' + lines.join('\r\n') + '\r\n');
+    } catch (e) {
+      res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });
     }
   });
 };

@@ -2,6 +2,7 @@
 <%
 var _rows = rows || [];
 var _sched = schedule || {};
+var _att = attendancePolicy || {};
 %>
 
 <div class="sage-page-head">
@@ -70,12 +71,29 @@ var _sched = schedule || {};
   </section>
 
   <section class="sage-card">
+    <div class="sage-card-head"><div><h2>Attendance &amp; payroll policy</h2><p class="sage-card-sub">Drives overtime pay, late penalties and absence deductions</p></div></div>
+    <form method="POST" action="/hr/attendance/policy" class="sage-card-body">
+      <div class="sage-form-grid">
+        <div class="sage-field"><label>Paid days per month</label><input type="number" step="0.01" min="1" max="31" name="monthly_work_days" class="form-control" value="<%= Number(_att.monthly_work_days || 22) %>"></div>
+        <div class="sage-field"><label>Standard hours per day</label><input type="number" step="0.5" min="1" max="24" name="standard_daily_hours" class="form-control" value="<%= Number(_att.standard_daily_hours || 8) %>"></div>
+        <div class="sage-field"><label>Overtime multiplier</label><input type="number" step="0.05" min="0" max="5" name="overtime_multiplier" class="form-control" value="<%= Number(_att.overtime_multiplier ?? 1.25) %>"></div>
+        <div class="sage-field"><label>Late penalty (× hourly rate per minute)</label><input type="number" step="0.05" min="0" max="5" name="late_penalty_multiplier" class="form-control" value="<%= Number(_att.late_penalty_multiplier ?? 1) %>"></div>
+        <div class="sage-field"><label>Absence multiplier</label><input type="number" step="0.05" min="0" max="5" name="absence_multiplier" class="form-control" value="<%= Number(_att.absence_multiplier ?? 1) %>"></div>
+        <div class="sage-field"><label>Unpaid leave multiplier</label><input type="number" step="0.05" min="0" max="5" name="unpaid_leave_multiplier" class="form-control" value="<%= Number(_att.unpaid_leave_multiplier ?? 1) %>"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin:14px 0;font-size:13px;"><input type="checkbox" name="overtime_enabled" value="1" <%= Number(_att.overtime_enabled) === 0 ? '' : 'checked' %>> Pay recorded overtime on payroll</label>
+      <button type="submit" class="btn btn-sage-ghost"><i class="fa fa-calculator mr-1"></i> Save attendance policy</button>
+    </form>
+  </section>
+
+  <section class="sage-card">
     <div class="sage-card-head"><div><h2>Policy notes</h2><p class="sage-card-sub">How the engine applies these values</p></div></div>
     <div class="sage-card-body sage-muted" style="font-size:13px;line-height:1.7;">
       <p><strong>Weekends and holidays</strong> are excluded from day counts. Hourly permission is converted at 8 hours per working day.</p>
       <p><strong>Balances</strong> are reserved by pending requests and consumed when approved. Cancellation reverses the ledger entry. Carry-over is capped by the type's carry-over maximum.</p>
       <p><strong>Documents</strong> are required at submission when enabled and are stored with the request. Employees and authorised approvers can download them.</p>
       <p><strong>Attendance</strong> is written automatically on final approval. Full-day leave has blank clock times; partial leave keeps clock times and a leave note.</p>
+      <p><strong>Payroll</strong> pays overtime above the scheduled end time and deducts late minutes, absences and unpaid leave at the rates above. Balances accrue automatically once a day, and carry-over runs at the start of the leave year.</p>
     </div>
   </section>
 </div>

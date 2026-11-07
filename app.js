@@ -336,6 +336,7 @@ require('./routes/staffDirectory')(app, pool, requireAuth);
 require('./routes/taxHub')(app, pool, requireAuth, { requirePerm });
 require('./routes/statutoryReports')(app, pool, requireAuth, { requirePerm });
 require('./routes/integrationSettings')(app, pool, requireAuth, { requireAdminOrSuper });
+require('./routes/attendanceDevice')(app, pool);
 require('./routes/employees')(app, pool, requireAuth, { requireAdminOrSuper });
 require('./routes/hrHome')(app, pool, requireAuth);
 require('./routes/payrollOptimizer')(app, pool, requireAuth, { requirePayrollAccess });
@@ -348,6 +349,7 @@ async function boot() {
       await require('./lib/ensureEmployeeHrSchema')(pool);
       await require('./lib/ensureHrPayrollSchema')(pool);
       await require('./lib/leaveSystem').ensureLeaveSystemSchema(pool);
+      await require('./lib/maintenanceScheduler').ensureMaintenanceSchema(pool);
       await require('./lib/ensureFacilityIntegrationSchema')(pool);
       await require('./lib/ensureAdminSchema')(pool).catch((e) => console.warn('[admin schema]', e.message));
       await require('./lib/ensurePayrollRoleProfiles')(pool).catch((e) => console.warn('[payroll roles]', e.message));
@@ -361,6 +363,13 @@ async function boot() {
     const boundPort = addr && typeof addr === 'object' ? addr.port : PORT;
     console.log(`ZAIZENS PAY listening on port ${boundPort}`);
   });
+
+  const maintenance = require('./lib/maintenanceScheduler').startMaintenanceScheduler(pool);
+  if (maintenance.started) {
+    console.log(`[hr-maintenance] daily leave run scheduled at ${maintenance.hour}:00, checked every ${maintenance.intervalMinutes}m`);
+  } else {
+    console.log(`[hr-maintenance] scheduler off (${maintenance.reason})`);
+  }
 }
 
 boot();

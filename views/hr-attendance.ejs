@@ -17,6 +17,7 @@ if (isNaN(_dateLabel.getTime())) _dateLabel = new Date();
       <input type="date" name="date" class="form-control" style="width:160px;" value="<%= date %>" aria-label="Attendance date">
       <button type="submit" class="btn btn-sage-ghost">Fetch date</button>
     </form>
+    <a href="/hr/attendance/export.csv?from=<%= String(date).slice(0, 8) %>01&to=<%= date %>" class="btn btn-sage-ghost"><i class="fa fa-download mr-1"></i> Export CSV</a>
     <a href="/hr/leave-calendar" class="btn btn-sage-ghost"><i class="fa fa-calendar mr-1"></i> Leave calendar</a>
     <a href="/hr" class="btn btn-sage-ghost"><i class="fa fa-home mr-1"></i> HR overview</a>
   </div>
@@ -77,6 +78,14 @@ if (isNaN(_dateLabel.getTime())) _dateLabel = new Date();
     </div>
     <div class="sage-card-foot"><span class="sage-muted" style="font-size:12px;">Saving writes an attendance audit row and marks the day as a locked manual entry. Payroll uses unpaid leave and unapproved absences for deductions.</span><button type="submit" class="btn btn-sage"><i class="fa fa-save mr-1"></i> Save attendance</button></div>
   </form>
+</section>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>Clock devices &amp; export</h2><p class="sage-card-sub">Biometric punch ingestion and CSV extracts</p></div></div>
+  <div class="sage-card-body sage-muted" style="font-size:13px;line-height:1.7;">
+    <p><strong>Device endpoint:</strong> <code>POST /api/attendance/punch</code> with header <code>X-Device-Token</code> and JSON <code>{ "employee_code": "EMP-001", "direction": "in", "timestamp": "2026-11-07T08:02:00" }</code>. Set the shared token in <code>ATTENDANCE_DEVICE_TOKEN</code> and point the device at this server.</p>
+    <p><strong>CSV export:</strong> the button above downloads the displayed month up to the selected date. Overtime pay and late, absence and unpaid-leave deductions follow the attendance policy on the <a href="/hr/leave-types">leave policy</a> page when monthly payroll runs.</p>
+  </div>
 </section>
 
 <style>

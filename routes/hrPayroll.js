@@ -832,6 +832,8 @@ module.exports = function registerHrPayrollRoutes(app, pool, requireAuth, deps) 
         basic_salary_snap = ?, housing_allowance_snap = ?, transport_allowance_snap = ?, other_allowances_snap = ?,
         payout_status = 'pending', allowances_snap = ?, non_taxable_allowance = ?,
         unpaid_leave_days = 0, unpaid_leave_deduction = 0, attendance_deduction = 0,
+        absence_days = 0, absence_deduction = 0, late_minutes = 0, late_deduction = 0,
+        overtime_minutes = 0, overtime_amount = 0,
         payment_date = NULL, reversed_at = NULL, reversal_reason = NULL, reversed_by = NULL
        WHERE id = ? AND facility_id = ? AND LOWER(COALESCE(payout_status, 'pending')) = 'reversed'`,
       [

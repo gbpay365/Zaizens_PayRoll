@@ -46,21 +46,26 @@ function getFreePort() {
   });
 }
 
-async function waitForServer() {
+async function waitForApp(url, childRef, outputRef) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    if (server && server.exitCode !== null) {
-      throw new Error(`Test app exited during startup.\n${serverOutput.slice(-4000)}`);
+    const child = childRef();
+    if (child && child.exitCode !== null) {
+      throw new Error(`Test app exited during startup.\n${outputRef().slice(-4000)}`);
     }
     try {
-      const response = await fetch(`${baseURL}/__health`);
+      const response = await fetch(`${url}/__health`);
       if (response.ok) return;
     } catch (_) {
       // Keep polling until the app has finished its schema boot.
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Test app did not become healthy.\n${serverOutput.slice(-4000)}`);
+  throw new Error(`Test app did not become healthy.\n${outputRef().slice(-4000)}`);
+}
+
+async function waitForServer() {
+  return waitForApp(baseURL, () => server, () => serverOutput);
 }
 
 function allowanceRow(page, code) {
@@ -79,14 +84,44 @@ function futureWorkingDate(offsetDays = 3) {
   ].join('-');
 }
 
-async function login(page, username, password, urlPattern) {
-  await page.goto(`${baseURL}/`);
+async function login(page, username, password, urlPattern, base = baseURL) {
+  await page.goto(`${base}/`);
   await page.getByLabel('Username').fill(username);
   await page.getByLabel('Password').fill(password);
   await Promise.all([
     page.waitForURL(urlPattern, { timeout: 15_000 }),
     page.getByRole('button', { name: /sign in/i }).click(),
   ]);
+}
+
+function buildChildEnv(config, overrides = {}) {
+  const env = {
+    ...process.env,
+    NODE_ENV: 'test',
+    SESSION_SECRET: 'browser-regression-test-secret',
+    DB_HOST: config.host,
+    DB_PORT: String(config.port),
+    DB_USER: config.user,
+    DB_PASSWORD: config.password,
+    DB_NAME,
+    MYSQLHOST: config.host,
+    MYSQL_HOST: config.host,
+    MYSQLPORT: String(config.port),
+    MYSQL_PORT: String(config.port),
+    MYSQLUSER: config.user,
+    MYSQL_USER: config.user,
+    MYSQLPASSWORD: config.password,
+    MYSQL_PASSWORD: config.password,
+    MYSQLDATABASE: DB_NAME,
+    MYSQL_DATABASE: DB_NAME,
+    ...overrides,
+  };
+  delete env.DATABASE_URL;
+  delete env.MYSQL_URL;
+  delete env.RAILWAY_ENVIRONMENT;
+  delete env.RAILWAY;
+  delete env.RAILWAY_PROJECT_ID;
+  return env;
 }
 
 test.beforeAll(async () => {
@@ -155,32 +190,7 @@ test.beforeAll(async () => {
 
   const port = await getFreePort();
   baseURL = `http://127.0.0.1:${port}`;
-  const childEnv = {
-    ...process.env,
-    NODE_ENV: 'test',
-    PORT: String(port),
-    SESSION_SECRET: 'browser-regression-test-secret',
-    DB_HOST: config.host,
-    DB_PORT: String(config.port),
-    DB_USER: config.user,
-    DB_PASSWORD: config.password,
-    DB_NAME,
-    MYSQLHOST: config.host,
-    MYSQL_HOST: config.host,
-    MYSQLPORT: String(config.port),
-    MYSQL_PORT: String(config.port),
-    MYSQLUSER: config.user,
-    MYSQL_USER: config.user,
-    MYSQLPASSWORD: config.password,
-    MYSQL_PASSWORD: config.password,
-    MYSQLDATABASE: DB_NAME,
-    MYSQL_DATABASE: DB_NAME,
-  };
-  delete childEnv.DATABASE_URL;
-  delete childEnv.MYSQL_URL;
-  delete childEnv.RAILWAY_ENVIRONMENT;
-  delete childEnv.RAILWAY;
-  delete childEnv.RAILWAY_PROJECT_ID;
+  const childEnv = buildChildEnv(config, { PORT: String(port) });
 
   server = spawn(process.execPath, ['app.js'], {
     cwd: ROOT,
@@ -456,6 +466,49 @@ test('each HR account keeps its own maintenance filters', async ({ browser }) =>
   } finally {
     await contextOne.close().catch(() => {});
     await contextTwo.close().catch(() => {});
+  }
+});
+
+test('no email-off banner once SMTP and a recipient are configured', async ({ page }) => {
+  test.setTimeout(90_000);
+  const config = resolveDbConfig(process.env);
+  const port = await getFreePort();
+  const childEnv = buildChildEnv(config, {
+    PORT: String(port),
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_PORT: '587',
+    SMTP_SECURE: '0',
+    SMTP_FROM: 'Zaizens PayRoll <payroll@example.com>',
+    HR_MAINTENANCE_NOTIFY_EMAILS: 'hr@example.com',
+    // The banner is read per request; keep this instance from firing a run or
+    // attempting real SMTP delivery while the assertion runs.
+    HR_MAINTENANCE_SCHEDULER_ENABLED: '0',
+  });
+  const child = spawn(process.execPath, ['app.js'], {
+    cwd: ROOT,
+    env: childEnv,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  child.stdout.on('data', (chunk) => { output += chunk; });
+  child.stderr.on('data', (chunk) => { output += chunk; });
+  const url = `http://127.0.0.1:${port}`;
+  try {
+    await waitForApp(url, () => child, () => output);
+    await login(page, ADMIN_USER, ADMIN_PASSWORD, /\/(payroll|hr)(\?|$)/, url);
+    const response = await page.goto(`${url}/hr/leave-maintenance`);
+    expect(response.status()).toBe(200);
+    await expect(page.locator('h1').first()).toContainText('Leave maintenance');
+    await expect(page.locator('#maintenanceHealth')).toBeVisible();
+    await expect(page.locator('#maintenanceMailNotice')).toHaveCount(0);
+    await expect(page.getByText('Email alerts are off')).toHaveCount(0);
+  } finally {
+    if (child.exitCode === null) {
+      const exited = new Promise((resolve) => child.once('exit', resolve));
+      child.kill();
+      await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 5000))]);
+      if (child.exitCode === null) child.kill('SIGKILL');
+    }
   }
 });
 

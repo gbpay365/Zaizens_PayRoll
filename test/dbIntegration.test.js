@@ -713,3 +713,113 @@ test('bulk audit facility assignment keeps the authorization and unresolved-row 
     assert.match(row.detail, /Bulk-assigned facility/i);
   }
 });
+
+test('allowance settings save persists edits and requires payroll write access', async (t) => {
+  if (!requireDatabase(t)) return;
+
+  const allowanceBody = () => {
+    const body = new URLSearchParams();
+    body.append('sector', 'medical');
+    body.append('allowance_code[]', 'seniority');
+    body.append('allowance_code[]', 'medical_risk');
+    body.append('allowance_label[]', 'Seniority Bonus (regression)');
+    body.append('allowance_label[]', 'Medical Risk Allowance (regression)');
+    body.append('allowance_label_fr[]', "Prime d'ancienneté (régression)");
+    body.append('allowance_label_fr[]', 'Prime de risque médical (régression)');
+    body.append('allowance_calc_type[]', 'seniority_scale');
+    body.append('allowance_calc_type[]', 'pct_basic');
+    body.append('allowance_pct_value[]', '');
+    body.append('allowance_pct_value[]', '12.5');
+    body.append('allowance_fixed_amount[]', '');
+    body.append('allowance_fixed_amount[]', '');
+    body.append('allowance_per_unit_amount[]', '');
+    body.append('allowance_per_unit_amount[]', '');
+    body.append('allowance_cap_pct[]', '35');
+    body.append('allowance_cap_pct[]', '');
+    body.append('allowance_sort_order[]', '1');
+    body.append('allowance_sort_order[]', '4');
+    body.append('allowance_legal_basis[]', 'Labour Code Art.68 (regression)');
+    body.append('allowance_legal_basis[]', 'Regression legal basis');
+    body.append('allowance_description[]', 'Regression coverage for the seniority row.');
+    body.append('allowance_description[]', 'Regression coverage for the medical risk row.');
+    body.append('allowance_applies_roles[]', '');
+    body.append('allowance_applies_roles[]', '[2,7]');
+    body.append('allowance_enabled[]', 'seniority');
+    return body;
+  };
+
+  await withApp(
+    makeApp(registerHrPayrollRoutes, pool, { role: '101', userPerms: ['payroll.read'] }),
+    async (base) => {
+      const res = await request(base, '/payroll/settings/allowances/save', {
+        method: 'POST',
+        body: allowanceBody(),
+      });
+      assert.equal(res.status, 403);
+    }
+  );
+
+  await withApp(makeApp(registerHrPayrollRoutes, pool), async (base) => {
+    const res = await request(base, '/payroll/settings/allowances/save', {
+      method: 'POST',
+      body: allowanceBody(),
+    });
+    assert.equal(res.status, 302);
+    assert.match(
+      decodeURIComponent(res.headers.get('location')),
+      /Allowance settings saved/i
+    );
+  });
+
+  const [rows] = await pool.query(
+    `SELECT code, label, label_fr, calc_type, enabled, pct_value, fixed_amount,
+            per_unit_amount, cap_pct, applies_to_roles, legal_basis, description, sort_order
+       FROM tbl_hms_allowance_settings
+      WHERE facility_id = ? AND sector = ? AND code IN (?, ?)
+      ORDER BY code`,
+    [FACILITY_ID, 'medical', 'medical_risk', 'seniority']
+  );
+  const byCode = new Map(rows.map((row) => [row.code, row]));
+  assert.equal(byCode.size, 2);
+
+  const seniority = byCode.get('seniority');
+  assert.equal(seniority.label, 'Seniority Bonus (regression)');
+  assert.equal(seniority.label_fr, "Prime d'ancienneté (régression)");
+  assert.equal(seniority.calc_type, 'seniority_scale');
+  assert.equal(Number(seniority.enabled), 1);
+  assert.equal(seniority.pct_value, null);
+  assert.equal(seniority.fixed_amount, null);
+  assert.equal(seniority.per_unit_amount, null);
+  assert.equal(Number(seniority.cap_pct), 35);
+  assert.equal(seniority.legal_basis, 'Labour Code Art.68 (regression)');
+  assert.equal(seniority.description, 'Regression coverage for the seniority row.');
+  assert.equal(seniority.applies_to_roles, null);
+  assert.equal(Number(seniority.sort_order), 1);
+
+  const medicalRisk = byCode.get('medical_risk');
+  assert.equal(medicalRisk.label, 'Medical Risk Allowance (regression)');
+  assert.equal(medicalRisk.label_fr, 'Prime de risque médical (régression)');
+  assert.equal(medicalRisk.calc_type, 'pct_basic');
+  assert.equal(Number(medicalRisk.enabled), 0);
+  assert.equal(Number(medicalRisk.pct_value), 12.5);
+  assert.equal(medicalRisk.fixed_amount, null);
+  assert.equal(medicalRisk.per_unit_amount, null);
+  assert.equal(medicalRisk.cap_pct, null);
+  assert.equal(medicalRisk.applies_to_roles, '[2,7]');
+  assert.equal(medicalRisk.legal_basis, 'Regression legal basis');
+  assert.equal(medicalRisk.description, 'Regression coverage for the medical risk row.');
+  assert.equal(Number(medicalRisk.sort_order), 4);
+
+  await withApp(makeApp(registerHrPayrollRoutes, pool), async (base) => {
+    const res = await request(base, '/payroll/settings?sector=medical&tab=allowances');
+    assert.equal(res.status, 200);
+    const body = JSON.parse(res.text);
+    assert.equal(body.view, 'payroll-settings');
+    const saved = new Map(body.locals.allowanceSettings.map((row) => [row.code, row]));
+    assert.equal(saved.get('seniority').label, 'Seniority Bonus (regression)');
+    assert.equal(Number(saved.get('seniority').cap_pct), 35);
+    assert.equal(saved.get('medical_risk').label, 'Medical Risk Allowance (regression)');
+    assert.equal(Number(saved.get('medical_risk').enabled), 0);
+    assert.equal(Number(saved.get('medical_risk').pct_value), 12.5);
+  });
+});

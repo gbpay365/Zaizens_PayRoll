@@ -9,6 +9,7 @@ const L = require('../lib/leaveSystem');
 const W = require('../lib/leaveWorkflow');
 const Accrual = require('../lib/leaveAccrual');
 const AttendancePolicy = require('../lib/attendancePolicy');
+const Maintenance = require('../lib/maintenanceScheduler');
 const { logAdminAction } = require('../lib/adminAudit');
 
 const UPLOAD_DIR = path.join(__dirname, '..', 'public', 'uploads', 'leave');
@@ -70,6 +71,61 @@ function employeeName(row) {
 function csv(value) {
   const s = String(value == null ? '' : value);
   return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function maintenanceTaskLabel(task) {
+  const labels = { leave_carryover: 'Carry-over', leave_accrual: 'Accrual', leave_digest: 'Email digest' };
+  const key = String(task || '');
+  return labels[key] || key.replace(/_/g, ' ') || '—';
+}
+
+function formatMaintenanceTime(value) {
+  if (!value) return '—';
+  const date = value instanceof Date ? value : new Date(String(value).replace(' ', 'T'));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+}
+
+function formatMaintenanceDuration(seconds) {
+  if (seconds == null) return '—';
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+  return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+}
+
+/**
+ * A run's detail is either JSON from a completed task or plain error/digest text.
+ */
+function parseMaintenanceDetail(task, detail) {
+  const raw = String(detail == null ? '' : detail).trim();
+  if (!raw) return { note: 'No detail was recorded for this run.', changes: [], changeCount: 0 };
+  let parsed = null;
+  try { parsed = JSON.parse(raw); } catch (_) { parsed = null; }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { note: raw.slice(0, 500), changes: [], changeCount: 0 };
+  }
+  const rows = Array.isArray(parsed.rows) ? parsed.rows : [];
+  const changes = rows.slice(0, 25).map((row) => ({
+    employee: String(row.employee_name || `Employee #${row.employee_id || '—'}`),
+    leaveType: String(row.leave_type || '—').replace(/_/g, ' '),
+    days: n(row.days),
+  }));
+  const count = task === 'leave_carryover' ? n(parsed.applied) : n(parsed.updated);
+  const employees = n(parsed.employees) || new Set(rows.map((row) => row.employee_id)).size;
+  let note;
+  if (!count || !rows.length) {
+    note = task === 'leave_carryover'
+      ? 'No balances needed carrying over.'
+      : 'All balances already matched the entitlement.';
+  } else if (task === 'leave_carryover') {
+    note = `${count} balance(s) carried over for ${employees} employee(s).`;
+  } else {
+    note = `${count} balance(s) accrued for ${employees} employee(s).`;
+  }
+  return { note, changes, changeCount: rows.length };
 }
 
 module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
@@ -764,6 +820,121 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
       res.redirect(back + '&msg=' + encodeURIComponent(`Entitlement accrual complete: ${updated} balance(s) updated.`));
     } catch (e) {
       res.redirect(back + '&err=' + encodeURIComponent(e.message));
+    }
+  });
+
+  app.get('/hr/leave-maintenance', requireAuth, requireLeaveAdmin, async (req, res) => {
+    try {
+      await ensureSchema();
+      await Maintenance.ensureMaintenanceSchema(pool);
+      const fid = facilityId(req);
+      const [rows] = await pool.query(
+        `SELECT id, task, run_key, status, detail, started_at, finished_at
+           FROM tbl_hms_maintenance_run
+          WHERE facility_id = ?
+          ORDER BY started_at DESC, id DESC
+          LIMIT 100`,
+        [fid]
+      ).catch(() => [[]]);
+      const [stats] = await pool.query(
+        `SELECT task, status, COUNT(*) AS total, MAX(finished_at) AS last_at
+           FROM tbl_hms_maintenance_run
+          WHERE facility_id = ?
+          GROUP BY task, status`,
+        [fid]
+      ).catch(() => [[]]);
+
+      const runs = (rows || []).map((row) => {
+        const parsed = parseMaintenanceDetail(row.task, row.detail);
+        const started = row.started_at ? new Date(row.started_at) : null;
+        const finished = row.finished_at ? new Date(row.finished_at) : null;
+        const elapsed = started && finished && !Number.isNaN(finished - started)
+          ? Math.max(0, Math.round((finished - started) / 1000))
+          : null;
+        return {
+          ...row,
+          taskLabel: maintenanceTaskLabel(row.task),
+          statusKey: String(row.status || '').toLowerCase(),
+          startedDisplay: formatMaintenanceTime(row.started_at),
+          finishedDisplay: formatMaintenanceTime(row.finished_at),
+          durationLabel: formatMaintenanceDuration(elapsed),
+          note: parsed.note,
+          changes: parsed.changes,
+          changeCount: parsed.changeCount,
+        };
+      });
+
+      const summary = { total: 0, success: 0, failed: 0, running: 0, lastSuccess: '—', lastFailure: '—' };
+      let lastSuccessAt = null;
+      let lastFailureAt = null;
+      for (const stat of stats || []) {
+        const count = n(stat.total);
+        summary.total += count;
+        const status = String(stat.status || '').toLowerCase();
+        const at = stat.last_at ? new Date(stat.last_at) : null;
+        if (status === 'success') {
+          summary.success += count;
+          if (at && !Number.isNaN(at.getTime()) && (!lastSuccessAt || at > lastSuccessAt)) lastSuccessAt = at;
+        } else if (status === 'failed') {
+          summary.failed += count;
+          if (at && !Number.isNaN(at.getTime()) && (!lastFailureAt || at > lastFailureAt)) lastFailureAt = at;
+        } else if (status === 'running') {
+          summary.running += count;
+        }
+      }
+      if (lastSuccessAt) summary.lastSuccess = formatMaintenanceTime(lastSuccessAt);
+      if (lastFailureAt) summary.lastFailure = formatMaintenanceTime(lastFailureAt);
+
+      const notes = await notificationsFor(req);
+      res.render('hr-leave-maintenance', {
+        title: 'Leave maintenance — ZAIZENS',
+        runs,
+        summary,
+        notifications: notes.rows,
+        unreadNotifications: notes.unread,
+        flash: req.query.msg || null,
+        error: req.query.err || null,
+      });
+    } catch (e) {
+      res.status(500).render('error', { title: 'Error', message: e.message, status: 500 });
+    }
+  });
+
+  app.post('/hr/leave-maintenance/run', requireAuth, requireLeaveAdmin, async (req, res) => {
+    const fid = facilityId(req);
+    const back = '/hr/leave-maintenance';
+    try {
+      await ensureSchema();
+      await Maintenance.ensureMaintenanceSchema(pool);
+      const out = await Maintenance.runDailyLeaveMaintenance(pool, {
+        facilityId: fid,
+        actorId: sessionEmpId(req),
+        notify: false,
+      });
+      const result = (out.results || []).find((row) => Number(row.facilityId) === fid) || (out.results || [])[0] || {};
+      const carry = result.carryOver || {};
+      const accrual = result.accrual || {};
+      const parts = [
+        carry.skipped
+          ? `Carry-over for ${result.year} was already completed.`
+          : `Carry-over: ${n(carry.applied)} balance(s) moved.`,
+        accrual.skipped
+          ? 'Accrual was already completed today.'
+          : `Accrual: ${n(accrual.updated)} balance(s) updated.`,
+      ];
+      const errors = result.errors || [];
+      await audit(
+        req,
+        'hr.leave.maintenance.run',
+        null,
+        `Manual maintenance run for ${result.year}: ${parts.join(' ')}${errors.length ? ' Errors: ' + errors.join(' | ') : ''}`
+      );
+      if (errors.length) {
+        return res.redirect(back + '?err=' + encodeURIComponent(`Maintenance run had problems: ${errors.join(' | ')}`));
+      }
+      res.redirect(back + '?msg=' + encodeURIComponent(`Maintenance run finished. ${parts.join(' ')}`));
+    } catch (e) {
+      res.redirect(back + '?err=' + encodeURIComponent(e.message));
     }
   });
 

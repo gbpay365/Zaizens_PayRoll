@@ -328,6 +328,7 @@ test('HR leave policy, balances, calendar, reports and employee settings render'
     ['/hr/leave-calendar', 'Leave calendar'],
     ['/hr/leave-reports', 'Leave reports'],
     ['/hr/leave-employees', 'Employee leave settings'],
+    ['/hr/leave-maintenance', 'Leave maintenance'],
     ['/hr/notifications', 'Notifications'],
   ];
   for (const [path, heading] of screens) {
@@ -335,6 +336,14 @@ test('HR leave policy, balances, calendar, reports and employee settings render'
     expect(response.status(), `${path} status`).toBe(200);
     await expect(page.locator('h1').first(), `${path} heading`).toContainText(heading);
   }
+
+  await page.goto(`${baseURL}/hr/leave-maintenance`);
+  page.once('dialog', (dialog) => dialog.accept());
+  await Promise.all([
+    page.waitForURL(/leave-maintenance\?msg=/, { timeout: 20_000 }),
+    page.getByRole('button', { name: /run now/i }).click(),
+  ]);
+  await expect(page.locator('.pay-flash-msg')).toContainText('Maintenance run finished');
 });
 
 test('hourly permission records a partial-day request and partial attendance note', async ({ page }) => {

@@ -1,0 +1,96 @@
+<%- include('partials/payroll-layout-start', { payNavActive: 'leaveadmin', showHrLeaveAdmin: true }) %>
+<%
+var _runs = runs || [];
+var _summary = summary || {};
+var _statusLabel = function (s) {
+  var v = String(s || '');
+  return v ? v.charAt(0).toUpperCase() + v.slice(1) : '—';
+};
+var _statusBadge = function (s) {
+  if (s === 'success') return 'pay-badge--ok';
+  if (s === 'failed') return 'pay-badge--error';
+  return 'pay-badge--pending';
+};
+%>
+
+<div class="sage-page-head">
+  <div>
+    <p class="sage-eyebrow"><%= company.legalName %> &middot; HR &middot; Leave maintenance</p>
+    <h1>Leave maintenance</h1>
+    <p class="sage-sub">Every carry-over, accrual and digest the scheduler has recorded for this facility, with the balances each run changed.</p>
+  </div>
+  <div class="sage-head-actions no-print">
+    <form method="POST" action="/hr/leave-maintenance/run" class="mb-0" data-pay-confirm="Run carry-over and accrual for this facility now?">
+      <button type="submit" class="btn btn-sage"><i class="fa fa-play mr-1"></i> Run now</button>
+    </form>
+    <a href="/hr/leave-balances" class="btn btn-sage-ghost"><i class="fa fa-balance-scale mr-1"></i> Balances</a>
+    <a href="/hr/leave-types" class="btn btn-sage-ghost"><i class="fa fa-sliders mr-1"></i> Leave policy</a>
+  </div>
+</div>
+
+<div class="sage-stats">
+  <div class="sage-stat">
+    <div class="sage-stat-label">Runs recorded</div>
+    <div class="sage-stat-value"><%= _summary.total || 0 %></div>
+    <p class="sage-stat-foot">This facility</p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">Successful</div>
+    <div class="sage-stat-value"><%= _summary.success || 0 %></div>
+    <p class="sage-stat-foot">Last <%= _summary.lastSuccess || '—' %></p>
+  </div>
+  <div class="sage-stat <%= (_summary.failed || 0) > 0 ? 'sage-stat--warn' : '' %>">
+    <div class="sage-stat-label">Failed</div>
+    <div class="sage-stat-value"><%= _summary.failed || 0 %></div>
+    <p class="sage-stat-foot"><%= (_summary.failed || 0) > 0 ? 'Last ' + _summary.lastFailure : 'No failures' %></p>
+  </div>
+  <div class="sage-stat">
+    <div class="sage-stat-label">In progress</div>
+    <div class="sage-stat-value"><%= _summary.running || 0 %></div>
+    <p class="sage-stat-foot">Started, not finished</p>
+  </div>
+</div>
+
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>Recent runs</h2><p class="sage-card-sub">Newest first &middot; the latest <%= _runs.length %> record(s)</p></div></div>
+  <div class="pay-table-wrap">
+    <table class="pay-table">
+      <thead>
+        <tr><th>Started</th><th>Task</th><th>Period</th><th>Status</th><th class="pay-num">Duration</th><th>What changed</th></tr>
+      </thead>
+      <tbody>
+        <% if (!_runs.length) { %>
+        <tr><td colspan="6" class="sage-empty"><i class="fa fa-history"></i>No maintenance runs recorded yet. The scheduler writes a row the first time it runs inside the configured maintenance hour.</td></tr>
+        <% } %>
+        <% _runs.forEach(function (run) { %>
+        <tr>
+          <td>
+            <strong style="font-weight:600;"><%= run.startedDisplay %></strong>
+            <br><span class="sage-muted" style="font-size:12px;">Finished <%= run.finishedDisplay %></span>
+          </td>
+          <td><%= run.taskLabel %></td>
+          <td><%= run.run_key %></td>
+          <td><span class="pay-badge <%= _statusBadge(run.statusKey) %>"><%= _statusLabel(run.statusKey) %></span></td>
+          <td class="pay-num"><%= run.durationLabel %></td>
+          <td style="max-width:460px;">
+            <span style="font-size:13px;"><%= run.note %></span>
+            <% if (run.changes.length) { %>
+            <details style="margin-top:6px;">
+              <summary style="cursor:pointer;font-size:12px;color:#2f6b52;">View <%= run.changeCount %> change(s)</summary>
+              <ul style="margin:6px 0 0 16px;padding:0;font-size:12px;line-height:1.6;">
+                <% run.changes.forEach(function (change) { %>
+                <li><%= change.employee %> &middot; <%= change.leaveType %> &middot; <%= change.days > 0 ? '+' : '' %><%= change.days %> day(s)</li>
+                <% }); %>
+              </ul>
+              <% if (run.changeCount > run.changes.length) { %><p class="sage-muted" style="font-size:12px;margin:6px 0 0;">Showing the first <%= run.changes.length %>; the leave ledger holds the full list.</p><% } %>
+            </details>
+            <% } %>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<%- include('partials/payroll-layout-end') %>

@@ -67,10 +67,21 @@ The application shell uses the ZAIZENS identity: a light navigation rail with gr
 | Leave balances | `/hr/leave-balances` | HR / admin |
 | Public holidays | `/hr/holidays` | HR / admin |
 | Attendance register | `/hr/attendance` | HR / payroll write |
+| Leave maintenance | `/hr/leave-maintenance` | HR / admin |
 
 Employees can be deleted one at a time or in bulk from the Employees register; deleting an employee also removes their login account, pay profile, payroll lines, leave records and attendance. Super Admin accounts and your own account are protected, and every deletion is written to the admin audit trail.
 
 Leave balances show entitlement, days taken (approved), days pending and the remaining balance; a default-entitlement control writes the same annual days to every active employee in one step. Employee records in `/payroll/employees/:id` show the same leave/attendance data next to the salary breakdown, and payslips, payroll runs and tax declarations all read the same payroll tables. Non-admin users land on `/hr` after sign-in and are redirected there if they open a payroll-only page.
+
+### Leave maintenance, filters and alerts
+
+`/hr/leave-maintenance` shows every carry-over, accrual and digest run recorded in `tbl_hms_maintenance_run` — newest first, with its status, duration, triggering user (`Scheduler` for unattended runs), the balances it changed, and a filter for task type, status and start date. A **Task health** table above the filters summarises each task facility-wide and flags one that is failing repeatedly (“Failed N runs in a row”), regardless of the filters applied to the run list.
+
+Filters are remembered per HR account in `tbl_hms_maintenance_filter`: opening the page without query parameters restores the last applied task, status and date range, including after visiting another page and coming back. **Clear** (`?clear=1`) deletes the saved row and shows the unfiltered log. **Run now** performs carry-over and accrual for the current facility immediately and returns to the unfiltered log (`?all=1`) without changing the saved filter or sending email.
+
+Email is optional and depends on SMTP. Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` and `SMTP_FROM`, plus `HR_MAINTENANCE_NOTIFY_EMAILS` for the recipient mailbox (it falls back to the address in `SMTP_FROM`). With SMTP configured, the scheduler sends a daily digest after a scheduled run, and a failure alert when that run records an error. Alerts are limited to one per facility per day and appear in the log as a **Failure alert** row; a forced run reports again. Without SMTP both messages are logged and skipped, and the run outcomes still record in the log.
+
+The scheduler is in-process: `HR_MAINTENANCE_SCHEDULER_ENABLED` turns it on, `HR_MAINTENANCE_HOUR` (0–23, server time) is the only hour it runs, and `HR_MAINTENANCE_INTERVAL_MINUTES` is how often it checks for that hour. Every task is keyed, so repeated checks and retries are idempotent.
 
 ## Admin module
 

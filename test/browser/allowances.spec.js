@@ -340,25 +340,52 @@ test('HR leave policy, balances, calendar, reports and employee settings render'
   await page.goto(`${baseURL}/hr/leave-maintenance`);
   page.once('dialog', (dialog) => dialog.accept());
   await Promise.all([
-    page.waitForURL(/leave-maintenance\?msg=/, { timeout: 20_000 }),
+    page.waitForURL(/leave-maintenance\?all=1&msg=/, { timeout: 20_000 }),
     page.getByRole('button', { name: /run now/i }).click(),
   ]);
   await expect(page.locator('.pay-flash-msg')).toContainText('Maintenance run finished');
-  const carryRow = page.locator('table tbody tr').filter({ hasText: 'Carry-over' }).first();
+  const carryRow = page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' }).first();
   await expect(carryRow).toContainText('Payroll Admin');
 
   await page.goto(`${baseURL}/hr/leave-maintenance?status=failed`);
-  await expect(page.locator('table tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
   await expect(page.locator('.sage-empty')).toContainText('No maintenance runs match these filters');
 
-  await page.goto(`${baseURL}/hr/leave-maintenance`);
+  await page.goto(`${baseURL}/hr/leave-maintenance?clear=1`);
   await page.locator('select[name="task"]').selectOption('leave_accrual');
   await Promise.all([
     page.waitForURL(/task=leave_accrual/, { timeout: 15_000 }),
     page.getByRole('button', { name: /apply filters/i }).click(),
   ]);
-  await expect(page.locator('table tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
-  await expect(page.locator('table tbody tr').filter({ hasText: 'Accrual' })).toHaveCount(1);
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Accrual' })).toHaveCount(1);
+
+  await page.goto(`${baseURL}/hr/leave-maintenance`);
+  await expect(page.locator('select[name="task"]')).toHaveValue('leave_accrual');
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' })).toHaveCount(0);
+  await page.getByRole('link', { name: /^clear$/i }).click();
+  await expect(page.locator('select[name="task"]')).toHaveValue('');
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' }).first()).toBeVisible();
+
+  await page.goto(`${baseURL}/hr/leave-maintenance?from=2000-01-01&to=2000-01-02`);
+  await expect(page.locator('.sage-empty')).toContainText('No maintenance runs match these filters');
+  await page.goto(`${baseURL}/hr/leave-maintenance?from=2000-01-01&to=2999-12-31`);
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' }).first()).toBeVisible();
+  await page.goto(`${baseURL}/hr/leave-maintenance`);
+  await expect(page.locator('input[name="from"]')).toHaveValue('2000-01-01');
+  await expect(page.locator('input[name="to"]')).toHaveValue('2999-12-31');
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' }).first()).toBeVisible();
+  await page.goto(`${baseURL}/hr/leave-maintenance?from=not-a-date`);
+  await expect(page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' }).first()).toBeVisible();
+
+  await pool.query(
+    `INSERT INTO tbl_hms_maintenance_run (facility_id, task, run_key, status, detail, started_at, finished_at)
+     VALUES (1, 'leave_digest', 'health-fail-1', 'failed', 'SMTP refused', DATE_SUB(NOW(), INTERVAL 4 MINUTE), DATE_SUB(NOW(), INTERVAL 3 MINUTE)),
+            (1, 'leave_digest', 'health-fail-2', 'failed', 'SMTP refused', DATE_SUB(NOW(), INTERVAL 2 MINUTE), DATE_SUB(NOW(), INTERVAL 1 MINUTE))`
+  );
+  await page.goto(`${baseURL}/hr/leave-maintenance`);
+  await expect(page.locator('#maintenanceHealth tbody tr').filter({ hasText: 'Carry-over' })).toContainText('Last run succeeded');
+  await expect(page.locator('#maintenanceHealth tbody tr').filter({ hasText: 'Email digest' })).toContainText('Failed 2 runs in a row');
 });
 
 test('hourly permission records a partial-day request and partial attendance note', async ({ page }) => {

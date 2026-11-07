@@ -73,8 +73,16 @@ function csv(value) {
   return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+function maintenanceFilterDate(value) {
+  const raw = value instanceof Date
+    ? `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+    : String(value == null ? '' : value).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+  return L.parseDate(raw) ? raw : '';
+}
+
 function maintenanceTaskLabel(task) {
-  const labels = { leave_carryover: 'Carry-over', leave_accrual: 'Accrual', leave_digest: 'Email digest' };
+  const labels = { leave_carryover: 'Carry-over', leave_accrual: 'Accrual', leave_digest: 'Email digest', leave_alert: 'Failure alert' };
   const key = String(task || '');
   return labels[key] || key.replace(/_/g, ' ') || '—';
 }
@@ -828,12 +836,56 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
       await ensureSchema();
       await Maintenance.ensureMaintenanceSchema(pool);
       const fid = facilityId(req);
-      const requestedTask = String(req.query.task || '').trim();
-      const requestedStatus = String(req.query.status || '').trim().toLowerCase();
-      const taskFilter = ['leave_carryover', 'leave_accrual', 'leave_digest'].includes(requestedTask) ? requestedTask : '';
+      // Each HR user gets their last filter back when they open the page bare.
+      const filterKeys = ['task', 'status', 'from', 'to'];
+      const resetRequested = String(req.query.clear || '') === '1';
+      const showAll = String(req.query.all || '') === '1';
+      const explicitFilters = resetRequested
+        || filterKeys.some((key) => Object.prototype.hasOwnProperty.call(req.query, key));
+      const uid = sessionEmpId(req);
+      let savedFilter = null;
+      if (!explicitFilters && !showAll && uid > 0) {
+        const [[row]] = await pool.query(
+          'SELECT task, status, from_date, to_date FROM tbl_hms_maintenance_filter WHERE employee_id = ? LIMIT 1',
+          [uid]
+        ).catch(() => [[null]]);
+        savedFilter = row || null;
+      }
+      const filterSource = explicitFilters
+        ? { task: req.query.task, status: req.query.status, from: req.query.from, to: req.query.to }
+        : {
+          task: savedFilter && savedFilter.task,
+          status: savedFilter && savedFilter.status,
+          from: savedFilter && savedFilter.from_date,
+          to: savedFilter && savedFilter.to_date,
+        };
+      const requestedTask = String(filterSource.task || '').trim();
+      const requestedStatus = String(filterSource.status || '').trim().toLowerCase();
+      const taskFilter = ['leave_carryover', 'leave_accrual', 'leave_digest', 'leave_alert'].includes(requestedTask) ? requestedTask : '';
       const statusFilter = ['running', 'success', 'failed'].includes(requestedStatus) ? requestedStatus : '';
+      const fromDate = maintenanceFilterDate(filterSource.from);
+      const toDate = maintenanceFilterDate(filterSource.to);
+      if (uid > 0 && resetRequested) {
+        await pool.query('DELETE FROM tbl_hms_maintenance_filter WHERE employee_id = ?', [uid]).catch(() => {});
+      } else if (uid > 0 && explicitFilters) {
+        await pool.query(
+          `INSERT INTO tbl_hms_maintenance_filter (employee_id, task, status, from_date, to_date)
+           VALUES (?,?,?,?,?)
+           ON DUPLICATE KEY UPDATE task = VALUES(task), status = VALUES(status),
+             from_date = VALUES(from_date), to_date = VALUES(to_date)`,
+          [uid, taskFilter || null, statusFilter || null, fromDate || null, toDate || null]
+        ).catch(() => {});
+      }
       const where = ['facility_id = ?'];
       const whereParams = [fid];
+      if (fromDate) {
+        where.push('DATE(started_at) >= ?');
+        whereParams.push(fromDate);
+      }
+      if (toDate) {
+        where.push('DATE(started_at) <= ?');
+        whereParams.push(toDate);
+      }
       if (taskFilter) {
         where.push('task = ?');
         whereParams.push(taskFilter);
@@ -902,12 +954,75 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
       if (lastSuccessAt) summary.lastSuccess = formatMaintenanceTime(lastSuccessAt);
       if (lastFailureAt) summary.lastFailure = formatMaintenanceTime(lastFailureAt);
 
+      // Health ignores the table filters so a filtered view never hides a failing task.
+      const [healthStats] = await pool.query(
+        `SELECT task, status, COUNT(*) AS total
+           FROM tbl_hms_maintenance_run
+          WHERE facility_id = ?
+          GROUP BY task, status`,
+        [fid]
+      ).catch(() => [[]]);
+      const [healthRecent] = await pool.query(
+        `SELECT task, status, started_at
+           FROM tbl_hms_maintenance_run
+          WHERE facility_id = ?
+          ORDER BY started_at DESC, id DESC
+          LIMIT 300`,
+        [fid]
+      ).catch(() => [[]]);
+      const health = ['leave_carryover', 'leave_accrual', 'leave_digest'].map((task) => {
+        const counts = { success: 0, failed: 0, running: 0 };
+        for (const stat of healthStats || []) {
+          if (String(stat.task) !== task) continue;
+          const key = String(stat.status || '').toLowerCase();
+          if (key in counts) counts[key] += n(stat.total);
+        }
+        const taskRuns = (healthRecent || []).filter((row) => String(row.task) === task);
+        const latest = taskRuns[0] || null;
+        const latestStatus = latest ? String(latest.status || '').toLowerCase() : '';
+        let streak = 0;
+        for (const row of taskRuns) {
+          if (String(row.status || '').toLowerCase() !== 'failed') break;
+          streak += 1;
+        }
+        let note = 'No runs recorded yet.';
+        let tone = 'pending';
+        if (latestStatus === 'failed') {
+          note = streak > 1 ? `Failed ${streak} runs in a row.` : 'Latest run failed.';
+          tone = 'error';
+        } else if (latestStatus === 'running') {
+          note = 'Running now.';
+        } else if (latestStatus === 'success') {
+          note = 'Last run succeeded.';
+          tone = 'ok';
+        }
+        return {
+          task,
+          label: maintenanceTaskLabel(task),
+          latestAt: latest ? formatMaintenanceTime(latest.started_at) : '—',
+          latestStatus,
+          success: counts.success,
+          failed: counts.failed,
+          running: counts.running,
+          streak,
+          note,
+          tone,
+        };
+      });
+
       const notes = await notificationsFor(req);
       res.render('hr-leave-maintenance', {
         title: 'Leave maintenance — ZAIZENS',
         runs,
         summary,
-        filters: { task: taskFilter, status: statusFilter, hasFilters: Boolean(taskFilter || statusFilter) },
+        filters: {
+          task: taskFilter,
+          status: statusFilter,
+          from: fromDate,
+          to: toDate,
+          hasFilters: Boolean(taskFilter || statusFilter || fromDate || toDate),
+        },
+        health,
         notifications: notes.rows,
         unreadNotifications: notes.unread,
         flash: req.query.msg || null,
@@ -950,9 +1065,9 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
         `Manual maintenance run for ${result.year}: ${parts.join(' ')}${errors.length ? ' Errors: ' + errors.join(' | ') : ''}`
       );
       if (errors.length) {
-        return res.redirect(back + '?err=' + encodeURIComponent(`Maintenance run had problems: ${errors.join(' | ')}`));
+        return res.redirect(back + '?all=1&err=' + encodeURIComponent(`Maintenance run had problems: ${errors.join(' | ')}`));
       }
-      res.redirect(back + '?msg=' + encodeURIComponent(`Maintenance run finished. ${parts.join(' ')}`));
+      res.redirect(back + '?all=1&msg=' + encodeURIComponent(`Maintenance run finished. ${parts.join(' ')}`));
     } catch (e) {
       res.redirect(back + '?err=' + encodeURIComponent(e.message));
     }

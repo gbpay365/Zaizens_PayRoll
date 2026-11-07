@@ -5,6 +5,9 @@ var _summary = summary || {};
 var _filters = filters || {};
 var _task = _filters.task || '';
 var _status = _filters.status || '';
+var _from = _filters.from || '';
+var _to = _filters.to || '';
+var _health = health || [];
 var _statusLabel = function (s) {
   var v = String(s || '');
   return v ? v.charAt(0).toUpperCase() + v.slice(1) : '—';
@@ -12,6 +15,11 @@ var _statusLabel = function (s) {
 var _statusBadge = function (s) {
   if (s === 'success') return 'pay-badge--ok';
   if (s === 'failed') return 'pay-badge--error';
+  return 'pay-badge--pending';
+};
+var _toneBadge = function (tone) {
+  if (tone === 'ok') return 'pay-badge--ok';
+  if (tone === 'error') return 'pay-badge--error';
   return 'pay-badge--pending';
 };
 %>
@@ -54,10 +62,45 @@ var _statusBadge = function (s) {
   </div>
 </div>
 
+<section class="sage-card">
+  <div class="sage-card-head"><div><h2>Task health</h2><p class="sage-card-sub">Facility-wide across every recorded run; the filters below only narrow the run list and counts</p></div></div>
+  <div class="pay-table-wrap">
+    <table class="pay-table" id="maintenanceHealth">
+      <thead>
+        <tr><th>Task</th><th>Latest run</th><th>Latest status</th><th class="pay-num">Successful</th><th class="pay-num">Failed</th><th>Health</th></tr>
+      </thead>
+      <tbody>
+        <% _health.forEach(function (item) { %>
+        <tr>
+          <td><strong style="font-weight:600;"><%= item.label %></strong></td>
+          <td><%= item.latestAt %><% if (item.latestStatus === 'running') { %> <span class="sage-muted" style="font-size:12px;">started</span><% } %></td>
+          <td><% if (item.latestStatus) { %><span class="pay-badge <%= _statusBadge(item.latestStatus) %>"><%= _statusLabel(item.latestStatus) %></span><% } else { %><span class="sage-muted">—</span><% } %></td>
+          <td class="pay-num"><%= item.success %></td>
+          <td class="pay-num"><%= item.failed %></td>
+          <td>
+            <span class="pay-badge <%= _toneBadge(item.tone) %>">
+              <i class="fa <%= item.tone === 'error' ? 'fa-exclamation-triangle' : (item.tone === 'ok' ? 'fa-check' : 'fa-clock-o') %> mr-1"></i><%= item.note %>
+            </span>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</section>
+
 <section class="sage-card no-print">
-  <div class="sage-card-head"><div><h2>Filters</h2><p class="sage-card-sub">Narrow the log by task or outcome; the counts above describe the same selection</p></div></div>
+  <div class="sage-card-head"><div><h2>Filters</h2><p class="sage-card-sub">Narrow the log by task, outcome or start date; the counts above describe the same selection, and your last choice is remembered for this account</p></div></div>
   <form method="GET" action="/hr/leave-maintenance" class="sage-card-body">
     <div class="sage-form-grid">
+      <div class="sage-field">
+        <label for="fromFilter">From</label>
+        <input type="date" id="fromFilter" name="from" class="form-control" value="<%= _from %>">
+      </div>
+      <div class="sage-field">
+        <label for="toFilter">To</label>
+        <input type="date" id="toFilter" name="to" class="form-control" value="<%= _to %>">
+      </div>
       <div class="sage-field">
         <label for="taskFilter">Task</label>
         <select id="taskFilter" name="task" class="form-control">
@@ -65,6 +108,7 @@ var _statusBadge = function (s) {
           <option value="leave_carryover" <%= _task === 'leave_carryover' ? 'selected' : '' %>>Carry-over</option>
           <option value="leave_accrual" <%= _task === 'leave_accrual' ? 'selected' : '' %>>Accrual</option>
           <option value="leave_digest" <%= _task === 'leave_digest' ? 'selected' : '' %>>Email digest</option>
+          <option value="leave_alert" <%= _task === 'leave_alert' ? 'selected' : '' %>>Failure alert</option>
         </select>
       </div>
       <div class="sage-field">
@@ -79,7 +123,7 @@ var _statusBadge = function (s) {
     </div>
     <div class="d-flex align-items-center" style="gap:8px;">
       <button type="submit" class="btn btn-sage-ghost"><i class="fa fa-filter mr-1"></i> Apply filters</button>
-      <% if (_filters.hasFilters) { %><a href="/hr/leave-maintenance" class="btn btn-sage-ghost">Clear</a><% } %>
+      <% if (_filters.hasFilters) { %><a href="/hr/leave-maintenance?clear=1" class="btn btn-sage-ghost">Clear</a><% } %>
     </div>
   </form>
 </section>
@@ -87,7 +131,7 @@ var _statusBadge = function (s) {
 <section class="sage-card">
   <div class="sage-card-head"><div><h2>Recent runs</h2><p class="sage-card-sub">Newest first &middot; <%= _runs.length %> record(s)<%= _filters.hasFilters ? ' matching these filters' : '' %></p></div></div>
   <div class="pay-table-wrap">
-    <table class="pay-table">
+    <table class="pay-table" id="maintenanceRuns">
       <thead>
         <tr><th>Started</th><th>Task</th><th>Period</th><th>Status</th><th>Triggered by</th><th class="pay-num">Duration</th><th>What changed</th></tr>
       </thead>

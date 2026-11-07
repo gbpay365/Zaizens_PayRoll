@@ -366,7 +366,10 @@ async function boot() {
 
   const maintenance = require('./lib/maintenanceScheduler').startMaintenanceScheduler(pool);
   if (maintenance.started) {
-    console.log(`[hr-maintenance] daily leave run scheduled at ${maintenance.hour}:00, checked every ${maintenance.intervalMinutes}m`);
+    console.log(
+      `[hr-maintenance] daily leave run scheduled at ${maintenance.hour}:00, checked every ${maintenance.intervalMinutes}m`
+        + (maintenance.mailReady ? '' : ' — email alerts disabled')
+    );
   } else {
     console.log(`[hr-maintenance] scheduler off (${maintenance.reason})`);
   }

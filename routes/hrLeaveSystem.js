@@ -1010,6 +1010,8 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
         };
       });
 
+      // Tell HR in the page itself when digests and failure alerts cannot go out.
+      const mailReadiness = Maintenance.mailReadiness();
       const notes = await notificationsFor(req);
       res.render('hr-leave-maintenance', {
         title: 'Leave maintenance — ZAIZENS',
@@ -1023,6 +1025,7 @@ module.exports = function registerHrLeaveSystem(app, pool, requireAuth, deps) {
           hasFilters: Boolean(taskFilter || statusFilter || fromDate || toDate),
         },
         health,
+        mailAlerts: { ready: mailReadiness.ready, configured: mailReadiness.configured },
         notifications: notes.rows,
         unreadNotifications: notes.unread,
         flash: req.query.msg || null,

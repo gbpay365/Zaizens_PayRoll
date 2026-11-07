@@ -357,6 +357,7 @@ test('HR leave policy, balances, calendar, reports and employee settings render'
     page.getByRole('button', { name: /run now/i }).click(),
   ]);
   await expect(page.locator('.pay-flash-msg')).toContainText('Maintenance run finished');
+  await expect(page.locator('#maintenanceMailNotice')).toContainText('Email alerts are off');
   const carryRow = page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Carry-over' }).first();
   await expect(carryRow).toContainText('Payroll Admin');
 

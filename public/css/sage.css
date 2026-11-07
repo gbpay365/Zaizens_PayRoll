@@ -642,6 +642,12 @@ body.hms-body--odoo .sage-main.o_action_manager {
 .sage-content .pay-badge--draft { background: #eef2f0; color: #4a5a53; }
 .sage-content .pay-badge--error { background: #fbe7e5; color: var(--sage-red); }
 
+/* Payroll-module pages (the leave maintenance log and others) are not wrapped in
+   .sage-content, so mirror the same status tones for them. */
+.pay-module .pay-badge--ok { background: #e4f5ea; color: #0a6b3d; }
+.pay-module .pay-badge--pending { background: #fdf1dc; color: #8a4c08; }
+.pay-module .pay-badge--error { background: #fbe7e5; color: var(--sage-red); }
+
 .sage-content .pay-input-xaf {
   max-width: 130px;
   text-align: right;

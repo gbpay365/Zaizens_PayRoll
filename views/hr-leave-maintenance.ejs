@@ -8,6 +8,7 @@ var _status = _filters.status || '';
 var _from = _filters.from || '';
 var _to = _filters.to || '';
 var _health = health || [];
+var _mail = mailAlerts || { ready: true };
 var _statusLabel = function (s) {
   var v = String(s || '');
   return v ? v.charAt(0).toUpperCase() + v.slice(1) : '—';
@@ -38,6 +39,18 @@ var _toneBadge = function (tone) {
     <a href="/hr/leave-types" class="btn btn-sage-ghost"><i class="fa fa-sliders mr-1"></i> Leave policy</a>
   </div>
 </div>
+
+<% if (!_mail.ready) { %>
+<div class="alert alert-warning no-print d-flex align-items-start" id="maintenanceMailNotice" role="status"
+     style="border-radius:10px;background:#fdf1dc;color:#8a4c08;font-weight:500;">
+  <i class="fa fa-exclamation-triangle mr-2" style="margin-top:3px;flex-shrink:0;"></i>
+  <span style="flex:1;">
+    <strong>Email alerts are off.</strong>
+    <%= _mail.configured ? 'No valid HR recipient address is set — add HR_MAINTENANCE_NOTIFY_EMAILS or an address inside SMTP_FROM.' : 'SMTP is not configured — set SMTP_HOST and SMTP_FROM to send the digest and failure alerts.' %>
+    Runs still record their outcomes in this log.
+  </span>
+</div>
+<% } %>
 
 <div class="sage-stats">
   <div class="sage-stat">

@@ -9,3 +9,6 @@ blob-report/
 
 public/uploads/leave/*
 !public/uploads/leave/.gitkeep
+
+# Local review screenshots
+screenshots/

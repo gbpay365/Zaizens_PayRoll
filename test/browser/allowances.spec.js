@@ -469,6 +469,23 @@ test('each HR account keeps its own maintenance filters', async ({ browser }) =>
   }
 });
 
+test('a running maintenance run says it is still running, not missing detail', async ({ page }) => {
+  await pool.query(
+    `INSERT INTO tbl_hms_maintenance_run
+       (facility_id, task, run_key, status, detail, started_at, finished_at)
+     VALUES (1, 'leave_digest', 'browser-running-note', 'running', NULL, NOW(), NULL)`
+  );
+
+  await login(page, ADMIN_USER, ADMIN_PASSWORD, /\/(payroll|hr)(\?|$)/);
+  // all=1 ignores any filter saved by another test in this suite.
+  await page.goto(`${baseURL}/hr/leave-maintenance?all=1`);
+
+  const runningRow = page.locator('#maintenanceRuns tbody tr').filter({ hasText: 'Still running' });
+  await expect(runningRow).toHaveCount(1);
+  await expect(runningRow).toContainText('Still running — the outcome will appear here when the task finishes.');
+  await expect(runningRow).not.toContainText('No detail was recorded for this run.');
+});
+
 test('no email-off banner once SMTP and a recipient are configured', async ({ page }) => {
   test.setTimeout(90_000);
   const config = resolveDbConfig(process.env);

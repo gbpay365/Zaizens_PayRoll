@@ -12,7 +12,8 @@
     "sync:core": "node scripts/resync-payroll-to-core.js",
     "sync:core:all": "node scripts/resync-payroll-to-core.js --all",
     "clear:core": "node scripts/clear-core-payroll-month.js",
-    "migrate:from-hms": "node scripts/migrate-from-hms.js"
+    "migrate:from-hms": "node scripts/migrate-from-hms.js",
+    "test:browser": "playwright test"
   },
   "engines": {
     "node": ">=18"
@@ -27,5 +28,8 @@
     "i18next": "^26.3.0",
     "i18next-fs-backend": "^2.6.6",
     "mysql2": "^3.6.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0"
   }
 }

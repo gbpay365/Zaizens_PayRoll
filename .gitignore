@@ -3,3 +3,6 @@ node_modules/
 .env.local
 .env.production
 tmp/
+test-results/
+playwright-report/
+blob-report/
